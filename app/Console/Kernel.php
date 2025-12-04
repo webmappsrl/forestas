@@ -37,18 +37,6 @@ class Kernel extends ConsoleKernel
         $schedule->command('osm2cai:calculate-region-hiking-routes-intersection')
             ->dailyAt('7:00')
             ->description('Calculate region hiking routes intersection');
-
-        $schedule->command('osm2cai:check_hr_existence_on_osm')
-            ->dailyAt('06:30')
-            ->description('Check hiking routes existence on OSM');
-
-        $schedule->command('osm2cai:fix-osmfeatures-sda')
-            ->dailyAt('07:00')
-            ->description('Update hiking routes status');
-
-        /*$schedule->command('osm2cai:cache-mitur-abruzzo-api --all')
-            ->weeklyOn(6, '09:00') // 6 = Saturday
-            ->description('Cache Mitur Abruzzo API (Saturday)');*/
     }
 
     /**
