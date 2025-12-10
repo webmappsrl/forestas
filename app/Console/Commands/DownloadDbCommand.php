@@ -42,7 +42,7 @@ class DownloadDbCommand extends Command
     {
         Log::info('db:download -> is started');
         $fileName = 'last-dump.sql.gz';
-        $lastDumpRemotePath = "maphub/ersaf/$fileName";
+        $lastDumpRemotePath = "maphub/forestas/$fileName";
         $localDirectory = 'database';
         $localRootPath = 'storage/app';
         $lastDumpLocalPath = "$localDirectory/$fileName";

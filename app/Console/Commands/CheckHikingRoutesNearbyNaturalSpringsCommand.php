@@ -26,7 +26,7 @@ class CheckHikingRoutesNearbyNaturalSpringsCommand extends Command
      */
     public function handle()
     {
-        $buffer = config('ersaf.ec_track_buffer');
+        $buffer = config('forestas.ec_track_buffer');
 
         if ($this->argument('id')) {
             CheckNearbyNaturalSpringsJob::dispatch($this->argument('id'), $buffer)->onQueue('geometric-computations');

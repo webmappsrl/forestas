@@ -9,9 +9,9 @@ jobs:
       postgres:
         image: postgis/postgis:16-3.4
         env:
-          POSTGRES_PASSWORD: ersaf
-          POSTGRES_DB: ersaf
-          POSTGRES_USER: ersaf
+          POSTGRES_PASSWORD: forestas
+          POSTGRES_DB: forestas
+          POSTGRES_USER: forestas
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
@@ -40,7 +40,7 @@ jobs:
       - name: Migrate
         run: php artisan migrate
         env:
-          PGPASSWORD: ersaf
+          PGPASSWORD: forestas
       - name: Clear the config cache
         run: php artisan config:clear
       - name: Optimize

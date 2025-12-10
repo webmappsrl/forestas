@@ -1,4 +1,4 @@
-# Docker Environment Rules per ersaf
+# Docker Environment Rules per forestas
 
 ## ⚠️ REGOLA CRITICA - LINGUA ITALIANA OBBLIGATORIA ⚠️
 **PRIMA DI TUTTO: RISPONDERE SEMPRE E SOLO IN ITALIANO**
@@ -9,7 +9,7 @@
 - **QUESTA REGOLA È PRIORITARIA** su tutte le altre regole
 
 ## ⚠️ REGOLA CRITICA - AMBIENTE DOCKERIZZATO OBBLIGATORIO ⚠️
-**ersaf SEMPRE gira in ambiente Docker - NON SUGGERIRE MAI INSTALLAZIONI DIRETTE**
+**forestas SEMPRE gira in ambiente Docker - NON SUGGERIRE MAI INSTALLAZIONI DIRETTE**
 - **NON SUGGERIRE MAI** installazioni dirette di PHP, PostgreSQL, Redis o altre dipendenze sul sistema host
 - **TUTTI I COMANDI** devono essere eseguiti all'interno dei container Docker appropriati
 - **VIOLAZIONE = FALLIMENTO TOTALE** - Se suggerisco installazioni dirette sto fallendo
@@ -25,10 +25,10 @@
 
 ---
 
-# Docker Environment Rules per ersaf
+# Docker Environment Rules per forestas
 
 ## Ambiente Dockerizzato
-- ersaf **SEMPRE** gira in un ambiente dockerizzato
+- forestas **SEMPRE** gira in un ambiente dockerizzato
 - Non suggerire mai installazioni dirette di PHP, PostgreSQL, Redis o altre dipendenze sul sistema host
 - Tutti i comandi devono essere eseguiti all'interno dei container Docker appropriati
 
@@ -36,7 +36,7 @@
 
 ### Container PHP-FPM (`phpfpm`)
 - **Image**: `wm-phpfpm:8.4-fpm`
-- **Container name**: `php81-${APP_NAME}` (solitamente `php81-ersaf`)
+- **Container name**: `php81-${APP_NAME}` (solitamente `php81-forestas`)
 - **PHP Version**: 8.4-fpm
 - **Working directory**: `/var/www/html/${DOCKER_PROJECT_DIR_NAME}`
 - **User**: `www-data` (id: 33)
@@ -83,7 +83,7 @@
        APP_NAME=$(grep "^APP_NAME=" .env | cut -d '=' -f2 | tr -d ' ' | tr -d '"' | tr -d "'")
    fi
    # Se non trovato, usare default
-   APP_NAME=${APP_NAME:-ersaf}
+   APP_NAME=${APP_NAME:-forestas}
    ```
 
 2. **Verificare i container attivi** (metodo più affidabile):
@@ -95,7 +95,7 @@
    docker ps --format "{{.Names}}" | grep -E "(php81|postgres|redis|elasticsearch|minio|mailpit)"
    ```
 
-3. **Usare i nomi determinati** invece di hardcodare "ersaf"
+3. **Usare i nomi determinati** invece di hardcodare "forestas"
 
 ### Pattern di Naming dei Container
 
@@ -104,7 +104,7 @@ Tutti i container seguono il pattern: `{SERVICE}-{APP_NAME}`
 
 Dove:
 - `{SERVICE}` = nome del servizio (php81, postgres, elasticsearch, minio, mailpit, redis)
-- `{APP_NAME}` = nome dell'applicazione (leggere da .env o usare default ersaf)
+- `{APP_NAME}` = nome dell'applicazione (leggere da .env o usare default forestas)
 
 ### Mapping Servizi → Nomi Container
 ```bash
@@ -117,31 +117,31 @@ minio-${APP_NAME}          # Container MinIO
 mailpit-${APP_NAME}        # Container MailPit
 ```
 
-### Esempi di Container Names (con APP_NAME=ersaf)
+### Esempi di Container Names (con APP_NAME=forestas)
 ```bash
 # Container PHP
-php81-ersaf
+php81-forestas
 
 # Container Database
-postgres-ersaf
+postgres-forestas
 
 # Container Redis
-redis-ersaf
+redis-forestas
 
 # Container Elasticsearch
-elasticsearch-ersaf
+elasticsearch-forestas
 
 # Container MinIO
-minio-ersaf
+minio-forestas
 
 # Container MailPit
-mailpit-ersaf
+mailpit-forestas
 ```
 
 ### Variabili Ambiente per Container Names
 ```bash
-APP_NAME=ersaf  # LEGGERE DA .env, non hardcodare!
-DOCKER_PROJECT_DIR_NAME=ersaf
+APP_NAME=forestas  # LEGGERE DA .env, non hardcodare!
+DOCKER_PROJECT_DIR_NAME=forestas
 DOCKER_PHP_PORT=9108
 DOCKER_PSQL_PORT=5508
 DOCKER_SERVE_PORT=8008 # solo locale
@@ -149,46 +149,46 @@ DB_HOST=db # sempre "db" (nome container)
 ```
 
 ### Cosa NON fare MAI:
-- ❌ Hardcodare "ersaf" nei comandi
-- ❌ Assumere che APP_NAME sia sempre "ersaf"
+- ❌ Hardcodare "forestas" nei comandi
+- ❌ Assumere che APP_NAME sia sempre "forestas"
 - ❌ Usare nomi di container senza verificarli
 
 ### Cosa fare SEMPRE:
 - ✅ Leggere APP_NAME dal file .env prima di usarlo
 - ✅ Verificare i container attivi con `docker ps`
 - ✅ Usare variabili invece di valori hardcodati
-- ✅ Se non trovo .env, usare default "ersaf" ma segnalarlo
+- ✅ Se non trovo .env, usare default "forestas" ma segnalarlo
 
 ## Comandi Essenziali
 
 ### Accesso ai Container
 ```bash
 # Container PHP (utente www-data)
-docker exec -it php81-ersaf bash
+docker exec -it php81-forestas bash
 
 # Container PHP (utente root per permessi)
-docker exec -u 0 -it php81-ersaf bash
+docker exec -u 0 -it php81-forestas bash
 
 # Container PostgreSQL
-docker exec -it postgres-ersaf bash
+docker exec -it postgres-forestas bash
 
 # Container Redis
-docker exec -it redis-ersaf bash
+docker exec -it redis-forestas bash
 
 # Container Elasticsearch
-docker exec -it elasticsearch-ersaf bash
+docker exec -it elasticsearch-forestas bash
 
 # Container MinIO
-docker exec -it minio-ersaf bash
+docker exec -it minio-forestas bash
 
 # Container MailPit
-docker exec -it mailpit-ersaf bash
+docker exec -it mailpit-forestas bash
 ```
 
 ### Comandi Laravel nel Container
 ```bash
 # Sempre nel container PHP
-docker exec -it php81-ersaf bash
+docker exec -it php81-forestas bash
 php artisan [comando]
 composer [comando]
 npm [comando]
@@ -204,7 +204,7 @@ php artisan serve --host 0.0.0.0
 ### Gestione Permessi
 ```bash
 # Per problemi di permessi (come utente root)
-docker exec -u 0 -it php81-ersaf bash
+docker exec -u 0 -it php81-forestas bash
 chown -R 33 storage/
 chown -R 33 bootstrap/cache/
 ```
@@ -236,7 +236,7 @@ chown -R 33 bootstrap/cache/
 
 ## Debug con Xdebug (Solo Locale)
 - Porta xdebug: 9200
-- Path mapping: `/var/www/html/ersaf` → `${workspaceRoot}`
+- Path mapping: `/var/www/html/forestas` → `${workspaceRoot}`
 - Variabile ambiente: `export XDEBUG_SESSION=1`
 - File log: `/var/log/xdebug.log`
 
@@ -244,9 +244,9 @@ chown -R 33 bootstrap/cache/
 - Utilizza il sistema **Geobox** per gestione environment
 - Scripts nella cartella `scripts/` vanno eseguiti nel container PHP
 - Comandi geobox disponibili:
-  - `geobox_install ersaf`
-  - `geobox_serve ersaf`
-  - `geobox_dump_restore ersaf`
+  - `geobox_install forestas`
+  - `geobox_serve forestas`
+  - `geobox_dump_restore forestas`
 
 ## ⚠️ REGOLA CRITICA - AVVIO LARAVEL SERVE E HORIZON ⚠️
 **QUANDO L'UTENTE CHIEDE DI AVVIARE LARAVEL SERVE E/O HORIZON:**
@@ -270,7 +270,7 @@ chown -R 33 bootstrap/cache/
 if [ -f .env ]; then
     APP_NAME=$(grep "^APP_NAME=" .env | cut -d '=' -f2 | tr -d ' ' | tr -d '"' | tr -d "'")
 fi
-APP_NAME=${APP_NAME:-ersaf}
+APP_NAME=${APP_NAME:-forestas}
 CONTAINER_NAME="php81-${APP_NAME}"
 
 # Metodo 2: Verificare direttamente i container attivi (più affidabile)
@@ -348,8 +348,8 @@ Eseguire automaticamente e in sequenza i seguenti comandi:
 
 ## Variabili Ambiente Chiave
 ```bash
-APP_NAME=ersaf
-DOCKER_PROJECT_DIR_NAME=ersaf
+APP_NAME=forestas
+DOCKER_PROJECT_DIR_NAME=forestas
 DOCKER_PHP_PORT=9108
 DOCKER_PSQL_PORT=5508
 DOCKER_SERVE_PORT=8008 # solo locale
@@ -373,14 +373,14 @@ Questo pattern garantisce consistenza e facilità di manutenzione.
 ## Mapping Modelli ecTrack
 
 ### Regola per ecTrack
-Nel progetto ersaf, **ecTrack** rappresenta il modello generico per i percorsi escursionistici.
+Nel progetto forestas, **ecTrack** rappresenta il modello generico per i percorsi escursionistici.
 
 ### Configurazione Modello
 - **Variabile ambiente**: `EC_TRACK_MODEL`
 - **Valore di default**: `Wm\WmPackage\Models\EcTrack`
-- **Nel progetto ersaf**: `App\Models\HikingRoute` (estende EcTrack)
+- **Nel progetto forestas**: `App\Models\HikingRoute` (estende EcTrack)
 
-### Mapping Specifico per ersaf
+### Mapping Specifico per forestas
 ```bash
 # Nel file .env del progetto
 EC_TRACK_MODEL=App\Models\HikingRoute
@@ -394,6 +394,6 @@ EC_TRACK_MODEL=App\Models\HikingRoute
 
 ### Note Importanti
 - Quando si fa riferimento a "ecTrack" nel codice, si intende sempre il modello configurato tramite `EC_TRACK_MODEL`
-- Nel contesto di ersaf, ecTrack = HikingRoute
+- Nel contesto di forestas, ecTrack = HikingRoute
 - La relazione con i layer utilizza sempre il nome `ecTracks` indipendentemente dal modello specifico
 - Il modello deve estendere `Wm\WmPackage\Models\EcTrack` per mantenere la compatibilità

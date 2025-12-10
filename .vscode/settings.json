@@ -4,7 +4,7 @@
     "php.validate.args": [
         "exec",
         "-i",
-        "php81-ersaf",
+        "php81-forestas",
         "php"
     ],
     "php.suggest.basic": false,

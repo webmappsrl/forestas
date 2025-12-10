@@ -11,7 +11,7 @@
             "request": "launch",
             "port": 9010,
             "pathMappings": {
-                "/var/www/html/ersaf": "${workspaceRoot}"
+                "/var/www/html/forestas": "${workspaceRoot}"
             }
         }
     ]

@@ -21,4 +21,4 @@ jobs:
           username: ${{ secrets.USERNAMEDEV }}
           port: ${{ secrets.PORTDEV }}
           key: ${{ secrets.SSHKEYDEV }}
-          script: "cd /root/html/ersaf && git pull && git submodule update --init --recursive && docker exec php81-ersaf bash scripts/deploy_dev.sh"
+          script: "cd /root/html/forestas && git pull && git submodule update --init --recursive && docker exec php81-forestas bash scripts/deploy_dev.sh"
