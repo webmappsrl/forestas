@@ -1,0 +1,185 @@
+services:
+  php:
+    # Generic service for manual operations (artisan, tinker, composer)
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    build: ./docker/configs/phpfpm
+    restart: always
+    container_name: "php-${APP_NAME}"
+    image: wm-phpfpm:8.4
+    # No exposed ports (only for manual operations)
+    ports: []
+    volumes:
+      - ".:/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+      - "../wm-package:/var/www/html/wm-package"
+    working_dir: "/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+  db:
+    extends:
+      file: develop.compose.yml
+      service: db
+  redis:
+    extends:
+      file: develop.compose.yml
+      service: redis
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    container_name: "elasticsearch-${APP_NAME}"
+    restart: always
+    environment:
+      - node.name=elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  # Init container to automatically set kibana_system password
+  # Elasticsearch doesn't support env vars for kibana_system, so it must be set via API
+  # The container is automatically removed after execution
+  elasticsearch-init:
+    image: curlimages/curl:latest
+    container_name: "elasticsearch-init-${APP_NAME}"
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    environment:
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for Elasticsearch to be ready..."
+        i=0
+        while [ $$i -lt 60 ]; do
+          if curl -s -f -u elastic:$$ELASTICSEARCH_PASSWORD http://elasticsearch:9200/_cluster/health > /dev/null 2>&1; then
+            echo "Elasticsearch is ready!"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 2
+        done
+        echo "Setting password for kibana_system user..."
+        curl -s -X POST -u elastic:$$ELASTICSEARCH_PASSWORD \
+          http://elasticsearch:9200/_security/user/kibana_system/_password \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"$$ELASTICSEARCH_PASSWORD\"}" || true
+        echo "Password set successfully!"
+        echo "Removing init container..."
+        docker rm -f elasticsearch-init-${APP_NAME} 2>/dev/null || true
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.1
+    container_name: "kibana-${APP_NAME}"
+    restart: always
+    depends_on:
+      elasticsearch-init:
+        condition: service_completed_successfully
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+    ports:
+      - ${DOCKER_KIBANA_PORT:-5601}:5601
+  # Init container for automatic Scout indexing
+  # Runs scout:import for wm-package models on startup
+  scout-init:
+    build: ./docker/configs/phpfpm
+    image: wm-phpfpm:8.4
+    container_name: "scout-init-${APP_NAME}"
+    depends_on:
+      elasticsearch-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+    environment:
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ".:/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+      - "../wm-package:/var/www/html/wm-package"
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: "/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for Elasticsearch to be ready..."
+        i=0
+        while [ $$i -lt 60 ]; do
+          if curl -s -f -u elastic:$$ELASTICSEARCH_PASSWORD http://elasticsearch:9200/_cluster/health > /dev/null 2>&1; then
+            echo "Elasticsearch is ready!"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 2
+        done
+        echo "Waiting for database to be ready..."
+        i=0
+        while [ $$i -lt 60 ]; do
+          if php artisan db:show > /dev/null 2>&1; then
+            echo "Database is ready!"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 2
+        done
+        echo "Starting Scout import for EcTrack..."
+        php artisan scout:import "Wm\WmPackage\Models\EcTrack"
+        echo "Scout import completed successfully!"
+        echo "Removing init container..."
+        docker rm -f scout-init-${APP_NAME} 2>/dev/null || true
+    restart: "no"
+  # Laravel server for local environment (without nginx/proxy)
+  laravel:
+    build: ./docker/configs/phpfpm
+    container_name: "laravel-${APP_NAME}"
+    image: wm-phpfpm:8.4
+    command: php artisan serve --host 0.0.0.0 --port 8000
+    restart: always
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ".:/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+      - "../wm-package:/var/www/html/wm-package"
+    working_dir: "/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+    ports:
+      - ${DOCKER_SERVE_PORT:-8000}:8000
+  horizon:
+    extends:
+      file: develop.compose.yml
+      service: horizon
+    ports: []
+  minio:
+    extends:
+      file: develop.compose.yml
+      service: minio
+  mailpit:
+    extends:
+      file: develop.compose.yml
+      service: mailpit

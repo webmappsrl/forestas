@@ -1,0 +1,119 @@
+services:
+  php:
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    # user: root
+    build: ./docker/configs/phpfpm
+    restart: always
+    container_name: "php-${APP_NAME}"
+    image: wm-phpfpm:8.4
+    ports:
+      - ${DOCKER_PHP_PORT}:9000
+    volumes:
+      - ".:/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+    working_dir: "/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+  db:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: "postgres-${APP_NAME}"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?err}
+      POSTGRES_USER_PASSWORD: ${DB_PASSWORD:?err}
+      POSTGRES_USER: ${DB_USERNAME:?err}
+      POSTGRES_DB: ${DB_DATABASE:?err}
+    volumes:
+      - "./docker/volumes/postgresql/data:/var/lib/postgresql/data"
+    ports:
+      - ${DOCKER_PSQL_PORT}:5432
+  redis:
+    image: redis:latest
+    container_name: "redis-${APP_NAME}"
+    restart: always
+  elasticsearch:
+    image: elasticsearch:8.17.1
+    container_name: "elasticsearch-${APP_NAME}"
+    restart: always
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=elasticsearch-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  # Init container to automatically set kibana_system password
+  # Elasticsearch doesn't support env vars for kibana_system, so it must be set via API
+  # The container is automatically removed after execution
+  elasticsearch-init:
+    image: curlimages/curl:latest
+    container_name: "elasticsearch-init-${APP_NAME}"
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    environment:
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for Elasticsearch to be ready..."
+        i=0
+        while [ $$i -lt 60 ]; do
+          if curl -s -f -u elastic:$$ELASTICSEARCH_PASSWORD http://elasticsearch:9200/_cluster/health > /dev/null 2>&1; then
+            echo "Elasticsearch is ready!"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 2
+        done
+        echo "Setting password for kibana_system user..."
+        curl -s -X POST -u elastic:$$ELASTICSEARCH_PASSWORD \
+          http://elasticsearch:9200/_security/user/kibana_system/_password \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"$$ELASTICSEARCH_PASSWORD\"}" || true
+        echo "Password set successfully!"
+        docker rm -f elasticsearch-init-${APP_NAME} 2>/dev/null || true
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.1
+    container_name: "kibana-${APP_NAME}"
+    restart: always
+    depends_on:
+      elasticsearch-init:
+        condition: service_completed_successfully
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+      - SERVER_BASEPATH=/kibana
+      - SERVER_REWRITEBASEPATH=false
+    ports:
+      - ${DOCKER_KIBANA_PORT:-5601}:5601
+  horizon:
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    build: ./docker/configs/phpfpm
+    restart: always
+    container_name: "horizon-${APP_NAME}"
+    image: wm-phpfpm:8.4
+    command: php artisan horizon
+    volumes:
+      - ".:/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+      - "../wm-package:/var/www/html/wm-package"
+    working_dir: "/var/www/html/${DOCKER_PROJECT_DIR_NAME}"
+    depends_on:
+      - redis
+      - db
+    ports: []
