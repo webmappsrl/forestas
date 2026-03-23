@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Import;
 
-use App\Services\Import\SardegnaSentieriPoiImportService;
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -39,7 +39,7 @@ class ImportSardegnaSentieriPoiJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(SardegnaSentieriPoiImportService $service): void
+    public function handle(SardegnaSentieriImportService $service): void
     {
         $service->importPoi($this->externalId);
     }

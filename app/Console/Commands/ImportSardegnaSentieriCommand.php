@@ -7,7 +7,7 @@ namespace App\Console\Commands;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
-use App\Services\Import\SardegnaSentieriTaxonomyService;
+use App\Services\Import\SardegnaSentieriImportService;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
@@ -40,12 +40,12 @@ class ImportSardegnaSentieriCommand extends Command
      */
     public function handle(
         SardegnaSentieriClient $client,
-        SardegnaSentieriTaxonomyService $taxonomyService
+        SardegnaSentieriImportService $importService
     ): int {
         $this->ensurePrerequisites();
 
         $this->info('Importing taxonomies...');
-        $taxonomyService->importAll();
+        $importService->importAll();
         $this->info('Taxonomies imported.');
 
         $only = $this->option('only');
@@ -76,6 +76,7 @@ class ImportSardegnaSentieriCommand extends Command
 
         $poiCount = 0;
         $force = $this->option('force');
+        $apiIds = array_map('strval', array_keys($poiList));
 
         foreach ($poiList as $id => $apiTimestamp) {
             // Skip if already up to date (unless force)
@@ -97,6 +98,44 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         $this->info("Dispatched {$poiCount} POI import jobs.");
+
+        // Mark POIs no longer present in the API
+        $this->markRemovedPois($apiIds);
+    }
+
+    /**
+     * Mark POIs that are no longer in the API source as deleted_from_source.
+     *
+     * @param string[] $apiIds
+     */
+    private function markRemovedPois(array $apiIds): void
+    {
+        $appId = $this->getAppIdForSardegnaSentieri();
+        if ($appId === null) {
+            return;
+        }
+
+        $removed = EcPoi::where('app_id', $appId)
+            ->whereRaw("(properties->'forestas'->>'deleted_from_source') IS DISTINCT FROM 'true'")
+            ->get()
+            ->filter(function (EcPoi $poi) use ($apiIds): bool {
+                $sourceId = $poi->properties['out_source_feature_id']
+                    ?? $poi->properties['sardegnasentieri_id']
+                    ?? null;
+
+                return $sourceId !== null && !in_array((string) $sourceId, $apiIds, true);
+            });
+
+        foreach ($removed as $poi) {
+            $properties = is_array($poi->properties) ? $poi->properties : [];
+            $properties['forestas']['deleted_from_source'] = true;
+            $poi->properties = $properties;
+            $poi->saveQuietly();
+        }
+
+        if ($removed->count() > 0) {
+            $this->warn("Marked {$removed->count()} POIs as deleted_from_source.");
+        }
     }
 
     /**
@@ -110,6 +149,7 @@ class ImportSardegnaSentieriCommand extends Command
 
         $trackCount = 0;
         $force = $this->option('force');
+        $apiIds = array_map('strval', array_keys($trackList));
 
         foreach ($trackList as $id => $apiTimestamp) {
             // Skip if already up to date (unless force)
@@ -128,6 +168,48 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         $this->info("Dispatched {$trackCount} Track import jobs.");
+
+        // Mark tracks no longer present in the API
+        $this->markRemovedTracks($apiIds);
+    }
+
+    /**
+     * Mark Tracks that are no longer in the API source as deleted_from_source.
+     *
+     * @param string[] $apiIds
+     */
+    private function markRemovedTracks(array $apiIds): void
+    {
+        $appId = $this->getAppIdForSardegnaSentieri();
+        if ($appId === null) {
+            return;
+        }
+
+        $removed = EcTrack::where('app_id', $appId)
+            ->whereRaw("properties->>'sardegnasentieri_id' IS NOT NULL")
+            ->whereRaw("(properties->'forestas'->>'deleted_from_source') IS DISTINCT FROM 'true'")
+            ->get()
+            ->filter(function (EcTrack $track) use ($apiIds): bool {
+                $sourceId = $track->properties['sardegnasentieri_id'] ?? null;
+
+                return $sourceId !== null && !in_array((string) $sourceId, $apiIds, true);
+            });
+
+        foreach ($removed as $track) {
+            $properties = is_array($track->properties) ? $track->properties : [];
+            $properties['forestas']['deleted_from_source'] = true;
+            $track->properties = $properties;
+            $track->saveQuietly();
+        }
+
+        if ($removed->count() > 0) {
+            $this->warn("Marked {$removed->count()} Tracks as deleted_from_source.");
+        }
+    }
+
+    private function getAppIdForSardegnaSentieri(): ?int
+    {
+        return App::where('sku', 'it.webmapp.sardegnasentieri')->value('id');
     }
 
     /**

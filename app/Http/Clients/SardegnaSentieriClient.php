@@ -13,6 +13,8 @@ class SardegnaSentieriClient
 
     private const TIMEOUT = 30;
 
+    private const GPX_TIMEOUT = 60;
+
     /**
      * Get POI list: {id: timestamp, ...}
      *
@@ -105,7 +107,7 @@ class SardegnaSentieriClient
      */
     public function getGpxContent(string $url): string
     {
-        $response = Http::timeout(self::TIMEOUT)
+        $response = Http::timeout(self::GPX_TIMEOUT)
             ->get($url);
 
         throw_if($response->failed(), \RuntimeException::class, "Failed to download GPX from {$url}");

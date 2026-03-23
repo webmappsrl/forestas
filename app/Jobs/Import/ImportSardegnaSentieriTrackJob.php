@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Import;
 
-use App\Services\Import\SardegnaSentieriTrackImportService;
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -40,7 +40,7 @@ class ImportSardegnaSentieriTrackJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(SardegnaSentieriTrackImportService $service): void
+    public function handle(SardegnaSentieriImportService $service): void
     {
         $service->importTrack($this->externalId);
     }
