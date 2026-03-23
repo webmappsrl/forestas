@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -31,22 +32,22 @@ class ResetSardegnaSentieriCommand extends Command
      */
     public function handle(): int
     {
-        if (!$this->option('yes') && !$this->confirm(
+        if (! $this->option('yes') && ! $this->confirm(
             'Eliminare tutti i dati Sardegna Sentieri? Questa operazione è irreversibile.'
         )) {
             return self::SUCCESS;
         }
 
-        $app = App::where('sku', 'it.webmapp.sardegnasentieri')->first();
+        $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
 
-        if (!$app) {
-            $this->warn('App "Sardegna Sentieri" not found. Nothing to reset.');
+        if (! App::query()->whereKey($appId)->exists()) {
+            $this->warn("App id {$appId} non trovata. Nothing to reset.");
 
             return self::SUCCESS;
         }
 
         // 1. Delete EcTracks first, to avoid POI observer blocks on linked tracks
-        $tracks = EcTrack::where('app_id', $app->id)->get();
+        $tracks = EcTrack::where('app_id', $appId)->get();
         foreach ($tracks as $track) {
             $track->taxonomyActivities()->detach();
             $track->ecPois()->detach();
@@ -56,7 +57,7 @@ class ResetSardegnaSentieriCommand extends Command
         $this->info("Eliminati {$tracks->count()} EcTrack.");
 
         // 2. Delete EcPois
-        $pois = EcPoi::where('app_id', $app->id)->get();
+        $pois = EcPoi::where('app_id', $appId)->get();
         foreach ($pois as $poi) {
             $poi->taxonomyPoiTypes()->detach();
             // Note: EcMedia relations are handled via spatie media library

@@ -10,17 +10,20 @@ use App\Dto\Import\PoiPropertiesData;
 use App\Dto\Import\TrackPropertiesData;
 use App\Enums\StatoValidazione;
 use App\Http\Clients\SardegnaSentieriClient;
+use App\Models\EcTrack;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Helpers\GlobalFileHelper;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
-use App\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 
 class SardegnaSentieriImportService
 {
+    /** Forestas: una sola app nel progetto; tutti gli import usano questo id. */
+    public const IMPORT_APP_ID = 1;
+
     private const POI_VOCABULARIES = [
         'tipologia_poi',
     ];
@@ -119,7 +122,7 @@ class SardegnaSentieriImportService
      */
     public function resolvePoiTypeIds(string $apiTermId): array
     {
-        $cacheKey = 'all:' . $apiTermId;
+        $cacheKey = 'all:'.$apiTermId;
         if (isset($this->cache['poi_types'][$cacheKey])) {
             return (array) ($this->cache['poi_types'][$cacheKey] ?? []);
         }
@@ -155,7 +158,7 @@ class SardegnaSentieriImportService
      */
     public function resolveActivityIdsForVocabulary(string $apiTermId, string $vocabulary): array
     {
-        $cacheKey = $vocabulary . ':all:' . $apiTermId;
+        $cacheKey = $vocabulary.':all:'.$apiTermId;
 
         if (isset($this->cache['activities'][$cacheKey])) {
             return (array) ($this->cache['activities'][$cacheKey] ?? []);
@@ -193,23 +196,26 @@ class SardegnaSentieriImportService
 
     public function importPoi(int $externalId): EcPoi
     {
-        $response = $this->client->getPoiDetail($externalId);
+        return $this->importPoiFromResponse($externalId, $this->client->getPoiDetail($externalId));
+    }
 
+    public function importPoiFromResponse(int $externalId, ApiPoiResponse $response): EcPoi
+    {
         if (count($response->coordinates) < 2) {
             throw new \RuntimeException("Invalid geometry for POI {$externalId}");
         }
 
         $data = [
-            'app_id'   => $this->getAppId(),
-            'user_id'  => $this->getUserId(),
-            'name'     => $response->name,
+            'app_id' => $this->getAppId(),
+            'user_id' => $this->getUserId(),
+            'name' => $response->name,
             'geometry' => "POINT({$response->coordinates[0]} {$response->coordinates[1]})",
         ];
 
         $ecPoi = EcPoi::whereRaw(
             "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
             [(string) $externalId, (string) $externalId]
-        )->first() ?? new EcPoi();
+        )->first() ?? new EcPoi;
 
         $existingProperties = is_array($ecPoi->properties) ? $ecPoi->properties : [];
 
@@ -243,20 +249,23 @@ class SardegnaSentieriImportService
 
     public function importTrack(int $externalId): EcTrack
     {
-        $response = $this->client->getTrackDetail($externalId);
+        return $this->importTrackFromResponse($externalId, $this->client->getTrackDetail($externalId));
+    }
 
+    public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
+    {
         $geometry = $this->getGeometryFromGpx($response->gpx);
 
         $data = [
-            'app_id'  => $this->getAppId(),
+            'app_id' => $this->getAppId(),
             'user_id' => $this->getUserId(),
-            'name'    => $response->name,
+            'name' => $response->name,
         ];
 
         $ecTrack = EcTrack::firstWhere(
             DB::raw("properties->>'sardegnasentieri_id'"),
             (string) $externalId
-        ) ?? new EcTrack();
+        ) ?? new EcTrack;
 
         $existingProperties = is_array($ecTrack->properties) ? $ecTrack->properties : [];
         $existingManualData = is_array($existingProperties['manual_data'] ?? null) ? $existingProperties['manual_data'] : [];
@@ -288,7 +297,7 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * @param list<string> $gpxUrls
+     * @param  list<string>  $gpxUrls
      */
     private function getGeometryFromGpx(array $gpxUrls): ?string
     {
@@ -333,7 +342,7 @@ class SardegnaSentieriImportService
                 }
 
                 if (! empty($points)) {
-                    $segments[] = '(' . implode(', ', $points) . ')';
+                    $segments[] = '('.implode(', ', $points).')';
                 }
             }
         }
@@ -342,7 +351,7 @@ class SardegnaSentieriImportService
             return null;
         }
 
-        return 'MULTILINESTRING Z (' . implode(', ', $segments) . ')';
+        return 'MULTILINESTRING Z ('.implode(', ', $segments).')';
     }
 
     private function syncRelatedPois(EcTrack $ecTrack, ApiTrackResponse $response): void
@@ -386,13 +395,15 @@ class SardegnaSentieriImportService
     private function getAppId(): int
     {
         if ($this->appId === null) {
-            $app = App::where('sku', 'it.webmapp.sardegnasentieri')->first();
+            $id = self::IMPORT_APP_ID;
 
-            if (! $app) {
-                throw new \RuntimeException('App "Sardegna Sentieri" not found. Run SardegnaSentieriSeeder first.');
+            if (! App::query()->whereKey($id)->exists()) {
+                throw new \RuntimeException(
+                    "App id {$id} non trovata. Il progetto Forestas usa una sola app (id 1); esegui il seed o creala in Nova."
+                );
             }
 
-            $this->appId = $app->id;
+            $this->appId = $id;
         }
 
         return $this->appId;
@@ -441,7 +452,7 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * @param array<string, mixed> $term
+     * @param  array<string, mixed>  $term
      * @return array{identifier: string|null, name: string, description: mixed}|null
      */
     private function buildTaxonomyData(array $term): ?array
@@ -449,8 +460,8 @@ class SardegnaSentieriImportService
         $geohubIdentifier = $term['geohub_identifier'] ?? null;
         if (is_string($geohubIdentifier) && trim($geohubIdentifier) !== '') {
             return [
-                'identifier'  => $geohubIdentifier,
-                'name'        => $geohubIdentifier,
+                'identifier' => $geohubIdentifier,
+                'name' => $geohubIdentifier,
                 'description' => $term['description'] ?? null,
             ];
         }
@@ -462,8 +473,8 @@ class SardegnaSentieriImportService
         }
 
         return [
-            'identifier'  => 'name:' . $this->normalizeKey($name),
-            'name'        => $name,
+            'identifier' => 'name:'.$this->normalizeKey($name),
+            'name' => $name,
             'description' => $term['description'] ?? null,
         ];
     }
@@ -489,14 +500,14 @@ class SardegnaSentieriImportService
     private function findPoiTypeByName(string $name): ?TaxonomyPoiType
     {
         return TaxonomyPoiType::query()
-            ->whereRaw('name::text ilike ?', ['%"' . $name . '"%'])
+            ->whereRaw('name::text ilike ?', ['%"'.$name.'"%'])
             ->first();
     }
 
     private function findActivityByName(string $name): ?TaxonomyActivity
     {
         return TaxonomyActivity::query()
-            ->whereRaw('name::text ilike ?', ['%"' . $name . '"%'])
+            ->whereRaw('name::text ilike ?', ['%"'.$name.'"%'])
             ->first();
     }
 

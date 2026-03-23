@@ -7,8 +7,8 @@ namespace App\Console\Commands;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
-use App\Services\Import\SardegnaSentieriImportService;
 use App\Models\User;
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -42,7 +42,9 @@ class ImportSardegnaSentieriCommand extends Command
         SardegnaSentieriClient $client,
         SardegnaSentieriImportService $importService
     ): int {
-        $this->ensurePrerequisites();
+        if (! $this->ensurePrerequisites()) {
+            return self::FAILURE;
+        }
 
         $this->info('Importing taxonomies...');
         $importService->importAll();
@@ -51,12 +53,12 @@ class ImportSardegnaSentieriCommand extends Command
         $only = $this->option('only');
 
         // Import POIs
-        if (!$only || $only === 'pois') {
+        if (! $only || $only === 'pois') {
             $this->importPois($client);
         }
 
         // Import Tracks
-        if (!$only || $only === 'tracks') {
+        if (! $only || $only === 'tracks') {
             $this->importTracks($client);
         }
 
@@ -72,15 +74,16 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching POI list...');
         $poiList = $client->getPoiList();
-        $this->info('Found ' . count($poiList) . ' POIs.');
+        $this->info('Found '.count($poiList).' POIs.');
 
         $poiCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($poiList));
 
+        $candidateIds = [];
         foreach ($poiList as $id => $apiTimestamp) {
             // Skip if already up to date (unless force)
-            if (!$force) {
+            if (! $force) {
                 $existing = EcPoi::whereRaw(
                     "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
                     [(string) $id, (string) $id]
@@ -93,7 +96,11 @@ class ImportSardegnaSentieriCommand extends Command
                 }
             }
 
-            ImportSardegnaSentieriPoiJob::dispatch((int) $id);
+            $candidateIds[] = (int) $id;
+        }
+
+        foreach ($this->sortPoiDispatchOrder($candidateIds, $poiList) as $id) {
+            ImportSardegnaSentieriPoiJob::dispatch($id);
             $poiCount++;
         }
 
@@ -106,7 +113,7 @@ class ImportSardegnaSentieriCommand extends Command
     /**
      * Mark POIs that are no longer in the API source as deleted_from_source.
      *
-     * @param string[] $apiIds
+     * @param  string[]  $apiIds
      */
     private function markRemovedPois(array $apiIds): void
     {
@@ -123,7 +130,7 @@ class ImportSardegnaSentieriCommand extends Command
                     ?? $poi->properties['sardegnasentieri_id']
                     ?? null;
 
-                return $sourceId !== null && !in_array((string) $sourceId, $apiIds, true);
+                return $sourceId !== null && ! in_array((string) $sourceId, $apiIds, true);
             });
 
         foreach ($removed as $poi) {
@@ -145,15 +152,16 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching track list...');
         $trackList = $client->getTrackList();
-        $this->info('Found ' . count($trackList) . ' tracks.');
+        $this->info('Found '.count($trackList).' tracks.');
 
         $trackCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($trackList));
 
+        $candidateIds = [];
         foreach ($trackList as $id => $apiTimestamp) {
             // Skip if already up to date (unless force)
-            if (!$force) {
+            if (! $force) {
                 $existing = EcTrack::whereRaw("properties->>'sardegnasentieri_id' = ?", [$id])
                     ->selectRaw("properties->'forestas'->>'updated_at' as updated_at")
                     ->value('updated_at');
@@ -163,7 +171,11 @@ class ImportSardegnaSentieriCommand extends Command
                 }
             }
 
-            ImportSardegnaSentieriTrackJob::dispatch((int) $id);
+            $candidateIds[] = (int) $id;
+        }
+
+        foreach ($this->sortTrackDispatchOrder($candidateIds, $trackList) as $id) {
+            ImportSardegnaSentieriTrackJob::dispatch($id);
             $trackCount++;
         }
 
@@ -176,7 +188,7 @@ class ImportSardegnaSentieriCommand extends Command
     /**
      * Mark Tracks that are no longer in the API source as deleted_from_source.
      *
-     * @param string[] $apiIds
+     * @param  string[]  $apiIds
      */
     private function markRemovedTracks(array $apiIds): void
     {
@@ -192,7 +204,7 @@ class ImportSardegnaSentieriCommand extends Command
             ->filter(function (EcTrack $track) use ($apiIds): bool {
                 $sourceId = $track->properties['sardegnasentieri_id'] ?? null;
 
-                return $sourceId !== null && !in_array((string) $sourceId, $apiIds, true);
+                return $sourceId !== null && ! in_array((string) $sourceId, $apiIds, true);
             });
 
         foreach ($removed as $track) {
@@ -209,14 +221,146 @@ class ImportSardegnaSentieriCommand extends Command
 
     private function getAppIdForSardegnaSentieri(): ?int
     {
-        return App::where('sku', 'it.webmapp.sardegnasentieri')->value('id');
+        $id = SardegnaSentieriImportService::IMPORT_APP_ID;
+
+        return App::query()->whereKey($id)->exists() ? $id : null;
+    }
+
+    /**
+     * Dispatch order: new rows first (by API updated_at desc), then existing by created_at desc
+     * so Nova/index (typically newest first) gets body + media sooner.
+     *
+     * @param  list<int>  $candidateIds
+     * @param  array<string, string>  $poiList
+     * @return list<int>
+     */
+    private function sortPoiDispatchOrder(array $candidateIds, array $poiList): array
+    {
+        $appId = $this->getAppIdForSardegnaSentieri();
+        if ($appId === null || $candidateIds === []) {
+            return $candidateIds;
+        }
+
+        $existingBySourceId = $this->loadEcPoisBySourceIds($appId, $candidateIds);
+
+        usort($candidateIds, function (int $a, int $b) use ($existingBySourceId, $poiList): int {
+            $sa = (string) $a;
+            $sb = (string) $b;
+            $existsA = isset($existingBySourceId[$sa]);
+            $existsB = isset($existingBySourceId[$sb]);
+            if ($existsA !== $existsB) {
+                return $existsA ? 1 : -1;
+            }
+            if (! $existsA) {
+                return strcmp($poiList[$sb] ?? '', $poiList[$sa] ?? '');
+            }
+
+            return $existingBySourceId[$sb]->created_at <=> $existingBySourceId[$sa]->created_at;
+        });
+
+        return $candidateIds;
+    }
+
+    /**
+     * @param  list<int>  $candidateIds
+     * @param  array<string, string>  $trackList
+     * @return list<int>
+     */
+    private function sortTrackDispatchOrder(array $candidateIds, array $trackList): array
+    {
+        $appId = $this->getAppIdForSardegnaSentieri();
+        if ($appId === null || $candidateIds === []) {
+            return $candidateIds;
+        }
+
+        $existingBySourceId = $this->loadEcTracksBySourceIds($appId, $candidateIds);
+
+        usort($candidateIds, function (int $a, int $b) use ($existingBySourceId, $trackList): int {
+            $sa = (string) $a;
+            $sb = (string) $b;
+            $existsA = isset($existingBySourceId[$sa]);
+            $existsB = isset($existingBySourceId[$sb]);
+            if ($existsA !== $existsB) {
+                return $existsA ? 1 : -1;
+            }
+            if (! $existsA) {
+                return strcmp($trackList[$sb] ?? '', $trackList[$sa] ?? '');
+            }
+
+            return $existingBySourceId[$sb]->created_at <=> $existingBySourceId[$sa]->created_at;
+        });
+
+        return $candidateIds;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return array<string, EcPoi>
+     */
+    private function loadEcPoisBySourceIds(int $appId, array $ids): array
+    {
+        $stringIds = array_map('strval', $ids);
+        $query = EcPoi::query()->where('app_id', $appId);
+
+        $query->where(function ($q) use ($stringIds) {
+            foreach ($stringIds as $sid) {
+                $q->orWhereRaw(
+                    "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+                    [$sid, $sid]
+                );
+            }
+        });
+
+        $map = [];
+        foreach ($query->get() as $poi) {
+            $key = (string) ($poi->properties['out_source_feature_id'] ?? $poi->properties['sardegnasentieri_id'] ?? '');
+            if ($key !== '') {
+                $map[$key] = $poi;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return array<string, EcTrack>
+     */
+    private function loadEcTracksBySourceIds(int $appId, array $ids): array
+    {
+        $stringIds = array_map('strval', $ids);
+        $query = EcTrack::query()->where('app_id', $appId);
+
+        $query->where(function ($q) use ($stringIds) {
+            foreach ($stringIds as $sid) {
+                $q->orWhereRaw("properties->>'sardegnasentieri_id' = ?", [$sid]);
+            }
+        });
+
+        $map = [];
+        foreach ($query->get() as $track) {
+            $key = (string) ($track->properties['sardegnasentieri_id'] ?? '');
+            if ($key !== '') {
+                $map[$key] = $track;
+            }
+        }
+
+        return $map;
     }
 
     /**
      * Ensure minimum entities needed by import exist.
      */
-    private function ensurePrerequisites(): void
+    private function ensurePrerequisites(): bool
     {
+        $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
+
+        if (! App::query()->whereKey($appId)->exists()) {
+            $this->error("L'app con id {$appId} non esiste. Crea l'app in Nova/DB (Forestas usa una sola app, id 1).");
+
+            return false;
+        }
+
         $editorRole = Role::firstOrCreate([
             'name' => 'Editor',
             'guard_name' => 'web',
@@ -230,19 +374,10 @@ class ImportSardegnaSentieriCommand extends Command
             ]
         );
 
-        if (!$user->hasRole('Editor')) {
+        if (! $user->hasRole('Editor')) {
             $user->assignRole($editorRole);
         }
 
-        App::withoutEvents(function () use ($user) {
-            App::firstOrCreate(
-                ['sku' => 'it.webmapp.sardegnasentieri'],
-                [
-                    'name' => 'Sardegna Sentieri',
-                    'customer_name' => 'forestas',
-                    'user_id' => $user->id,
-                ]
-            );
-        });
+        return true;
     }
 }

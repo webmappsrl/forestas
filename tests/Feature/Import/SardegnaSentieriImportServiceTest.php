@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 use App\Dto\Api\ApiPoiResponse;
 use App\Dto\Api\ApiTrackResponse;
+use App\Dto\Import\SardegnaSentieriImageManifest;
 use App\Enums\StatoValidazione;
-use App\Services\Import\SardegnaSentieriImportService;
 use App\Http\Clients\SardegnaSentieriClient;
+use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
+use App\Jobs\Import\ImportSardegnaSentieriPoiMediaJob;
+use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
+use App\Jobs\Import\ImportSardegnaSentieriTrackMediaJob;
 use App\Models\User;
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
@@ -26,10 +31,20 @@ uses(RefreshDatabase::class);
 
 function sardegnaSentieriApp(): App
 {
-    return App::firstOrCreate(
-        ['sku' => 'it.webmapp.sardegnasentieri'],
-        ['name' => 'Sardegna Sentieri', 'customer_name' => 'forestas', 'user_id' => sardegnaSentieriUser()->id]
-    );
+    $user = sardegnaSentieriUser();
+    $id = SardegnaSentieriImportService::IMPORT_APP_ID;
+    $existing = App::query()->find($id);
+    if ($existing !== null) {
+        return $existing;
+    }
+
+    return App::withoutEvents(fn () => App::query()->create([
+        'id' => $id,
+        'name' => 'Forestas',
+        'sku' => 'it.webmapp.forestas',
+        'customer_name' => 'forestas',
+        'user_id' => $user->id,
+    ]));
 }
 
 function sardegnaSentieriUser(): User
@@ -128,7 +143,7 @@ function minimalTrackFeature(int $id, array $overrides = []): ApiTrackResponse
 function gpxWithNamespace(array $coords = [[9.19, 41.10, 100.0], [9.20, 41.11, 110.0]]): string
 {
     $trkpts = implode('', array_map(
-        fn($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
+        fn ($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
         $coords
     ));
 
@@ -143,7 +158,7 @@ GPX;
 function gpxWithoutNamespace(array $coords = [[9.19, 41.10, 100.0], [9.20, 41.11, 110.0]]): string
 {
     $trkpts = implode('', array_map(
-        fn($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
+        fn ($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
         $coords
     ));
 
@@ -162,7 +177,7 @@ GPX;
 beforeEach(function () {
     Bus::fake();
     Storage::fake('wmfe');
-    Storage::disk('wmfe')->put(config('app.name', 'forestas') . '/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
+    Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
     sardegnaSentieriApp(); // ensures App + User exist
 });
 
@@ -519,4 +534,83 @@ it('il Command marca come deleted_from_source i Track non più nell\'API (fix P5
 
     $track = EcTrack::first();
     expect($track->properties['forestas']['deleted_from_source'])->toBeTrue();
+});
+
+// ---------------------------------------------------------------------------
+// Import immagini — manifest e dispatch job media
+// ---------------------------------------------------------------------------
+
+it('costruisce il manifest POI con principale poi galleria senza duplicare URL', function () {
+    $response = minimalPoiFeature(1, ['properties' => [
+        'immagine_principale' => [
+            'url' => 'https://example.com/main.jpg',
+            'autore' => 'Mario',
+            'credits' => 'FORESTAS',
+        ],
+        'galleria' => [
+            ['url' => 'https://example.com/main.jpg', 'autore' => '', 'credits' => ''],
+            ['url' => 'https://example.com/other.jpg', 'autore' => 'x', 'credits' => 'y'],
+        ],
+    ]]);
+
+    $manifest = SardegnaSentieriImageManifest::fromApiPoiResponse($response);
+
+    expect($manifest)->toHaveCount(2)
+        ->and($manifest[0]['url'])->toBe('https://example.com/main.jpg')
+        ->and($manifest[0]['autore'])->toBe('Mario')
+        ->and($manifest[1]['url'])->toBe('https://example.com/other.jpg')
+        ->and($manifest[1]['order'])->toBe(1);
+});
+
+it('ImportSardegnaSentieriPoiJob accoda ImportSardegnaSentieriPoiMediaJob con manifest', function () {
+    Bus::fake();
+
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getPoiDetail')->with(55)->once()->andReturn(
+        minimalPoiFeature(55, ['properties' => [
+            'immagine_principale' => [
+                'url' => 'https://example.com/p.jpg',
+                'autore' => 'a',
+                'credits' => 'c',
+            ],
+        ]])
+    );
+
+    $service = new SardegnaSentieriImportService($client);
+    (new ImportSardegnaSentieriPoiJob(55))->handle($client, $service);
+
+    Bus::assertDispatched(ImportSardegnaSentieriPoiMediaJob::class, function (ImportSardegnaSentieriPoiMediaJob $job): bool {
+        return $job->queue === 'aws'
+            && count($job->items) === 1
+            && $job->items[0]['url'] === 'https://example.com/p.jpg'
+            && $job->items[0]['order'] === 0
+            && $job->ecPoiId > 0;
+    });
+});
+
+it('ImportSardegnaSentieriTrackJob accoda ImportSardegnaSentieriTrackMediaJob con manifest', function () {
+    Bus::fake();
+
+    $feature = minimalTrackFeature(88, ['properties' => [
+        'gpx' => ['https://x/gpx'],
+        'immagine_principale' => [
+            'url' => 'https://example.com/t.jpg',
+            'autore' => '',
+            'credits' => '',
+        ],
+    ]]);
+
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->with(88)->once()->andReturn($feature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    $service = new SardegnaSentieriImportService($client);
+    (new ImportSardegnaSentieriTrackJob(88))->handle($client, $service);
+
+    Bus::assertDispatched(ImportSardegnaSentieriTrackMediaJob::class, function (ImportSardegnaSentieriTrackMediaJob $job): bool {
+        return $job->queue === 'aws'
+            && count($job->items) === 1
+            && $job->items[0]['url'] === 'https://example.com/t.jpg'
+            && $job->ecTrackId > 0;
+    });
 });

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Import;
 
+use App\Dto\Import\SardegnaSentieriImageManifest;
+use App\Http\Clients\SardegnaSentieriClient;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,14 +36,19 @@ class ImportSardegnaSentieriTrackJob implements ShouldQueue
      */
     public function __construct(
         public readonly int $externalId
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
-    public function handle(SardegnaSentieriImportService $service): void
+    public function handle(SardegnaSentieriClient $client, SardegnaSentieriImportService $service): void
     {
-        $service->importTrack($this->externalId);
+        $response = $client->getTrackDetail($this->externalId);
+        $track = $service->importTrackFromResponse($this->externalId, $response);
+
+        ImportSardegnaSentieriTrackMediaJob::dispatch(
+            $track->id,
+            SardegnaSentieriImageManifest::fromApiTrackResponse($response)
+        );
     }
 }

@@ -29,16 +29,30 @@ readonly class ApiTrackResponse
         public ?string $partenza,
         public ?string $arrivo,
         public ApiTaxonomiesData $taxonomies,
+        public ?ApiSardegnaImageData $immaginePrincipale,
+        /** @var list<ApiSardegnaImageData> */
+        public array $galleriaImmagini,
     ) {}
 
     /**
      * Parse a GeoJSON Feature returned by GET /track/{id}?_format=json
      *
-     * @param array<string, mixed> $feature
+     * @param  array<string, mixed>  $feature
      */
     public static function fromJson(array $feature): self
     {
         $props = $feature['properties'] ?? [];
+
+        $galleryRaw = $props['galleria_immagini'] ?? $props['galleria'] ?? null;
+        $galleriaImmagini = [];
+        if (is_array($galleryRaw)) {
+            foreach ($galleryRaw as $row) {
+                $img = ApiSardegnaImageData::tryFromMixed($row);
+                if ($img !== null) {
+                    $galleriaImmagini[] = $img;
+                }
+            }
+        }
 
         return new self(
             id: (string) ($props['id'] ?? ''),
@@ -57,6 +71,8 @@ readonly class ApiTrackResponse
             partenza: isset($props['partenza']) ? (string) $props['partenza'] : null,
             arrivo: isset($props['arrivo']) ? (string) $props['arrivo'] : null,
             taxonomies: ApiTaxonomiesData::fromArray(is_array($props['taxonomies'] ?? null) ? $props['taxonomies'] : []),
+            immaginePrincipale: ApiSardegnaImageData::tryFromMixed($props['immagine_principale'] ?? null),
+            galleriaImmagini: $galleriaImmagini,
         );
     }
 }

@@ -45,6 +45,7 @@ app/
 │   ├── Api/
 │   │   ├── ApiPoiResponse.php               # risposta tipizzata GET /poi/{id}
 │   │   ├── ApiTrackResponse.php             # risposta tipizzata GET /track/{id}
+│   │   ├── ApiSardegnaImageData.php         # oggetto immagine API: url, autore, credits
 │   │   └── ApiTaxonomiesData.php            # sub-DTO taxonomies condiviso
 │   └── Import/
 │       ├── ForestasPoiData.php              # campi custom forestas POI
@@ -58,12 +59,15 @@ app/
 │                                            # getTrackDetail() → ApiTrackResponse
 │                                            # GPX_TIMEOUT = 60s separato
 ├── Jobs/Import/
-│   ├── ImportSardegnaSentieriPoiJob.php     # tries=3, timeout=120
-│   └── ImportSardegnaSentieriTrackJob.php   # tries=3, timeout=300
+│   ├── ImportSardegnaSentieriPoiJob.php         # tries=3, timeout=120 — salva POI poi dispatch job foto
+│   ├── ImportSardegnaSentieriPoiMediaJob.php    # sync immagini da manifest (tries/timeout dedicati)
+│   ├── ImportSardegnaSentieriTrackJob.php       # tries=3, timeout=300 — salva track poi dispatch job foto
+│   └── ImportSardegnaSentieriTrackMediaJob.php
 ├── Nova/
 │   └── EcTrack.php                          # campo Select stato_validazione
 └── Services/Import/
-    └── SardegnaSentieriImportService.php    # import + taxonomy service unificati
+    ├── SardegnaSentieriImportService.php    # import + taxonomy service unificati
+    └── SardegnaSentieriMediaSyncService.php # usato dal job Media: lista voci → Spatie + prune
 
 wm-package/src/Dto/
 ├── EcPoiPropertiesData.php                  # base generica properties EcPoi
@@ -86,13 +90,13 @@ tests/Feature/Import/
 
 ```
 JSON API
-  └─→ ApiPoiResponse::fromJson()         (parsing + type-coercion)
+  └─→ ApiPoiResponse::fromJson()         (parsing + type-coercion; immagini → `ApiSardegnaImageData`)
         └─→ PoiPropertiesData::fromApiResponse()
               ├── EcPoiPropertiesData     (wm-package, campi standard)
               └── ForestasPoiData::fromApiResponse()   (campi custom)
 
 JSON API
-  └─→ ApiTrackResponse::fromJson()
+  └─→ ApiTrackResponse::fromJson()       (stesso sub-DTO immagini dove presenti)
         └─→ TrackPropertiesData::fromApiResponse($existing)
               ├── EcTrackPropertiesData   (wm-package)
               │   └── ManualTrackData::merge(existing, fromApi)
@@ -119,6 +123,31 @@ JSON API
 | `taxonomies.tipologia_poi` | `taxonomyPoiTypes()->sync()` | Via `identifier` |
 | `taxonomies.zona_geografica` | `properties->forestas->zona_geografica` | Raw IDs |
 | *(hardcoded)* | `app_id`, `user_id` | |
+
+## Mapping immagini — API → Spatie `default` (EcPoi / EcTrack)
+
+Struttura API verificata: ogni immagine è un **oggetto** con `url` (stringa), `autore`, `credits` (stringhe, possono essere vuote). **Nessun `excerpt`** sulle immagini.
+
+| Campo API | Destinazione | Note |
+|-----------|-------------|------|
+| `properties.immagine_principale` | Collezione `default`, `order_column` = 0 | Oggetto; se assente o senza `url` valida, niente feature image da API |
+| `…immagine_principale.url` | Download (`addMediaFromUrl`) + `custom_properties.sardegnasentieri_source_url` | Idempotenza / prune |
+| `…immagine_principale.autore` | `custom_properties.sardegnasentieri_autore` | Aggiornare su re-sync se cambia |
+| `…immagine_principale.credits` | `custom_properties.sardegnasentieri_credits` | Idem |
+| `properties.galleria[]` | Stessa collezione, `order_column` 1… | Array di oggetti stessa forma; deduplicare `url` già usata come principale |
+| `custom_properties` *(import)* | `sardegnasentieri_import` = true | Prune: cancellare solo media con questo flag |
+
+**Track:** `properties.immagine_principale` con la stessa forma. Campo galleria: **opzionale** (es. `galleria_immagini` o assente a seconda del contenuto); parsing difensivo come per POI.
+
+I metadati delle singole foto restano sui record `media` (`custom_properties`). Per il flusso a **due job** (vedi sotto) si può **opzionalmente** copiare in `properties->forestas` una copia del manifest (stessa lista) solo per debug / ispezione in DB; non è obbligatorio se il payload del job Media è sufficiente.
+
+### Due job: import feature vs sync foto (decisione architetturale)
+
+1. **Job import** (`ImportSardegnaSentieriPoiJob` / `TrackJob`): chiama il client API, esegue `importPoi` / `importTrack` (save modello, tassonomie, ecc.). **Non** scarica le immagini qui. Costruisce la **lista normalizzata** di voci immagine (`url`, `autore`, `credits`, `order`) dall’`ApiPoiResponse` / `ApiTrackResponse` e la passa al secondo job (costruttore del job → serializzazione coda). Opzionale: persistere la stessa lista in `properties->forestas` (es. chiave `image_sync_manifest`) con un secondo `saveQuietly` se serve tracciabilità senza dipendere dalla coda.
+
+2. **Job media** (`ImportSardegnaSentieriPoiMediaJob` / `TrackMediaJob`): riceve `modelId` + lista voci. Per ogni voce: se esiste già un `Media` in collezione `default` con `custom_properties.sardegnasentieri_source_url` uguale → **nessun re-download** (eventuale aggiornamento `order_column` / autore / credits); altrimenti `addMediaFromUrl`. **Errore su una singola foto**: `try/catch` per voce, log, continuare con le altre (il job completa; retry del job riparte dall’intera lista, idempotente). **Prune**: alla fine, rimuovere solo media `sardegnasentieri_import` le cui URL non sono più nella lista.
+
+Così un fallimento sul download **non** blocca il salvataggio del POI/track; il job Media può avere timeout/retry propri.
 
 ## Mapping Campi — EcTrack
 
@@ -151,6 +180,7 @@ JSON API
 - **deleted_from_source**: item non più nell'API vengono marcati con `properties->forestas->deleted_from_source = true` (NON eliminati)
 - **GPX_TIMEOUT = 60s** separato dal TIMEOUT generico (30s)
 - **ManualTrackData::merge()**: i valori esistenti (override manuali utente) hanno precedenza sui valori API
+- **Import immagini**: due job; manifest serializzato verso `Import*MediaJob`; gestione errori **per singola URL** nel job Media
 
 ---
 
@@ -172,7 +202,7 @@ Documentazione e anti-pattern identificati.
 - Sync tassonomie POI
 
 ## Phase 4 — IN CORSO / DA FARE
-- EcMedia per POI (`immagine_principale`, `galleria`) — relazione da verificare nel modello
+- `ImportSardegnaSentieriPoiMediaJob` + dispatch da `ImportSardegnaSentieriPoiJob` con manifest; `SardegnaSentieriMediaSyncService` (skip se URL già presente, import altrimenti, prune, try/catch per voce)
 
 ## Phase 5 — COMPLETATA
 - `SardegnaSentieriImportService::importTrack()`
@@ -180,7 +210,7 @@ Documentazione e anti-pattern identificati.
 - Sync relazioni (ecPois, taxonomyActivities)
 
 ## Phase 6 — DA FARE
-- EcMedia per Track (`immagine_principale`, `galleria_immagini`)
+- `ImportSardegnaSentieriTrackMediaJob` + dispatch da track job; stessa logica manifest / skip / prune del POI
 
 ## Phase 7 — COMPLETATA
 - `ImportSardegnaSentieriCommand` con `--force` e `--only=`

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Import;
 
+use App\Dto\Import\SardegnaSentieriImageManifest;
+use App\Http\Clients\SardegnaSentieriClient;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,14 +35,19 @@ class ImportSardegnaSentieriPoiJob implements ShouldQueue
      */
     public function __construct(
         public readonly int $externalId
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
-    public function handle(SardegnaSentieriImportService $service): void
+    public function handle(SardegnaSentieriClient $client, SardegnaSentieriImportService $service): void
     {
-        $service->importPoi($this->externalId);
+        $response = $client->getPoiDetail($this->externalId);
+        $poi = $service->importPoiFromResponse($this->externalId, $response);
+
+        ImportSardegnaSentieriPoiMediaJob::dispatch(
+            $poi->id,
+            SardegnaSentieriImageManifest::fromApiPoiResponse($response)
+        );
     }
 }
