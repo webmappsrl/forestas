@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
+use App\Dto\Api\ApiPoiResponse;
+use App\Dto\Api\ApiTrackResponse;
+use App\Dto\Import\PoiPropertiesData;
+use App\Dto\Import\TrackPropertiesData;
 use App\Enums\StatoValidazione;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\User;
@@ -11,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Helpers\GlobalFileHelper;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
-use Wm\WmPackage\Models\EcTrack;
+use App\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 
@@ -189,29 +193,17 @@ class SardegnaSentieriImportService
 
     public function importPoi(int $externalId): EcPoi
     {
-        $feature = $this->client->getPoiDetail($externalId);
-        $props = $feature['properties'] ?? [];
-        $geometry = $feature['geometry'] ?? null;
+        $response = $this->client->getPoiDetail($externalId);
 
-        $coords = $geometry['coordinates'] ?? null;
-        if (! is_array($coords) || count($coords) < 2) {
+        if (count($response->coordinates) < 2) {
             throw new \RuntimeException("Invalid geometry for POI {$externalId}");
         }
-
-        $forestasData = [
-            'codice'          => $props['codice'] ?? null,
-            'collegamenti'    => $props['collegamenti'] ?? [],
-            'come_arrivare'   => $props['come_arrivare'] ?? null,
-            'url'             => $props['url'] ?? null,
-            'updated_at'      => $props['updated_at'] ?? null,
-            'zona_geografica' => $props['taxonomies']['zona_geografica'] ?? [],
-        ];
 
         $data = [
             'app_id'   => $this->getAppId(),
             'user_id'  => $this->getUserId(),
-            'name'     => $this->extractTranslatable($props['name'] ?? null),
-            'geometry' => "POINT({$coords[0]} {$coords[1]})",
+            'name'     => $response->name,
+            'geometry' => "POINT({$response->coordinates[0]} {$response->coordinates[1]})",
         ];
 
         $ecPoi = EcPoi::whereRaw(
@@ -223,24 +215,19 @@ class SardegnaSentieriImportService
 
         $data['properties'] = array_merge(
             $existingProperties,
-            [
-                'description'           => $this->extractTranslatable($props['description'] ?? null),
-                'addr_complete'         => $props['addr_locality'] ?? null,
-                'out_source_feature_id' => (string) $externalId,
-                'forestas'              => $forestasData,
-            ]
+            PoiPropertiesData::fromApiResponse($externalId, $response)->toArray()
         );
 
         $ecPoi->fill($data)->saveQuietly();
 
-        $this->syncPoiTaxonomies($ecPoi, $props);
+        $this->syncPoiTaxonomies($ecPoi, $response);
 
         return $ecPoi;
     }
 
-    private function syncPoiTaxonomies(EcPoi $ecPoi, array $props): void
+    private function syncPoiTaxonomies(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
-        $poiTypeIds = collect($props['taxonomies']['tipologia_poi'] ?? [])
+        $poiTypeIds = collect($response->taxonomies->tipologia_poi)
             ->flatMap(fn ($apiId) => $this->resolvePoiTypeIds((string) $apiId))
             ->filter()
             ->unique()
@@ -256,34 +243,14 @@ class SardegnaSentieriImportService
 
     public function importTrack(int $externalId): EcTrack
     {
-        $feature = $this->client->getTrackDetail($externalId);
-        $props = $feature['properties'] ?? [];
+        $response = $this->client->getTrackDetail($externalId);
 
-        $geometry = $this->getGeometryFromGpx($props);
-
-        $forestasData = [
-            'source_id'       => (string) $externalId,
-            'type'            => $props['type'] ?? null,
-            'allegati'        => $props['allegati'] ?? [],
-            'video'           => $props['video'] ?? [],
-            'gpx'             => $props['gpx'] ?? [],
-            'url'             => $props['url'] ?? null,
-            'updated_at'      => $props['updated_at'] ?? null,
-            'zona_geografica' => $props['taxonomies']['zona_geografica'] ?? [],
-            'skip_dem_jobs'   => true,
-        ];
-
-        $manualData = [
-            'distance'          => $props['lunghezza'] ?? null,
-            'ascent'            => $props['dislivello_totale'] ?? null,
-            'duration_forward'  => $props['durata'] ?? null,
-            'duration_backward' => $props['durata'] ?? null,
-        ];
+        $geometry = $this->getGeometryFromGpx($response->gpx);
 
         $data = [
             'app_id'  => $this->getAppId(),
             'user_id' => $this->getUserId(),
-            'name'    => $this->extractTranslatable($props['name'] ?? null),
+            'name'    => $response->name,
         ];
 
         $ecTrack = EcTrack::firstWhere(
@@ -296,35 +263,36 @@ class SardegnaSentieriImportService
 
         $data['properties'] = array_merge(
             $existingProperties,
-            [
-                'sardegnasentieri_id' => (string) $externalId,
-                'description'         => $this->extractTranslatable($props['description'] ?? null),
-                'excerpt'             => $this->extractTranslatable($props['excerpt'] ?? null),
-                'manual_data'         => array_merge($existingManualData, $manualData),
-                'forestas'            => $forestasData,
-            ]
+            TrackPropertiesData::fromApiResponse($externalId, $response, $existingManualData)->toArray()
         );
+
+        $isNew = ! $ecTrack->exists;
 
         if ($geometry !== null) {
             $data['geometry'] = $geometry;
+        } elseif ($isNew) {
+            throw new \RuntimeException("No GPX geometry available for new track {$externalId}. Import skipped.");
         }
 
-        $statoId = $props['taxonomies']['stato_di_validazione'][0] ?? null;
+        $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
         if ($statoId !== null) {
-            $data['stato_validazione'] = StatoValidazione::fromApiId((string) $statoId)?->value;
+            $data['stato_validazione'] = StatoValidazione::fromApiId($statoId)?->value;
         }
 
         $ecTrack->fill($data)->saveQuietly();
 
-        $this->syncRelatedPois($ecTrack, $props);
-        $this->syncTrackTaxonomies($ecTrack, $props);
+        $this->syncRelatedPois($ecTrack, $response);
+        $this->syncTrackTaxonomies($ecTrack, $response);
 
         return $ecTrack;
     }
 
-    private function getGeometryFromGpx(array $props): ?string
+    /**
+     * @param list<string> $gpxUrls
+     */
+    private function getGeometryFromGpx(array $gpxUrls): ?string
     {
-        foreach ($props['gpx'] ?? [] as $gpxUrl) {
+        foreach ($gpxUrls as $gpxUrl) {
             try {
                 $gpxContent = $this->client->getGpxContent($gpxUrl);
                 $geometry = $this->parseGpxToWkt($gpxContent);
@@ -377,13 +345,13 @@ class SardegnaSentieriImportService
         return 'MULTILINESTRING Z (' . implode(', ', $segments) . ')';
     }
 
-    private function syncRelatedPois(EcTrack $ecTrack, array $props): void
+    private function syncRelatedPois(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $poiIds = collect([$props['partenza'] ?? null, $props['arrivo'] ?? null])
+        $poiIds = collect([$response->partenza, $response->arrivo])
             ->filter()
             ->map(fn ($sourceId) => EcPoi::whereRaw(
                 "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
-                [(string) $sourceId, (string) $sourceId]
+                [$sourceId, $sourceId]
             )->value('id'))
             ->filter()
             ->values()
@@ -392,15 +360,15 @@ class SardegnaSentieriImportService
         $ecTrack->ecPois()->sync($poiIds);
     }
 
-    private function syncTrackTaxonomies(EcTrack $ecTrack, array $props): void
+    private function syncTrackTaxonomies(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $activityIds = collect($props['taxonomies']['categorie_fruibilita_sentieri'] ?? [])
+        $activityIds = collect($response->taxonomies->categorie_fruibilita_sentieri)
             ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'categorie_fruibilita_sentieri'))
             ->filter()
             ->values()
             ->toArray();
 
-        $tipologiaIds = collect($props['taxonomies']['tipologia_sentieri'] ?? [])
+        $tipologiaIds = collect($response->taxonomies->tipologia_sentieri)
             ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'tipologia_sentieri'))
             ->filter()
             ->values()
@@ -443,22 +411,6 @@ class SardegnaSentieriImportService
         }
 
         return $this->userId;
-    }
-
-    /**
-     * @return array<string, string>|null
-     */
-    private function extractTranslatable(mixed $value): ?array
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        if (is_array($value)) {
-            return $value;
-        }
-
-        return ['it' => $value];
     }
 
     // -------------------------------------------------------------------------

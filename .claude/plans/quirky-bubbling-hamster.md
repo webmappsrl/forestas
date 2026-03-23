@@ -1,69 +1,137 @@
-# Fix: Import come sync affidabile
+# DTO: tipizzare anche l'input (risposta API)
 
 ## Contesto
 
-L'import deve funzionare come sync bidirezionale: aggiornare dati esistenti, aggiungere nuovi, e gestire rimozioni/svuotamenti dall'API. Attualmente ci sono bug che impediscono una sync corretta.
+`fromApi(array $props)` è opaco quanto prima: nessun autocomplete sull'input, nessuna
+validazione statica, nessuna garanzia che un campo esista. La soluzione è tipizzare anche
+la risposta API con DTO dedicati, così la catena diventa completamente tipizzata:
 
-## Problemi identificati
-
-### P1 — `sync([])` mai chiamato su relazioni vuote
-Se l'API rimuove tutte le tassonomie da un POI/Track, o rimuove partenza/arrivo, le vecchie relazioni restano perché il codice fa `if (!empty($ids)) { sync($ids) }` — salta il caso vuoto.
-
-**Fix:** Chiamare sempre `sync()`, anche con array vuoto.
-
-**File:** `app/Services/Import/SardegnaSentieriImportService.php`
-- `syncPoiTaxonomies()` (riga ~253): rimuovere il `if (!empty(...))`
-- `syncTrackTaxonomies()` (riga ~417): rimuovere il `if (!empty(...))`
-- `syncRelatedPois()` (riga ~396): rimuovere il `if (!empty(...))`
-
-### P2 — GPX con namespace XML non parsato
-I file GPX standard hanno `xmlns="http://www.topografix.com/GPX/1/1"`. SimpleXML non trova `$xml->trk` senza registrare il namespace → geometry sempre null, silenziosamente.
-
-**Fix:** In `parseGpxToWkt()`, dopo `simplexml_load_string()`, registrare il namespace di default e usare `children()` oppure strip del namespace prima del parsing.
-
-Approccio più semplice — strip namespace:
-```php
-$gpxContent = preg_replace('/xmlns\s*=\s*"[^"]*"/', '', $gpxContent, 1);
+```
+JSON → ApiPoiResponse (input) → PoiPropertiesData (output DB)
+                     ↓
+              ForestasPoiData
 ```
 
-**File:** `app/Services/Import/SardegnaSentieriImportService.php` — metodo `parseGpxToWkt()` (riga ~350)
+Il developer vede i campi disponibili sia sull'input (ApiPoiResponse) sia sull'output
+(PoiPropertiesData). Se usa un campo inesistente, PHPStan e l'IDE lo segnalano subito.
 
-### P3 — Doppia query in `importPoi()`
-La whereRaw per cercare il POI esistente viene eseguita 2 volte (riga ~217 per `value('properties')` e riga ~232 per `first()`). Unificare in una sola query.
+## Struttura DTO aggiornata
 
-**Fix:** fare `first()` una volta, estrarre properties da lì.
+```
+app/Dto/
+├── Api/
+│   ├── ApiPoiResponse.php         # risposta GET /poi/{id}
+│   ├── ApiTrackResponse.php       # risposta GET /track/{id}
+│   └── ApiTaxonomiesData.php      # sub-DTO per il blocco taxonomies comune
+└── Import/
+    ├── ForestasPoiData.php        # fromApiResponse(ApiPoiResponse) invece di fromApi(array)
+    ├── ForestasTrackData.php      # fromApiResponse(ApiTrackResponse)
+    ├── PoiPropertiesData.php      # fromApiResponse(ApiPoiResponse)
+    └── TrackPropertiesData.php    # fromApiResponse(ApiTrackResponse, array $existingManual)
+```
 
-### P4 — Doppia query in `importTrack()`
-Stesso pattern: riga ~294 `value('properties')` e riga ~319 `firstWhere()`.
+## DTO da creare
 
-**Fix:** stesso approccio del P3.
+### `app/Dto/Api/ApiTaxonomiesData.php`
+Sub-DTO condiviso da POI e Track:
+```php
+readonly class ApiTaxonomiesData
+{
+    public function __construct(
+        /** @var list<string> */
+        public array $tipologia_poi = [],
+        /** @var list<string> */
+        public array $categorie_fruibilita_sentieri = [],
+        /** @var list<string> */
+        public array $tipologia_sentieri = [],
+        /** @var list<string> */
+        public array $stato_di_validazione = [],
+        /** @var list<string> */
+        public array $zona_geografica = [],
+    ) {}
 
-### P5 — Gestione item rimossi dall'API
-Se un POI/Track viene eliminato dall'API, resta nel DB per sempre. Serve un meccanismo di soft-delete/disabilitazione.
+    public static function fromArray(array $taxonomies): self { ... }
+}
+```
 
-**Fix:** Nel command, dopo il dispatch dei job, confrontare gli ID dell'API con quelli nel DB. Marcare come `properties->forestas->deleted_from_source = true` quelli non più presenti nell'API. Non eliminarli fisicamente.
+### `app/Dto/Api/ApiPoiResponse.php`
+```php
+readonly class ApiPoiResponse
+{
+    public function __construct(
+        public string $id,
+        /** @var array<string, string> Translatable */
+        public array $name,
+        /** @var array<string, string>|null */
+        public ?array $description,
+        public ?string $addr_locality,
+        public ?string $codice,
+        /** @var list<mixed> */
+        public array $collegamenti,
+        public ?string $come_arrivare,
+        public ?string $url,
+        public ?string $updated_at,
+        /** @var array{type: string, coordinates: list<float>}|null */
+        public ?array $geometry,
+        public ApiTaxonomiesData $taxonomies,
+    ) {}
 
-**File:** `app/Console/Commands/ImportSardegnaSentieriCommand.php` — aggiungere logica dopo `importPois()` e `importTracks()`
+    public static function fromJson(array $feature): self { ... }  // unico fromArray
+}
+```
 
-### P6 — Client timeout basso per GPX pesanti
-Il client ha `TIMEOUT = 30s` per tutto, ma i GPX possono essere grossi.
+### `app/Dto/Api/ApiTrackResponse.php`
+```php
+readonly class ApiTrackResponse
+{
+    public function __construct(
+        public string $id,
+        /** @var array<string, string> */
+        public array $name,
+        /** @var array<string, string>|null */
+        public ?array $description,
+        /** @var array<string, string>|null */
+        public ?array $excerpt,
+        public ?string $lunghezza,
+        public ?string $dislivello_totale,
+        public ?string $durata,
+        public ?string $type,
+        /** @var list<string> URL PDF */
+        public array $allegati,
+        /** @var list<string> URL YouTube */
+        public array $video,
+        /** @var list<string> URL GPX */
+        public array $gpx,
+        public ?string $url,
+        public ?string $updated_at,
+        public ?string $partenza,
+        public ?string $arrivo,
+        public ApiTaxonomiesData $taxonomies,
+    ) {}
 
-**Fix:** `getGpxContent()` deve usare un timeout più alto (es. 60s).
+    public static function fromJson(array $feature): self { ... }
+}
+```
 
-**File:** `app/Http/Clients/SardegnaSentieriClient.php` — metodo `getGpxContent()` (riga ~106)
+## Modifiche ai DTO esistenti
+
+### `ForestasPoiData`, `ForestasTrackData`, `PoiPropertiesData`, `TrackPropertiesData`
+- Sostituire `fromApi(array $props)` con `fromApiResponse(ApiPoiResponse|ApiTrackResponse $response)`
+- Tutti i campi diventano accessi tipizzati: `$response->codice` invece di `$props['codice'] ?? null`
+
+### `SardegnaSentieriClient`
+- `getPoiDetail(int $id): ApiPoiResponse` invece di `array`
+- `getTrackDetail(int $id): ApiTrackResponse` invece di `array`
+- Il parsing JSON → DTO avviene nel client, una volta sola
+
+### `SardegnaSentieriImportService`
+- `importPoi()`: riceve `ApiPoiResponse` dal client direttamente
+- `importTrack()`: riceve `ApiTrackResponse` dal client direttamente
+- `$feature['properties'] ?? []` sparisce — tutto tipizzato
 
 ## Verifica
 
 ```bash
-# PHPStan
-vendor/bin/phpstan analyse app/Services/Import/ app/Http/Clients/ app/Console/Commands/
-
-# Test sync: import, poi re-import per verificare idempotenza
-docker exec -it php-${APP_NAME} php artisan sardegnasentieri:import --only=pois --force
-docker exec -it php-${APP_NAME} php artisan sardegnasentieri:import --only=pois  # secondo run: 0 dispatched
-
-# Test GPX: import di una track con GPX
-docker exec -it php-${APP_NAME} php artisan tinker --execute="
-  app(\App\Services\Import\SardegnaSentieriImportService::class)->importTrack(75);
-"
+docker exec -it php-forestas vendor/bin/phpstan analyse app/Dto/ app/Http/Clients/ app/Services/Import/
+docker exec -it php-forestas vendor/bin/pest tests/Feature/Import/
 ```

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Clients;
 
+use App\Dto\Api\ApiPoiResponse;
+use App\Dto\Api\ApiTrackResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -35,18 +37,16 @@ class SardegnaSentieriClient
     /**
      * Get POI detail by ID
      *
-     * @return array<string, mixed>
-     *
      * @throws ConnectionException
      */
-    public function getPoiDetail(int $id): array
+    public function getPoiDetail(int $id): ApiPoiResponse
     {
         $response = Http::timeout(self::TIMEOUT)
             ->get(self::BASE_URL . "/poi/{$id}", ['_format' => 'json']);
 
         throw_if($response->failed(), \RuntimeException::class, "Failed to fetch POI {$id}: " . $response->body());
 
-        return $response->json() ?? [];
+        return ApiPoiResponse::fromJson($response->json() ?? []);
     }
 
     /**
@@ -69,18 +69,16 @@ class SardegnaSentieriClient
     /**
      * Get Track detail by ID
      *
-     * @return array<string, mixed>
-     *
      * @throws ConnectionException
      */
-    public function getTrackDetail(int $id): array
+    public function getTrackDetail(int $id): ApiTrackResponse
     {
         $response = Http::timeout(self::TIMEOUT)
             ->get(self::BASE_URL . "/track/{$id}", ['_format' => 'json']);
 
         throw_if($response->failed(), \RuntimeException::class, "Failed to fetch track {$id}: " . $response->body());
 
-        return $response->json() ?? [];
+        return ApiTrackResponse::fromJson($response->json() ?? []);
     }
 
     /**
