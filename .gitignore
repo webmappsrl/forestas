@@ -4,8 +4,7 @@
 /public/hot
 /public/storage
 /public/vendor/nova/
-/storage/*.key
-/storage/pail
+/storage/*
 /vendor
 .env
 .env.backup
