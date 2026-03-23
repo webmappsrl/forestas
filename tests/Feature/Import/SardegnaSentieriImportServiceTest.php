@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Dto\Api\ApiPoiResponse;
+use App\Dto\Api\ApiTrackResponse;
 use App\Enums\StatoValidazione;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -24,7 +28,7 @@ function sardegnaSentieriApp(): App
 {
     return App::firstOrCreate(
         ['sku' => 'it.webmapp.sardegnasentieri'],
-        ['name' => 'Sardegna Sentieri', 'user_id' => sardegnaSentieriUser()->id]
+        ['name' => 'Sardegna Sentieri', 'customer_name' => 'forestas', 'user_id' => sardegnaSentieriUser()->id]
     );
 }
 
@@ -52,9 +56,9 @@ function makeService(array $clientMethods = []): SardegnaSentieriImportService
     return new SardegnaSentieriImportService($client);
 }
 
-function minimalPoiFeature(int $id, array $overrides = []): array
+function minimalPoiFeature(int $id, array $overrides = []): ApiPoiResponse
 {
-    return array_merge_recursive([
+    $base = [
         'type' => 'Feature',
         'geometry' => ['type' => 'Point', 'coordinates' => [9.1903, 41.1087]],
         'properties' => [
@@ -69,12 +73,21 @@ function minimalPoiFeature(int $id, array $overrides = []): array
             'url' => null,
             'taxonomies' => ['tipologia_poi' => [], 'zona_geografica' => []],
         ],
-    ], $overrides);
+    ];
+
+    if (isset($overrides['properties'])) {
+        $base['properties'] = array_merge($base['properties'], $overrides['properties']);
+        unset($overrides['properties']);
+    }
+
+    $feature = array_merge($base, $overrides);
+
+    return ApiPoiResponse::fromJson($feature);
 }
 
-function minimalTrackFeature(int $id, array $overrides = []): array
+function minimalTrackFeature(int $id, array $overrides = []): ApiTrackResponse
 {
-    return array_merge_recursive([
+    $base = [
         'type' => 'Feature',
         'geometry' => null,
         'properties' => [
@@ -100,7 +113,16 @@ function minimalTrackFeature(int $id, array $overrides = []): array
                 'zona_geografica' => [],
             ],
         ],
-    ], $overrides);
+    ];
+
+    if (isset($overrides['properties'])) {
+        $base['properties'] = array_merge($base['properties'], $overrides['properties']);
+        unset($overrides['properties']);
+    }
+
+    $feature = array_merge($base, $overrides);
+
+    return ApiTrackResponse::fromJson($feature);
 }
 
 function gpxWithNamespace(array $coords = [[9.19, 41.10, 100.0], [9.20, 41.11, 110.0]]): string
@@ -138,6 +160,9 @@ GPX;
 // ---------------------------------------------------------------------------
 
 beforeEach(function () {
+    Bus::fake();
+    Storage::fake('wmfe');
+    Storage::disk('wmfe')->put(config('app.name', 'forestas') . '/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
     sardegnaSentieriApp(); // ensures App + User exist
 });
 
@@ -178,8 +203,15 @@ it('salva la geometry come POINT WKT', function () {
 });
 
 it('lancia eccezione se la geometry è mancante', function () {
-    $feature = minimalPoiFeature(42);
-    $feature['geometry'] = null;
+    $feature = ApiPoiResponse::fromJson([
+        'type' => 'Feature',
+        'geometry' => null,
+        'properties' => [
+            'id' => '42',
+            'name' => ['it' => 'Test'],
+            'taxonomies' => [],
+        ],
+    ]);
 
     $service = makeService(['getPoiDetail' => $feature]);
 
@@ -192,7 +224,7 @@ it('lancia eccezione se la geometry è mancante', function () {
 // ---------------------------------------------------------------------------
 
 it('sincronizza le TaxonomyPoiType quando presenti', function () {
-    $taxonomy = TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']);
+    $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
     $client = Mockery::mock(SardegnaSentieriClient::class);
     $client->shouldReceive('getPoiDetail')->andReturn(
@@ -210,7 +242,7 @@ it('sincronizza le TaxonomyPoiType quando presenti', function () {
 });
 
 it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', function () {
-    $taxonomy = TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']);
+    $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
     // Prima importazione con tassonomia
     $client = Mockery::mock(SardegnaSentieriClient::class);
@@ -236,10 +268,14 @@ it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', 
 // importTrack — creazione e aggiornamento
 // ---------------------------------------------------------------------------
 
-it('crea un nuovo EcTrack dalla API senza GPX', function () {
-    $service = makeService(['getTrackDetail' => minimalTrackFeature(75)]);
+it('crea un nuovo EcTrack dalla API con GPX', function () {
+    $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $track = $service->importTrack(75);
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn($feature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    $track = (new SardegnaSentieriImportService($client))->importTrack(75);
 
     expect(EcTrack::count())->toBe(1)
         ->and($track->properties['sardegnasentieri_id'])->toBe('75')
@@ -248,21 +284,36 @@ it('crea un nuovo EcTrack dalla API senza GPX', function () {
 
 it('imposta stato_validazione tramite enum', function () {
     $feature = minimalTrackFeature(75, [
-        'properties' => ['taxonomies' => ['stato_di_validazione' => ['4188']]],
+        'properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'taxonomies' => ['stato_di_validazione' => ['4188']],
+        ],
     ]);
-    $service = makeService(['getTrackDetail' => $feature]);
 
-    $track = $service->importTrack(75);
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn($feature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    $track = (new SardegnaSentieriImportService($client))->importTrack(75);
 
     expect($track->stato_validazione)->toBe(StatoValidazione::Validato->value);
 });
 
 it('aggiorna un EcTrack esistente senza duplicati', function () {
-    $service = makeService(['getTrackDetail' => minimalTrackFeature(75)]);
-    $service->importTrack(75);
+    $gpxFeature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn($gpxFeature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    (new SardegnaSentieriImportService($client))->importTrack(75);
+
+    // Seconda esecuzione — stesso ID, nuova lunghezza, nessun GPX (track già esiste)
     $feature2 = minimalTrackFeature(75, ['properties' => ['lunghezza' => '9999']]);
-    (makeService(['getTrackDetail' => $feature2]))->importTrack(75);
+    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2->shouldReceive('getTrackDetail')->andReturn($feature2);
+
+    (new SardegnaSentieriImportService($client2))->importTrack(75);
 
     expect(EcTrack::count())->toBe(1)
         ->and(EcTrack::first()->properties['manual_data']['distance'])->toBe('9999');
@@ -296,16 +347,35 @@ it('parsa correttamente GPX senza namespace', function () {
     expect($track->getRawOriginal('geometry'))->not->toBeNull();
 });
 
-it('continua senza geometry se tutti i GPX falliscono', function () {
+it('lancia eccezione per nuovo track se tutti i GPX falliscono', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/bad.gpx']]]);
 
     $client = Mockery::mock(SardegnaSentieriClient::class);
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
 
-    $track = (new SardegnaSentieriImportService($client))->importTrack(75);
+    expect(fn () => (new SardegnaSentieriImportService($client))->importTrack(75))
+        ->toThrow(RuntimeException::class, 'No GPX geometry available for new track');
+});
 
-    // Track salvato anche senza geometry
+it('aggiorna un track esistente anche se il GPX fallisce', function () {
+    // Crea il track con geometry valida
+    $gpxFeature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
+
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn($gpxFeature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    (new SardegnaSentieriImportService($client))->importTrack(75);
+
+    // Aggiornamento — GPX fallisce ma il track esiste già con geometry
+    $feature2 = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/bad.gpx']]]);
+    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2->shouldReceive('getTrackDetail')->andReturn($feature2);
+    $client2->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
+
+    $track = (new SardegnaSentieriImportService($client2))->importTrack(75);
+
     expect(EcTrack::count())->toBe(1)
         ->and($track->properties['sardegnasentieri_id'])->toBe('75');
 });
@@ -315,16 +385,20 @@ it('continua senza geometry se tutti i GPX falliscono', function () {
 // ---------------------------------------------------------------------------
 
 it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)', function () {
-    $activity = TaxonomyActivity::create(['identifier' => 'escursionismo', 'name' => 'Escursionismo']);
+    $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create(['identifier' => 'escursionismo', 'name' => 'Escursionismo']));
 
-    // Prima importazione con attività
+    // Prima importazione con attività e GPX
     $client = Mockery::mock(SardegnaSentieriClient::class);
     $client->shouldReceive('getTrackDetail')->andReturn(
-        minimalTrackFeature(75, ['properties' => ['taxonomies' => [
-            'categorie_fruibilita_sentieri' => ['111'],
-            'tipologia_sentieri' => [],
-        ]]])
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'taxonomies' => [
+                'categorie_fruibilita_sentieri' => ['111'],
+                'tipologia_sentieri' => [],
+            ],
+        ]])
     );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
     $client->shouldReceive('getTaxonomy')->with('categorie_fruibilita_sentieri')->andReturn([
         '111' => ['geohub_identifier' => 'escursionismo', 'name' => 'Escursionismo'],
     ]);
@@ -335,8 +409,10 @@ it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)',
     $track = EcTrack::first();
     expect($track->taxonomyActivities()->count())->toBe(1);
 
-    // Seconda importazione senza attività → deve rimuoverle
-    (makeService(['getTrackDetail' => minimalTrackFeature(75)]))->importTrack(75);
+    // Seconda importazione senza attività (track esiste già con geometry) → deve rimuoverle
+    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
+    (new SardegnaSentieriImportService($client2))->importTrack(75);
 
     expect($track->fresh()->taxonomyActivities()->count())->toBe(0);
 });
@@ -346,16 +422,23 @@ it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)'
         'properties' => ['out_source_feature_id' => '10'],
     ]);
 
-    // Prima importazione con partenza
-    $feature = minimalTrackFeature(75, ['properties' => ['partenza' => '10']]);
-    $service = makeService(['getTrackDetail' => $feature]);
-    $service->importTrack(75);
+    // Prima importazione con partenza e GPX
+    $feature = minimalTrackFeature(75, ['properties' => [
+        'gpx' => ['http://example.com/track.gpx'],
+        'partenza' => '10',
+    ]]);
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn($feature);
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    (new SardegnaSentieriImportService($client))->importTrack(75);
 
     $track = EcTrack::first();
     expect($track->ecPois()->count())->toBe(1);
 
-    // Seconda importazione senza partenza
-    (makeService(['getTrackDetail' => minimalTrackFeature(75)]))->importTrack(75);
+    // Seconda importazione senza partenza (track esiste già con geometry)
+    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
+    (new SardegnaSentieriImportService($client2))->importTrack(75);
 
     expect($track->fresh()->ecPois()->count())->toBe(0);
 });
