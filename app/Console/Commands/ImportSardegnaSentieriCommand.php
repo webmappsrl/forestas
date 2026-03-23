@@ -74,20 +74,23 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching POI list...');
         $poiList = $client->getPoiList();
-        $this->info('Found ' . count($poiList) . ' POIs.');
+        $this->info('Found '.count($poiList).' POIs.');
 
         $poiCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($poiList));
+        $appId = $this->getAppIdForSardegnaSentieri();
 
         $candidateIds = [];
         foreach ($poiList as $id => $apiTimestamp) {
-            // Skip if already up to date (unless force)
-            if (! $force) {
-                $existing = EcPoi::whereRaw(
-                    "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
-                    [(string) $id, (string) $id]
-                )
+            // Skip if already up to date (unless force). Solo righe della Forestas app (IMPORT_APP_ID).
+            if (! $force && $appId !== null) {
+                $existing = EcPoi::query()
+                    ->where('app_id', $appId)
+                    ->whereRaw(
+                        "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+                        [(string) $id, (string) $id]
+                    )
                     ->selectRaw("properties->'forestas'->>'updated_at' as updated_at")
                     ->value('updated_at');
 
@@ -152,17 +155,20 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching track list...');
         $trackList = $client->getTrackList();
-        $this->info('Found ' . count($trackList) . ' tracks.');
+        $this->info('Found '.count($trackList).' tracks.');
 
         $trackCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($trackList));
+        $appId = $this->getAppIdForSardegnaSentieri();
 
         $candidateIds = [];
         foreach ($trackList as $id => $apiTimestamp) {
-            // Skip if already up to date (unless force)
-            if (! $force) {
-                $existing = EcTrack::whereRaw("properties->>'sardegnasentieri_id' = ?", [$id])
+            // Skip if already up to date (unless force). Solo righe della Forestas app (IMPORT_APP_ID).
+            if (! $force && $appId !== null) {
+                $existing = EcTrack::query()
+                    ->where('app_id', $appId)
+                    ->whereRaw("properties->>'sardegnasentieri_id' = ?", [$id])
                     ->selectRaw("properties->'forestas'->>'updated_at' as updated_at")
                     ->value('updated_at');
 

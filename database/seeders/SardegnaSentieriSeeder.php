@@ -27,19 +27,22 @@ class SardegnaSentieriSeeder extends Seeder
         );
         $forestasUser->syncRoles([Role::findByName('Editor', 'web')]);
 
-        $admin = User::firstOrCreate(
-            ['email' => 'team@webmapp.it'],
-            [
-                'name' => 'Admin Team',
-                'password' => Hash::make('webmapp123'),
-            ]
-        );
-        $admin->syncRoles([Role::findByName('Administrator', 'web')]);
+        $adminPassword = env('APP_ADMIN_PASSWORD');
+        if (is_string($adminPassword) && $adminPassword !== '') {
+            $admin = User::updateOrCreate(
+                ['email' => 'team@webmapp.it'],
+                [
+                    'name' => 'Admin Team',
+                    'password' => Hash::make($adminPassword),
+                ]
+            );
+            $admin->syncRoles([Role::findByName('Administrator', 'web')]);
+        }
 
         $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
 
         if (! App::query()->whereKey($appId)->exists()) {
-            App::withoutEvents(fn() => App::query()->create([
+            App::withoutEvents(fn () => App::query()->create([
                 'id' => $appId,
                 'name' => 'Sardegna Sentieri',
                 'sku' => 'it.webmapp.sardegnasentieri',
