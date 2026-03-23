@@ -38,10 +38,10 @@ function sardegnaSentieriApp(): App
         return $existing;
     }
 
-    return App::withoutEvents(fn () => App::query()->create([
+    return App::withoutEvents(fn() => App::query()->create([
         'id' => $id,
-        'name' => 'Forestas',
-        'sku' => 'it.webmapp.forestas',
+        'name' => 'Sardegna Sentieri',
+        'sku' => 'it.webmapp.sardegnasentieri',
         'customer_name' => 'forestas',
         'user_id' => $user->id,
     ]));
@@ -52,7 +52,7 @@ function sardegnaSentieriUser(): User
     Role::firstOrCreate(['name' => 'Editor', 'guard_name' => 'web']);
     $user = User::firstOrCreate(
         ['email' => 'forestas@webmapp.it'],
-        ['name' => 'forestas', 'password' => bcrypt('secret')]
+        ['name' => 'Sardegna Sentieri', 'password' => bcrypt('secret')]
     );
     if (! $user->hasRole('Editor')) {
         $user->assignRole('Editor');
@@ -143,7 +143,7 @@ function minimalTrackFeature(int $id, array $overrides = []): ApiTrackResponse
 function gpxWithNamespace(array $coords = [[9.19, 41.10, 100.0], [9.20, 41.11, 110.0]]): string
 {
     $trkpts = implode('', array_map(
-        fn ($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
+        fn($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
         $coords
     ));
 
@@ -158,7 +158,7 @@ GPX;
 function gpxWithoutNamespace(array $coords = [[9.19, 41.10, 100.0], [9.20, 41.11, 110.0]]): string
 {
     $trkpts = implode('', array_map(
-        fn ($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
+        fn($c) => "<trkpt lat=\"{$c[1]}\" lon=\"{$c[0]}\"><ele>{$c[2]}</ele></trkpt>",
         $coords
     ));
 
@@ -177,7 +177,7 @@ GPX;
 beforeEach(function () {
     Bus::fake();
     Storage::fake('wmfe');
-    Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
+    Storage::disk('wmfe')->put(config('app.name', 'forestas') . '/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
     sardegnaSentieriApp(); // ensures App + User exist
 });
 
@@ -230,7 +230,7 @@ it('lancia eccezione se la geometry è mancante', function () {
 
     $service = makeService(['getPoiDetail' => $feature]);
 
-    expect(fn () => $service->importPoi(42))
+    expect(fn() => $service->importPoi(42))
         ->toThrow(RuntimeException::class, 'Invalid geometry');
 });
 
@@ -239,7 +239,7 @@ it('lancia eccezione se la geometry è mancante', function () {
 // ---------------------------------------------------------------------------
 
 it('sincronizza le TaxonomyPoiType quando presenti', function () {
-    $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
+    $taxonomy = TaxonomyPoiType::withoutEvents(fn() => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
     $client = Mockery::mock(SardegnaSentieriClient::class);
     $client->shouldReceive('getPoiDetail')->andReturn(
@@ -257,7 +257,7 @@ it('sincronizza le TaxonomyPoiType quando presenti', function () {
 });
 
 it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', function () {
-    $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
+    $taxonomy = TaxonomyPoiType::withoutEvents(fn() => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
     // Prima importazione con tassonomia
     $client = Mockery::mock(SardegnaSentieriClient::class);
@@ -369,7 +369,7 @@ it('lancia eccezione per nuovo track se tutti i GPX falliscono', function () {
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
 
-    expect(fn () => (new SardegnaSentieriImportService($client))->importTrack(75))
+    expect(fn() => (new SardegnaSentieriImportService($client))->importTrack(75))
         ->toThrow(RuntimeException::class, 'No GPX geometry available for new track');
 });
 
@@ -400,7 +400,7 @@ it('aggiorna un track esistente anche se il GPX fallisce', function () {
 // ---------------------------------------------------------------------------
 
 it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)', function () {
-    $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create(['identifier' => 'escursionismo', 'name' => 'Escursionismo']));
+    $activity = TaxonomyActivity::withoutEvents(fn() => TaxonomyActivity::create(['identifier' => 'escursionismo', 'name' => 'Escursionismo']));
 
     // Prima importazione con attività e GPX
     $client = Mockery::mock(SardegnaSentieriClient::class);

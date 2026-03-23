@@ -21,7 +21,7 @@ class SardegnaSentieriSeeder extends Seeder
         $forestasUser = User::firstOrCreate(
             ['email' => 'forestas@webmapp.it'],
             [
-                'name' => 'forestas',
+                'name' => 'Sardegna Sentieri',
                 'password' => Hash::make(Str::random(32)),
             ]
         );
@@ -39,10 +39,10 @@ class SardegnaSentieriSeeder extends Seeder
         $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
 
         if (! App::query()->whereKey($appId)->exists()) {
-            App::withoutEvents(fn () => App::query()->create([
+            App::withoutEvents(fn() => App::query()->create([
                 'id' => $appId,
-                'name' => 'Forestas',
-                'sku' => 'it.webmapp.forestas',
+                'name' => 'Sardegna Sentieri',
+                'sku' => 'it.webmapp.sardegnasentieri',
                 'customer_name' => 'forestas',
                 'user_id' => $forestasUser->id,
             ]));

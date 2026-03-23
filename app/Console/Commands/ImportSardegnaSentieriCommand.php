@@ -74,7 +74,7 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching POI list...');
         $poiList = $client->getPoiList();
-        $this->info('Found '.count($poiList).' POIs.');
+        $this->info('Found ' . count($poiList) . ' POIs.');
 
         $poiCount = 0;
         $force = $this->option('force');
@@ -152,7 +152,7 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $this->info('Fetching track list...');
         $trackList = $client->getTrackList();
-        $this->info('Found '.count($trackList).' tracks.');
+        $this->info('Found ' . count($trackList) . ' tracks.');
 
         $trackCount = 0;
         $force = $this->option('force');
@@ -369,7 +369,7 @@ class ImportSardegnaSentieriCommand extends Command
         $user = User::firstOrCreate(
             ['email' => 'forestas@webmapp.it'],
             [
-                'name' => 'forestas',
+                'name' => 'Sardegna Sentieri',
                 'password' => Hash::make(Str::random(32)),
             ]
         );
