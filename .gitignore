@@ -19,7 +19,9 @@ yarn-error.log
 /.fleet
 /.idea
 /.nova
-/.vscode
+/.vscode/*
+!/.vscode/settings.json/*
+!/.vscode/settings.json
 /.zed
 /docker/volumes/*
 build/

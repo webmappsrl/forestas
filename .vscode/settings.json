@@ -1,0 +1,4 @@
+{
+    "php.validate.executablePath": "docker exec -i php-forestas php",                                         
+    "phpstan.executablePath": "docker exec -i php-forestas vendor/bin/phpstan"      
+}
