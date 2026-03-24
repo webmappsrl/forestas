@@ -11,6 +11,7 @@ use App\Nova\Layer;
 use App\Nova\Media as NovaMedia;
 use App\Nova\TaxonomyPoiType;
 use App\Nova\TaxonomyActivity;
+use App\Nova\TaxonomyWhere;
 use App\Nova\UgcPoi;
 use App\Nova\UgcTrack;
 use App\Nova\User as NovaUser;
@@ -65,6 +66,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 MenuSection::make('Taxonomies', [
                     MenuItem::resource(TaxonomyPoiType::class),
                     MenuItem::resource(TaxonomyActivity::class),
+                    MenuItem::resource(TaxonomyWhere::class),
                 ])->icon('document'),
 
                 MenuSection::make(__('Files'), [
