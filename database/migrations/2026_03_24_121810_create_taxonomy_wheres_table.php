@@ -17,8 +17,6 @@ return new class extends Migration
             $table->id('id');
 
             $table->text('name');
-            $table->string('osmfeatures_id')->unique()->nullable();
-            $table->integer('admin_level')->nullable();
 
             $table->timestamps();
             $table->jsonb('properties')->nullable();
