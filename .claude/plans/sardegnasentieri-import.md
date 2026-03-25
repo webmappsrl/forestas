@@ -201,23 +201,25 @@ Documentazione e anti-pattern identificati.
 - `SardegnaSentieriImportService::importPoi()`
 - Sync tassonomie POI
 
-## Phase 4 — IN CORSO / DA FARE
-- `ImportSardegnaSentieriPoiMediaJob` + dispatch da `ImportSardegnaSentieriPoiJob` con manifest; `SardegnaSentieriMediaSyncService` (skip se URL già presente, import altrimenti, prune, try/catch per voce)
+## Phase 4 — COMPLETATA
+- `ImportSardegnaSentieriPoiMediaJob` + dispatch da `ImportSardegnaSentieriPoiJob` con manifest
+- `SardegnaSentieriMediaSyncService` (skip se URL già presente, import altrimenti, prune, try/catch per voce)
 
 ## Phase 5 — COMPLETATA
 - `SardegnaSentieriImportService::importTrack()`
 - GPX parsing con namespace fix
 - Sync relazioni (ecPois, taxonomyActivities)
 
-## Phase 6 — DA FARE
-- `ImportSardegnaSentieriTrackMediaJob` + dispatch da track job; stessa logica manifest / skip / prune del POI
+## Phase 6 — COMPLETATA
+- `ImportSardegnaSentieriTrackMediaJob` + dispatch da track job
+- Stessa logica manifest / skip / prune del POI
 
 ## Phase 7 — COMPLETATA
 - `ImportSardegnaSentieriCommand` con `--force` e `--only=`
 - Scheduler in `routes/console.php` (`dailyAt('03:00')`)
 - `markRemovedPois()` / `markRemovedTracks()` per sync bidirezionale
 
-## Phase 8 — DA FARE
+## Phase 8 — COMPLETATA
 - `ResetSardegnaSentieriCommand` per reimport da zero
 
 ## Phase 9 — DA FARE
