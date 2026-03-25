@@ -6,7 +6,11 @@ namespace App\Services\Import;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyWhere;
+use Wm\WmPackage\Services\GeometryComputationService;
 
 class TaxonomyWhereLayersImportService
 {
@@ -23,10 +27,11 @@ class TaxonomyWhereLayersImportService
      *   skipped_missing_layer_id:int,
      *   skipped_missing_match:int,
      *   skipped_invalid_geometry:int,
-     *   errors:int
+     *   errors:int,
+     *   synced_tracks:int
      * }
      */
-    public function import(): array
+    public function import(?int $appId = null): array
     {
         $counters = [
             'created' => 0,
@@ -35,12 +40,15 @@ class TaxonomyWhereLayersImportService
             'skipped_missing_match' => 0,
             'skipped_invalid_geometry' => 0,
             'errors' => 0,
+            'synced_tracks' => 0,
         ];
 
         $geojson = $this->fetchJson(self::GEOJSON_URL);
         $config = $this->fetchJson(self::CONFIG_URL);
         $layersById = $this->indexLayersById($config['MAP']['layers'] ?? []);
         $features = $geojson['features'] ?? [];
+
+        $appUserId = $this->resolveAppUserId($appId);
 
         foreach ($features as $feature) {
             if (! is_array($feature)) {
@@ -90,12 +98,14 @@ class TaxonomyWhereLayersImportService
                         'name' => $name,
                         'properties' => array_merge($taxonomyWhere->properties ?? [], $propertiesPayload),
                     ]);
+                    $this->assignTaxonomyUser($taxonomyWhere, $appUserId);
                     $counters['updated']++;
                 } else {
                     $taxonomyWhere = TaxonomyWhere::create([
                         'name' => $name,
                         'properties' => $propertiesPayload,
                     ]);
+                    $this->assignTaxonomyUser($taxonomyWhere, $appUserId);
                     $counters['created']++;
                 }
 
@@ -104,6 +114,10 @@ class TaxonomyWhereLayersImportService
                 $counters['errors']++;
             }
         }
+
+        $counters['synced_tracks'] = GeometryComputationService::make()->syncTracksTaxonomyWhere(
+            config('wm-package.ec_track_model', EcTrack::class)
+        );
 
         return $counters;
     }
@@ -197,5 +211,31 @@ class TaxonomyWhereLayersImportService
         }
 
         return null;
+    }
+
+    private function resolveAppUserId(?int $appId): ?int
+    {
+        $app = null;
+
+        if ($appId !== null) {
+            $app = App::query()->find($appId);
+        } elseif (App::query()->count() === 1) {
+            $app = App::query()->first();
+        }
+
+        if (! $app instanceof App || empty($app->user_id)) {
+            return null;
+        }
+
+        return (int) $app->user_id;
+    }
+
+    private function assignTaxonomyUser(TaxonomyWhere $taxonomyWhere, ?int $userId): void
+    {
+        if ($userId === null || ! Schema::hasColumn($taxonomyWhere->getTable(), 'user_id')) {
+            return;
+        }
+
+        $taxonomyWhere->forceFill(['user_id' => $userId])->saveQuietly();
     }
 }
