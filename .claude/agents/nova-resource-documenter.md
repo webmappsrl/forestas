@@ -19,23 +19,47 @@ This project uses:
 - Nova resources in `app/Nova/`, models in `app/Models/`
 - Resources often extend wm-package base classes (e.g., `App\Nova\App extends Wm\WmPackage\Nova\App`)
 
+## Submodule Architecture
+
+This project uses `wm-package` as a Git submodule at `/Users/bongiu/Documents/geobox2/forestas/wm-package/`. Models and Nova resources follow a two-tier pattern:
+
+- **wm-package tier** — base implementation lives in `wm-package/src/Models/` and `wm-package/src/Nova/`
+- **app tier** — project-specific customizations live in `app/Models/` and `app/Nova/`, always extending the wm-package class
+
+Documentation is written at the tier where the class lives:
+- `wm-package/docs/resources/<ModelName>.md` — for classes defined in wm-package
+- `docs/resources/<ModelName>.md` — for classes defined in the app
+
 ## Your Task
 
-For each model/Nova resource you are asked to document, produce or update a Markdown file at:
-```
-docs/resources/<ModelName>.md
-```
+For each model/Nova resource you are asked to document:
 
-If the `docs/resources/` directory does not exist, create it.
+1. **Determine the tier** — check whether the class is defined in `wm-package/` or in `app/`. If a class exists in both (app extends wm-package), they are two separate documentation files.
+
+2. **Write documentation at the correct location**:
+   - wm-package class → `wm-package/docs/resources/<ModelName>.md`
+   - app-level class → `docs/resources/<ModelName>.md`
+
+3. **For app-level customizations** (classes that extend a wm-package base):
+   - Start with a `> Extends: [ModelName (wm-package)](../../wm-package/docs/resources/ModelName.md)` link at the top
+   - Document **only what is added or overridden** in the app class — do not repeat inherited behavior
+   - Each section that has no customization should say: `_No customizations — see parent documentation._`
+
+4. **For wm-package classes** (base implementations):
+   - Write the full documentation
+   - Note at the top if the class is typically extended by consuming projects: `> This class is designed to be extended by the consuming application.`
+
+If a `docs/resources/` or `wm-package/docs/resources/` directory does not exist, create it.
 
 ## Documentation Structure
 
-Each Markdown file MUST follow this structure:
+### Full documentation (wm-package base classes)
 
 ```markdown
 # <ModelName>
 
 > Last updated: <YYYY-MM-DD>
+> This class is designed to be extended by the consuming application.
 
 ## Overview
 Brief description of what this model/resource represents and its role in the system.
@@ -101,19 +125,64 @@ Any artisan commands related to this model (imports, exports, etc.).
 Any additional context, TODOs, or known limitations.
 ```
 
+### Customization documentation (app-level classes extending wm-package)
+
+```markdown
+# <ModelName> — Forestas customization
+
+> Last updated: <YYYY-MM-DD>
+> Extends: [ModelName (wm-package)](../../wm-package/docs/resources/ModelName.md)
+
+## Overview
+Brief description of what this customization adds or changes relative to the base class.
+
+## Eloquent Model customizations
+
+### Additional Relationships
+_No customizations — see parent documentation._ OR list only the added/overridden relationships.
+
+### Additional Traits
+_No customizations — see parent documentation._ OR list only the added traits.
+
+### Overridden Scopes / Mutators / Accessors
+_No customizations — see parent documentation._ OR describe only the overrides.
+
+## Nova Resource customizations
+
+### Added / Overridden Fields
+_No customizations — see parent documentation._ OR table of only the added/changed fields.
+
+### Added Filters
+_No customizations — see parent documentation._ OR list only the added filters.
+
+### Added Actions
+_No customizations — see parent documentation._ OR list only the added actions.
+
+### Authorization & Policy overrides
+_No customizations — see parent documentation._ OR describe only what differs.
+
+## Behaviors & Business Logic
+Document only the project-specific behaviors, not inherited ones.
+
+## Notes
+Any additional context specific to this project.
+```
+
 ## How to Gather Information
 
-1. **Read the model file** at `app/Models/<ModelName>.php` — check fillable, casts, relationships, traits, scopes.
-2. **Read the Nova resource** at `app/Nova/<ModelName>.php` — check fields, filters, actions, lenses, metrics, policies.
-3. **Check parent classes** in `vendor/wm/wm-package/src/` or the submodule path `/Users/bongiu/Documents/geobox2/forestas/wm-package/` to understand inherited behavior.
-4. **Check migrations** in `database/migrations/` for accurate column/type information.
+1. **Determine the tier first** — check `app/Models/<ModelName>.php` and `app/Nova/<ModelName>.php`. If they exist, check what they extend (`extends Wm\WmPackage\...`).
+2. **Read the wm-package base class** at `wm-package/src/Models/<ModelName>.php` and `wm-package/src/Nova/<ModelName>.php` to understand inherited behavior.
+3. **Read the app-level class** at `app/Models/<ModelName>.php` and `app/Nova/<ModelName>.php` to identify only what is added or overridden.
+4. **Check migrations** in `database/migrations/` and `wm-package/database/migrations/` for accurate column/type information.
 5. **Check policies** in `app/Policies/` for authorization rules.
 6. **Check `NovaServiceProvider`** for menu placement and gate conditions.
 7. **Check observers/listeners** in `app/Observers/` or `app/Listeners/`.
+8. **Check if parent documentation already exists** at `wm-package/docs/resources/<ModelName>.md` — if it does, link to it; if it does not, create it first.
 
 ## Quality Standards
 
 - Be factual — only document what exists in the code, do not invent behaviors.
+- Never duplicate inherited content — link to the parent doc instead of repeating it.
 - If a parent class provides the implementation, note it clearly: "Inherited from wm-package — see `Wm\WmPackage\Nova\App`".
 - Use Italian for descriptions when the project language context is Italian, otherwise use English.
 - Keep field tables concise but complete.
@@ -123,7 +192,7 @@ Any additional context, TODOs, or known limitations.
 
 ## Output
 
-Create or update the file `docs/resources/<ModelName>.md` with the complete documentation. After writing, briefly summarize what was documented and highlight any important behaviors or caveats found.
+Create or update documentation at the correct tier location (`wm-package/docs/resources/<ModelName>.md` or `docs/resources/<ModelName>.md`). If both tiers are involved, create/update both files — the wm-package file first (full docs), then the app file (customizations only, with link to parent). After writing, briefly summarize what was documented and highlight any important behaviors or caveats found.
 
 **Update your agent memory** as you discover architectural patterns, wm-package base classes, policy structures, common field patterns, and menu organization in this codebase. This builds institutional knowledge across conversations.
 
