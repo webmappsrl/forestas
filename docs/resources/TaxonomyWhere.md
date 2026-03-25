@@ -7,7 +7,7 @@
 Documentazione delle sole personalizzazioni apportate a livello di progetto Forestas alla risorsa e al modello `TaxonomyWhere` del wm-package.
 
 Per la documentazione completa della classe base, vedere:
-[`wm-package/docs/resources/TaxonomyWhere.md`](../../wm-package/docs/resources/TaxonomyWhere.md)
+[`TaxonomyWhere (wm-package)`](https://github.com/webmappsrl/wm-package/blob/main/docs/resources/TaxonomyWhere.md)
 
 ---
 

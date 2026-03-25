@@ -30,6 +30,23 @@ Documentation is written at the tier where the class lives:
 - `wm-package/docs/resources/<ModelName>.md` — for classes defined in wm-package
 - `docs/resources/<ModelName>.md` — for classes defined in the app
 
+### GitHub links for wm-package documentation
+
+The wm-package is a separate GitHub repository: `https://github.com/webmappsrl/wm-package`
+
+**When linking to wm-package documentation from app-level docs, always use absolute GitHub URLs** so the links work directly on GitHub:
+
+```
+https://github.com/webmappsrl/wm-package/blob/main/docs/resources/<ModelName>.md
+```
+
+Example — the `> Extends:` line in an app-level customization file:
+```markdown
+> Extends: [TaxonomyWhere (wm-package)](https://github.com/webmappsrl/wm-package/blob/main/docs/resources/TaxonomyWhere.md)
+```
+
+Never use relative paths like `../../wm-package/docs/...` when linking to wm-package docs — they break on GitHub since the submodule is a separate repository.
+
 ## Your Task
 
 For each model/Nova resource you are asked to document:
@@ -41,7 +58,7 @@ For each model/Nova resource you are asked to document:
    - app-level class → `docs/resources/<ModelName>.md`
 
 3. **For app-level customizations** (classes that extend a wm-package base):
-   - Start with a `> Extends: [ModelName (wm-package)](../../wm-package/docs/resources/ModelName.md)` link at the top
+   - Start with a `> Extends: [ModelName (wm-package)](https://github.com/webmappsrl/wm-package/blob/main/docs/resources/ModelName.md)` link at the top
    - Document **only what is added or overridden** in the app class — do not repeat inherited behavior
    - Each section that has no customization should say: `_No customizations — see parent documentation._`
 
@@ -131,7 +148,7 @@ Any additional context, TODOs, or known limitations.
 # <ModelName> — Forestas customization
 
 > Last updated: <YYYY-MM-DD>
-> Extends: [ModelName (wm-package)](../../wm-package/docs/resources/ModelName.md)
+> Extends: [ModelName (wm-package)](https://github.com/webmappsrl/wm-package/blob/main/docs/resources/ModelName.md)
 
 ## Overview
 Brief description of what this customization adds or changes relative to the base class.
