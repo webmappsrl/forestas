@@ -75,9 +75,9 @@ class TaxonomyWhereLayersImportService
                 continue;
             }
 
-            $name = $this->extractBestLabel($layer['title'] ?? null)
-                ?? $this->extractBestLabel($layer['name'] ?? null)
-                ?? $externalLayerId;
+            $name = $this->extractTranslatedName($layer['title'] ?? null)
+                ?? $this->extractTranslatedName($layer['name'] ?? null)
+                ?? ['it' => $externalLayerId, 'en' => $externalLayerId];
 
             $propertiesPayload = array_filter([
                 'source' => self::SOURCE_KEY,
@@ -190,27 +190,71 @@ class TaxonomyWhereLayersImportService
         );
     }
 
-    private function extractBestLabel(mixed $value): ?string
+    /**
+     * @return array<string, string>|null
+     */
+    private function extractTranslatedName(mixed $value): ?array
     {
-        if (is_string($value) && trim($value) !== '') {
-            return $value;
-        }
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return null;
+            }
 
-        if (is_array($value)) {
-            foreach (['it', 'en'] as $lang) {
-                if (isset($value[$lang]) && is_string($value[$lang]) && trim($value[$lang]) !== '') {
-                    return $value[$lang];
+            // Some upstream payloads contain JSON serialized as string.
+            $decoded = json_decode($trimmed, true);
+            if (is_array($decoded)) {
+                $normalized = $this->normalizeTranslations($decoded);
+                if ($normalized !== []) {
+                    return $normalized;
                 }
             }
 
-            foreach ($value as $candidate) {
-                if (is_string($candidate) && trim($candidate) !== '') {
-                    return $candidate;
-                }
+            return ['it' => $trimmed, 'en' => $trimmed];
+        }
+
+        if (is_array($value)) {
+            $normalized = $this->normalizeTranslations($value);
+            if ($normalized !== []) {
+                return $normalized;
             }
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<mixed>  $value
+     * @return array<string, string>
+     */
+    private function normalizeTranslations(array $value): array
+    {
+        $normalized = [];
+        foreach (['it', 'en', 'de', 'fr', 'es'] as $lang) {
+            if (isset($value[$lang]) && is_string($value[$lang]) && trim($value[$lang]) !== '') {
+                $normalized[$lang] = trim($value[$lang]);
+            }
+        }
+
+        if ($normalized === []) {
+            foreach ($value as $candidate) {
+                if (is_string($candidate) && trim($candidate) !== '') {
+                    $label = trim($candidate);
+                    $normalized['it'] = $label;
+                    $normalized['en'] = $label;
+                    break;
+                }
+            }
+        }
+
+        if (isset($normalized['it']) && ! isset($normalized['en'])) {
+            $normalized['en'] = $normalized['it'];
+        }
+        if (isset($normalized['en']) && ! isset($normalized['it'])) {
+            $normalized['it'] = $normalized['en'];
+        }
+
+        return $normalized;
     }
 
     private function resolveAppUserId(?int $appId): ?int
