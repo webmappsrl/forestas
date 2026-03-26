@@ -109,8 +109,8 @@ class ImportSardegnaSentieriCommand extends Command
                         "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
                         [(string) $id, (string) $id]
                     )
-                    ->selectRaw("properties->'forestas'->>'updated_at' as updated_at")
-                    ->value('updated_at');
+                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at")
+                    ->value('forestas_updated_at');
 
                 if ($existing === $apiTimestamp) {
                     continue;
@@ -191,8 +191,8 @@ class ImportSardegnaSentieriCommand extends Command
                 $existing = EcTrack::query()
                     ->where('app_id', $appId)
                     ->whereRaw("properties->>'sardegnasentieri_id' = ?", [$id])
-                    ->selectRaw("properties->'forestas'->>'updated_at' as updated_at")
-                    ->value('updated_at');
+                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at")
+                    ->value('forestas_updated_at');
 
                 if ($existing === $apiTimestamp) {
                     continue;
@@ -224,7 +224,7 @@ class ImportSardegnaSentieriCommand extends Command
     {
         $appId = $this->getAppIdForSardegnaSentieri();
         if ($appId === null) {
-            return;
+            return 0;
         }
 
         $removed = EcTrack::where('app_id', $appId)
