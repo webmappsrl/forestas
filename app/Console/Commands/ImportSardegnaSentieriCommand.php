@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
@@ -42,7 +43,11 @@ class ImportSardegnaSentieriCommand extends Command
         SardegnaSentieriClient $client,
         SardegnaSentieriImportService $importService
     ): int {
+        $runId = strtoupper(Str::random(8));
+
         if (! $this->ensurePrerequisites()) {
+            Log::channel('import')->error("[sardegnasentieri:{$runId}] Prerequisites not met, import aborted.");
+
             return self::FAILURE;
         }
 
@@ -51,39 +56,52 @@ class ImportSardegnaSentieriCommand extends Command
         $this->info('Taxonomies imported.');
 
         $only = $this->option('only');
+        $poisDispatched = [];
+        $tracksDispatched = [];
+        $poisRemoved = 0;
+        $tracksRemoved = 0;
 
         // Import POIs
         if (! $only || $only === 'pois') {
-            $this->importPois($client);
+            [$poisDispatched, $poisRemoved] = $this->importPois($client);
         }
 
         // Import Tracks
         if (! $only || $only === 'tracks') {
-            $this->importTracks($client);
+            [$tracksDispatched, $tracksRemoved] = $this->importTracks($client);
         }
 
         $this->info('Import completed.');
+
+        Log::channel('import')->info("[sardegnasentieri:{$runId}] Run completed.", [
+            'pois_dispatched' => count($poisDispatched),
+            'poi_ids' => $poisDispatched,
+            'pois_removed' => $poisRemoved,
+            'tracks_dispatched' => count($tracksDispatched),
+            'track_ids' => $tracksDispatched,
+            'tracks_removed' => $tracksRemoved,
+        ]);
 
         return self::SUCCESS;
     }
 
     /**
      * Import POIs from API
+     *
+     * @return array{0: list<int>, 1: int}
      */
-    private function importPois(SardegnaSentieriClient $client): void
+    private function importPois(SardegnaSentieriClient $client): array
     {
         $this->info('Fetching POI list...');
         $poiList = $client->getPoiList();
         $this->info('Found '.count($poiList).' POIs.');
 
-        $poiCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($poiList));
         $appId = $this->getAppIdForSardegnaSentieri();
 
         $candidateIds = [];
         foreach ($poiList as $id => $apiTimestamp) {
-            // Skip if already up to date (unless force). Solo righe della Forestas app (IMPORT_APP_ID).
             if (! $force && $appId !== null) {
                 $existing = EcPoi::query()
                     ->where('app_id', $appId)
@@ -102,15 +120,17 @@ class ImportSardegnaSentieriCommand extends Command
             $candidateIds[] = (int) $id;
         }
 
+        $dispatched = [];
         foreach ($this->sortPoiDispatchOrder($candidateIds, $poiList) as $id) {
             ImportSardegnaSentieriPoiJob::dispatch($id);
-            $poiCount++;
+            $dispatched[] = $id;
         }
 
-        $this->info("Dispatched {$poiCount} POI import jobs.");
+        $this->info('Dispatched '.count($dispatched).' POI import jobs.');
 
-        // Mark POIs no longer present in the API
-        $this->markRemovedPois($apiIds);
+        $removed = $this->markRemovedPois($apiIds);
+
+        return [$dispatched, $removed];
     }
 
     /**
@@ -118,11 +138,11 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @param  string[]  $apiIds
      */
-    private function markRemovedPois(array $apiIds): void
+    private function markRemovedPois(array $apiIds): int
     {
         $appId = $this->getAppIdForSardegnaSentieri();
         if ($appId === null) {
-            return;
+            return 0;
         }
 
         $removed = EcPoi::where('app_id', $appId)
@@ -146,25 +166,27 @@ class ImportSardegnaSentieriCommand extends Command
         if ($removed->count() > 0) {
             $this->warn("Marked {$removed->count()} POIs as deleted_from_source.");
         }
+
+        return $removed->count();
     }
 
     /**
      * Import Tracks from API
+     *
+     * @return array{0: list<int>, 1: int}
      */
-    private function importTracks(SardegnaSentieriClient $client): void
+    private function importTracks(SardegnaSentieriClient $client): array
     {
         $this->info('Fetching track list...');
         $trackList = $client->getTrackList();
         $this->info('Found '.count($trackList).' tracks.');
 
-        $trackCount = 0;
         $force = $this->option('force');
         $apiIds = array_map('strval', array_keys($trackList));
         $appId = $this->getAppIdForSardegnaSentieri();
 
         $candidateIds = [];
         foreach ($trackList as $id => $apiTimestamp) {
-            // Skip if already up to date (unless force). Solo righe della Forestas app (IMPORT_APP_ID).
             if (! $force && $appId !== null) {
                 $existing = EcTrack::query()
                     ->where('app_id', $appId)
@@ -180,15 +202,17 @@ class ImportSardegnaSentieriCommand extends Command
             $candidateIds[] = (int) $id;
         }
 
+        $dispatched = [];
         foreach ($this->sortTrackDispatchOrder($candidateIds, $trackList) as $id) {
             ImportSardegnaSentieriTrackJob::dispatch($id);
-            $trackCount++;
+            $dispatched[] = $id;
         }
 
-        $this->info("Dispatched {$trackCount} Track import jobs.");
+        $this->info('Dispatched '.count($dispatched).' Track import jobs.');
 
-        // Mark tracks no longer present in the API
-        $this->markRemovedTracks($apiIds);
+        $removed = $this->markRemovedTracks($apiIds);
+
+        return [$dispatched, $removed];
     }
 
     /**
@@ -196,7 +220,7 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @param  string[]  $apiIds
      */
-    private function markRemovedTracks(array $apiIds): void
+    private function markRemovedTracks(array $apiIds): int
     {
         $appId = $this->getAppIdForSardegnaSentieri();
         if ($appId === null) {
@@ -223,6 +247,8 @@ class ImportSardegnaSentieriCommand extends Command
         if ($removed->count() > 0) {
             $this->warn("Marked {$removed->count()} Tracks as deleted_from_source.");
         }
+
+        return $removed->count();
     }
 
     private function getAppIdForSardegnaSentieri(): ?int

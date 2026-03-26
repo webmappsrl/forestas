@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Daily import from Sardegna Sentieri API at 03:00
-Schedule::command('sardegnasentieri:import')->dailyAt('03:00');
+// Sync from Sardegna Sentieri API every 5 minutes (incremental via updated_at)
+Schedule::command('sardegnasentieri:import')->everyFiveMinutes();
