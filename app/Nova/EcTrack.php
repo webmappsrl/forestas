@@ -10,6 +10,7 @@ use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
+use Laravel\Nova\Tabs\TabsGroup;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 
 class EcTrack extends WmNovaEcTrack
@@ -21,7 +22,7 @@ class EcTrack extends WmNovaEcTrack
         // that contains both the inherited Info tab and the new Forestas tab.
         // Note: getInfoTabFields() is inherited from WmNovaEcTrack (wm-package).
         // If the parent adds new Tab::group entries in the future, review this filter.
-        $nonTabFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof Tab)));
+        $nonTabFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup)));
 
         return [
             ...$nonTabFields,
