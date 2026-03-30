@@ -36,6 +36,7 @@ class EcTrack extends WmNovaEcTrack
                 ->filterable(),
             Tab::group(__('Details'), [
                 Tab::make(__('Info'), $this->getInfoTabFields()),
+                Tab::make(__('DEM'), $this->getDemTabFields()),
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
             ]),
         ];
