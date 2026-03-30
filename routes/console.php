@@ -13,5 +13,5 @@ Artisan::command('inspire', function () {
 if (App::environment('staging')) {
     Schedule::command('sardegnasentieri:import --reset')->dailyAt('06:00');
 } else {
-    Schedule::command('sardegnasentieri:import')->evertyHour();
+    Schedule::command('sardegnasentieri:import')->hourly();
 }

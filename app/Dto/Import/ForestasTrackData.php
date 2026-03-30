@@ -36,6 +36,37 @@ readonly class ForestasTrackData
 
     public function toArray(): array
     {
-        return get_object_vars($this);
+        return [
+            'source_id'       => $this->source_id,
+            'type'            => $this->type,
+            'allegati'        => self::listToAssoc($this->allegati),
+            'video'           => self::listToAssoc($this->video),
+            'gpx'             => self::listToAssoc($this->gpx),
+            'url'             => $this->url,
+            'updated_at'      => $this->updated_at,
+            'zona_geografica' => self::listToAssoc($this->zona_geografica),
+            'skip_dem_jobs'   => $this->skip_dem_jobs,
+        ];
+    }
+
+    /**
+     * Converte una lista PHP (array indicizzato numericamente) in array associativo
+     * con chiavi stringa ("0", "1", ...) compatibile con il campo KeyValue di Nova.
+     *
+     * @param  list<mixed>  $list
+     * @return array<string, mixed>
+     */
+    private static function listToAssoc(array $list): array
+    {
+        if (empty($list)) {
+            return [];
+        }
+
+        $result = [];
+        foreach (array_values($list) as $i => $value) {
+            $result[(string) $i] = $value;
+        }
+
+        return $result;
     }
 }
