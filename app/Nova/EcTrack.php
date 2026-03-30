@@ -22,22 +22,22 @@ class EcTrack extends WmNovaEcTrack
         // that contains both the inherited Info tab and the new Forestas tab.
         // Note: getInfoTabFields() is inherited from WmNovaEcTrack (wm-package).
         // If the parent adds new Tab::group entries in the future, review this filter.
-        $nonTabFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup)));
+        $nonTabFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup)));
 
         return [
             ...$nonTabFields,
             Select::make('Stato validazione', 'stato_validazione')
                 ->options(
                     collect(StatoValidazione::cases())
-                        ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
+                        ->mapWithKeys(fn($case) => [$case->value => $case->label()])
                         ->toArray()
                 )
                 ->nullable()
                 ->filterable(),
             Tab::group(__('Details'), [
+                Tab::make(__('Forestas'), $this->getForestasTabFields()),
                 Tab::make(__('Info'), $this->getInfoTabFields()),
                 Tab::make(__('DEM'), $this->getDemTabFields()),
-                Tab::make(__('Forestas'), $this->getForestasTabFields()),
             ]),
         ];
     }
