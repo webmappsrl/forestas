@@ -10,6 +10,7 @@ use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,7 +28,8 @@ class ImportSardegnaSentieriCommand extends Command
      */
     protected $signature = 'sardegnasentieri:import
                             {--force : Reimport all ignoring updated_at}
-                            {--only= : Import only pois or tracks}';
+                            {--only= : Import only pois or tracks}
+                            {--reset : Truncate all imported data before importing (implies --force)}';
 
     /**
      * The console command description.
@@ -49,6 +51,12 @@ class ImportSardegnaSentieriCommand extends Command
             Log::channel('import')->error("[sardegnasentieri:{$runId}] Prerequisites not met, import aborted.");
 
             return self::FAILURE;
+        }
+
+        if ($this->option('reset')) {
+            $this->info('Resetting all imported data...');
+            $this->resetData();
+            $this->info('Reset completed.');
         }
 
         $this->info('Importing taxonomies...');
@@ -96,7 +104,7 @@ class ImportSardegnaSentieriCommand extends Command
         $poiList = $client->getPoiList();
         $this->info('Found '.count($poiList).' POIs.');
 
-        $force = $this->option('force');
+        $force = $this->option('force') || $this->option('reset');
         $apiIds = array_map('strval', array_keys($poiList));
         $appId = $this->getAppIdForSardegnaSentieri();
 
@@ -181,7 +189,7 @@ class ImportSardegnaSentieriCommand extends Command
         $trackList = $client->getTrackList();
         $this->info('Found '.count($trackList).' tracks.');
 
-        $force = $this->option('force');
+        $force = $this->option('force') || $this->option('reset');
         $apiIds = array_map('strval', array_keys($trackList));
         $appId = $this->getAppIdForSardegnaSentieri();
 
@@ -383,6 +391,23 @@ class ImportSardegnaSentieriCommand extends Command
     /**
      * Ensure minimum entities needed by import exist.
      */
+    private function resetData(): void
+    {
+        // Truncate in order: tables with FKs first, then referenced tables.
+        // CASCADE handles junction tables automatically.
+        DB::statement('TRUNCATE TABLE ec_tracks RESTART IDENTITY CASCADE');
+        $this->info('Truncated ec_tracks.');
+
+        DB::statement('TRUNCATE TABLE ec_pois RESTART IDENTITY CASCADE');
+        $this->info('Truncated ec_pois.');
+
+        DB::statement('TRUNCATE TABLE taxonomy_poi_types RESTART IDENTITY CASCADE');
+        $this->info('Truncated taxonomy_poi_types.');
+
+        DB::statement('TRUNCATE TABLE taxonomy_activities RESTART IDENTITY CASCADE');
+        $this->info('Truncated taxonomy_activities.');
+    }
+
     private function ensurePrerequisites(): bool
     {
         $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
