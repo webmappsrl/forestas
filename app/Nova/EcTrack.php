@@ -11,6 +11,7 @@ use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
+use Wm\WmPackage\Nova\Cards\ApiLinksCard\EcTrackApiLinksCard;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 
 class EcTrack extends WmNovaEcTrack
@@ -40,6 +41,23 @@ class EcTrack extends WmNovaEcTrack
                 Tab::make(__('DEM'), $this->getDemTabFields()),
             ]),
         ];
+    }
+
+    public function cards(NovaRequest $request): array
+    {
+        if (! $request->resourceId) {
+            return [];
+        }
+
+        $track = $request->findModelOrFail();
+        $card = new EcTrackApiLinksCard($track);
+
+        $sourceId = data_get($track->properties, 'forestas.source_id');
+        if ($sourceId) {
+            $card->addLink('Sardegna Sentieri', 'https://www.sardegnasentieri.it/ss/track/'.$sourceId.'?_format=json');
+        }
+
+        return [$card];
     }
 
     public function getForestasTabFields(): array

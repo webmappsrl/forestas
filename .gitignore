@@ -26,3 +26,4 @@ yarn-error.log
 /docker/volumes/*
 build/
 auth.json
+.claude/settings.local.json
