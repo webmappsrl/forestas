@@ -34,6 +34,8 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     {
         parent::boot();
 
+        Nova::style('nova-custom', resource_path('css/nova.css'));
+
         $this->getFooter();
 
         Nova::mainMenu(function (Request $request) {

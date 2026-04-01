@@ -1,0 +1,6 @@
+/**
+ * Nasconde l'avviso "Unregistered" in header Nova (LicenseWarning.vue).
+ */
+a[href='https://nova.laravel.com/licenses'] {
+    display: none !important;
+}
