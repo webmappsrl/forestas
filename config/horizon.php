@@ -46,10 +46,36 @@ return [
     ],
 
     'environments' => [
+        'develop' => [
+            'supervisor-default' => [
+                'maxProcesses' => 25,
+                'minProcesses' => 20,
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'balanceMaxShift' => 3,
+                'balanceCooldown' => 2,
+            ],
+            'supervisor-pbf' => [
+                'maxProcesses' => 6,
+                'minProcesses' => 1,
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'balanceMaxShift' => 3,
+                'balanceCooldown' => 2,
+            ],
+            'supervisor-layers' => [
+                'maxProcesses' => 4,
+                'minProcesses' => 1,
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 2,
+            ],
+        ],
         'staging' => [
             'supervisor-default' => [
-                'maxProcesses' => 8,
-                'minProcesses' => 4,
+                'maxProcesses' => 25,
+                'minProcesses' => 20,
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
                 'balanceMaxShift' => 3,
