@@ -2,9 +2,25 @@
 
 return [
     'defaults' => [
+        'supervisor-aws' => [
+            'connection' => 'redis',
+            'queue' => ['aws'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 30,
+            'minProcesses' => 1,
+            'balanceMaxShift' => 10,
+            'balanceCooldown' => 3,
+            'maxTime' => 3600,
+            'maxJobs' => 1000,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 120,
+            'nice' => 0,
+        ],
         'supervisor-default' => [
             'connection' => 'redis',
-            'queue' => ['default', 'aws'],
+            'queue' => ['default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 3,
@@ -48,12 +64,12 @@ return [
     'environments' => [
         'develop' => [
             'supervisor-default' => [
-                'maxProcesses' => 25,
-                'minProcesses' => 20,
+                'maxProcesses' => 30,
+                'minProcesses' => 1,
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
-                'balanceMaxShift' => 3,
-                'balanceCooldown' => 2,
+                'balanceMaxShift' => 10,
+                'balanceCooldown' => 3,
             ],
             'supervisor-pbf' => [
                 'maxProcesses' => 6,
@@ -74,12 +90,12 @@ return [
         ],
         'staging' => [
             'supervisor-default' => [
-                'maxProcesses' => 25,
-                'minProcesses' => 20,
+                'maxProcesses' => 30,
+                'minProcesses' => 1,
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
-                'balanceMaxShift' => 3,
-                'balanceCooldown' => 2,
+                'balanceMaxShift' => 10,
+                'balanceCooldown' => 3,
             ],
             'supervisor-pbf' => [
                 'maxProcesses' => 6,
