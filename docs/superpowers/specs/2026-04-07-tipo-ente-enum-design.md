@@ -102,6 +102,15 @@ Il campo `tipo_ente` passa da `Text::make(...)->readonly()` a `Select::make(...)
 
 ---
 
+## Gestione ID non mappati — nota per l'implementazione
+
+**Durante l'implementazione**, dopo aver eseguito un import di test, verificare i log per warning `TipoEnte Drupal ID {$id} non mappato`. Per ogni ID segnalato:
+1. Chiamare `/taxonomy/term/{id}?_format=json` per ottenere il label
+2. Aggiungere il case mancante all'enum `TipoEnte` con slug e `getDrupalId()` corrispondente
+3. Ripetere fino a zero warning
+
+---
+
 ## Gestione ID non mappati
 
 L'approccio "slug-first" garantisce che:
