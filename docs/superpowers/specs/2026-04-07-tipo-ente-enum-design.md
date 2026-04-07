@@ -121,4 +121,3 @@ L'approccio "slug-first" garantisce che:
 | `getTaxonomyTerm()` su `SardegnaSentieriClient` | pendente |
 | Logica import con fallback slug + warning | pendente |
 | Nova `Ente` campo Select | pendente |
-| File `lang/it/tipo_ente.php` con label italiani | pendente |
