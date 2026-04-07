@@ -62,11 +62,11 @@ enum TipoEnte: string
     public function label(): string
     {
         return match($this) {
-            self::ComplessoForestale   => 'Complesso forestale',
-            self::EntePartner          => 'Ente partner',
-            self::AltrePubbliche       => 'Altre Pubbliche Istituzioni',
-            self::PrivatoAssociazione  => 'Privato/associazione',
-            self::Comune               => 'Comune',
+            self::ComplessoForestale   => __('tipo_ente.complesso_forestale'),
+            self::EntePartner          => __('tipo_ente.ente_partner'),
+            self::AltrePubbliche       => __('tipo_ente.altre_pubbliche_istituzioni'),
+            self::PrivatoAssociazione  => __('tipo_ente.privato_associazione'),
+            self::Comune               => __('tipo_ente.comune'),
         };
     }
 }
@@ -121,3 +121,4 @@ L'approccio "slug-first" garantisce che:
 | `getTaxonomyTerm()` su `SardegnaSentieriClient` | pendente |
 | Logica import con fallback slug + warning | pendente |
 | Nova `Ente` campo Select | pendente |
+| File `lang/it/tipo_ente.php` con label italiani | pendente |
