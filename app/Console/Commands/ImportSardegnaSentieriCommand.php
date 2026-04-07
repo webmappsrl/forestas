@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Http\Clients\SardegnaSentieriClient;
+use App\Jobs\Import\SyncForestasSentieriItinerariLayersJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -210,10 +213,33 @@ class ImportSardegnaSentieriCommand extends Command
             $candidateIds[] = (int) $id;
         }
 
-        $dispatched = [];
-        foreach ($this->sortTrackDispatchOrder($candidateIds, $trackList) as $id) {
-            ImportSardegnaSentieriTrackJob::dispatch($id);
-            $dispatched[] = $id;
+        $orderedIds = $this->sortTrackDispatchOrder($candidateIds, $trackList);
+        $dispatched = $orderedIds;
+
+        if ($orderedIds !== []) {
+            $jobs = array_map(
+                static fn (int $id) => new ImportSardegnaSentieriTrackJob($id),
+                $orderedIds
+            );
+
+            Bus::batch($jobs)
+                ->name('sardegnasentieri:import:tracks')
+                ->allowFailures()
+                ->catch(function (Batch $batch, \Throwable $e): void {
+                    Log::channel('import')->error('sardegnasentieri tracks batch job failed', [
+                        'batch_id' => $batch->id,
+                        'exception' => $e->getMessage(),
+                    ]);
+                })
+                ->finally(function (Batch $batch) use ($appId): void {
+                    // Se il batch viene cancellato manualmente, non forziamo finalize.
+                    if ($batch->cancelled()) {
+                        return;
+                    }
+
+                    SyncForestasSentieriItinerariLayersJob::dispatch($appId ?? 1);
+                })
+                ->dispatch();
         }
 
         $this->info('Dispatched '.count($dispatched).' Track import jobs.');

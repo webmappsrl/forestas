@@ -7,6 +7,7 @@ namespace App\Jobs\Import;
 use App\Dto\Import\SardegnaSentieriImageManifest;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Services\Import\SardegnaSentieriImportService;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ImportSardegnaSentieriTrackJob implements ShouldQueue
 {
+    use Batchable;
     use Dispatchable;
     use InteractsWithQueue;
     use Queueable;
