@@ -4,3 +4,9 @@
 a[href='https://nova.laravel.com/licenses'] {
     display: none !important;
 }
+
+@media (min-width: 768px) {
+    .flex.md\:hidden{
+        display: none;
+    }
+}
