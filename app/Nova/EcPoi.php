@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
+use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\Text;
 use Marshmallow\Tiptap\Tiptap;
@@ -50,6 +51,7 @@ class EcPoi extends WmNovaEcPoi
 
         return [
             ...$nonTabFields,
+            BelongsToMany::make('Related POIs', 'relatedPois', self::class),
             Tab::group(__('Details'), [
                 Tab::make(__('Info'), $this->getInfoTabFields()),
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
