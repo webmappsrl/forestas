@@ -17,6 +17,10 @@ readonly class ApiTaxonomiesData
         public array $stato_di_validazione = [],
         /** @var list<string> */
         public array $zona_geografica = [],
+        /** @var list<string> */
+        public array $servizi = [],
+        /** @var list<string> */
+        public array $tipologia_di_avvertenze = [],
     ) {}
 
     public static function fromArray(array $taxonomies): self
@@ -27,6 +31,8 @@ readonly class ApiTaxonomiesData
             tipologia_sentieri: self::normalizeIdList($taxonomies['tipologia_sentieri'] ?? null),
             stato_di_validazione: self::normalizeIdList($taxonomies['stato_di_validazione'] ?? null),
             zona_geografica: self::normalizeIdList($taxonomies['zona_geografica'] ?? null),
+            servizi: self::normalizeIdList($taxonomies['servizi'] ?? null),
+            tipologia_di_avvertenze: self::normalizeIdList($taxonomies['tipologia_di_avvertenze'] ?? null),
         );
     }
 

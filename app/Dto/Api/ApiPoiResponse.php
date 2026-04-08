@@ -16,7 +16,8 @@ readonly class ApiPoiResponse
         public ?string $codice,
         /** @var list<mixed> */
         public array $collegamenti,
-        public ?string $come_arrivare,
+        /** @var array<string, string>|null {it: [HTML], en: [HTML]} */
+        public ?array $come_arrivare,
         public ?string $url,
         public ?string $updated_at,
         /** @var list<float> [lon, lat] or [lon, lat, ele] */
@@ -25,6 +26,14 @@ readonly class ApiPoiResponse
         public ?ApiSardegnaImageData $immaginePrincipale,
         /** @var list<ApiSardegnaImageData> */
         public array $galleria,
+        /** @var list<string> */
+        public array $allegati,
+        /** @var list<string> */
+        public array $video,
+        /** @var list<string> */
+        public array $poi_correlati,
+        /** @var array<string, mixed>|null */
+        public ?array $ente_istituzione_societa,
     ) {}
 
     /**
@@ -54,13 +63,17 @@ readonly class ApiPoiResponse
             addr_locality: self::optionalString($props['addr_locality'] ?? null),
             codice: self::optionalString($props['codice'] ?? null),
             collegamenti: is_array($props['collegamenti'] ?? null) ? $props['collegamenti'] : [],
-            come_arrivare: self::optionalString($props['come_arrivare'] ?? null),
+            come_arrivare: isset($props['come_arrivare']) && is_array($props['come_arrivare']) ? $props['come_arrivare'] : null,
             url: self::optionalString($props['url'] ?? null),
             updated_at: isset($props['updated_at']) ? (string) $props['updated_at'] : null,
             coordinates: is_array($coords) ? array_values(array_map('floatval', $coords)) : [],
             taxonomies: ApiTaxonomiesData::fromArray(is_array($props['taxonomies'] ?? null) ? $props['taxonomies'] : []),
             immaginePrincipale: ApiSardegnaImageData::tryFromMixed($props['immagine_principale'] ?? null),
             galleria: $galleria,
+            allegati: is_array($props['allegati'] ?? null) ? array_values($props['allegati']) : [],
+            video: is_array($props['video'] ?? null) ? array_values($props['video']) : [],
+            poi_correlati: is_array($props['poi_correlati'] ?? null) ? array_values(array_map('strval', $props['poi_correlati'])) : [],
+            ente_istituzione_societa: isset($props['ente_istituzione_societa']) && is_array($props['ente_istituzione_societa']) ? $props['ente_istituzione_societa'] : null,
         );
     }
 

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Enums\StatoValidazione;
+use App\Nova\Filters\EcTrackRuoloFilter;
 use Laravel\Nova\Fields\KeyValue;
+use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
@@ -16,30 +19,37 @@ use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 
 class EcTrack extends WmNovaEcTrack
 {
+    public static $model = \App\Models\EcTrack::class;
+
     public function fields(NovaRequest $request): array
     {
         $parentFields = parent::fields($request);
-        // Strip parent Tab::group(s) so we can rebuild a single Details group
-        // that contains both the inherited Info tab and the new Forestas tab.
-        // Note: getInfoTabFields() is inherited from WmNovaEcTrack (wm-package).
-        // If the parent adds new Tab::group entries in the future, review this filter.
-        $nonTabFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup)));
+        $nonTabFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup)));
 
         return [
             ...$nonTabFields,
             Select::make('Stato validazione', 'stato_validazione')
                 ->options(
                     collect(StatoValidazione::cases())
-                        ->mapWithKeys(fn($case) => [$case->value => $case->label()])
+                        ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
                         ->toArray()
                 )
                 ->nullable()
                 ->filterable(),
+            MorphToMany::make('Warnings', 'taxonomyWarnings', TaxonomyWarning::class)->display('name'),
             Tab::group(__('Details'), [
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
                 Tab::make(__('Info'), $this->getInfoTabFields()),
                 Tab::make(__('DEM'), $this->getDemTabFields()),
             ]),
+        ];
+    }
+
+    public function filters(NovaRequest $request): array
+    {
+        return [
+            ...parent::filters($request),
+            new EcTrackRuoloFilter,
         ];
     }
 
@@ -63,10 +73,13 @@ class EcTrack extends WmNovaEcTrack
     public function getForestasTabFields(): array
     {
         return [
-            Text::make('Source ID', 'properties->forestas->source_id'),
-            Text::make('Tipo', 'properties->forestas->type'),
-            Text::make('URL', 'properties->forestas->url'),
-            Text::make('Aggiornato il', 'properties->forestas->updated_at'),
+            Text::make('Sardegna Sentieri ID', 'properties->sardegnasentieri_id')->readonly(),
+            Text::make('Source ID', 'properties->forestas->source_id')->readonly(),
+            Text::make('URL', 'properties->forestas->url')->readonly(),
+            Text::make('Aggiornato il', 'properties->forestas->updated_at')->readonly(),
+            Text::make('Creato il', 'properties->forestas->created_at')->readonly(),
+            Textarea::make('Info utili', 'properties->forestas->info_utili')->readonly(),
+            Textarea::make('Roadbook', 'properties->forestas->roadbook')->readonly(),
             KeyValue::make('Allegati', 'properties->forestas->allegati'),
             KeyValue::make('Video', 'properties->forestas->video'),
             KeyValue::make('GPX', 'properties->forestas->gpx'),

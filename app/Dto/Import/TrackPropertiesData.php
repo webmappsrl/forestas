@@ -14,6 +14,7 @@ readonly class TrackPropertiesData extends EcTrackPropertiesData
         ?array $description,
         ?array $excerpt,
         ?ManualTrackData $manual_data,
+        ?string $ref,
         public string $sardegnasentieri_id,
         public ForestasTrackData $forestas,
     ) {
@@ -21,19 +22,22 @@ readonly class TrackPropertiesData extends EcTrackPropertiesData
             description: $description,
             excerpt: $excerpt,
             manual_data: $manual_data,
+            ref: $ref,
         );
     }
 
     /**
-     * @param array<string, mixed> $existingManualData Previously stored manual_data to preserve user edits
+     * @param  array<string, mixed>  $existingManualData  Previously stored manual_data to preserve user edits
      */
     public static function fromApiResponse(int $externalId, ApiTrackResponse $response, array $existingManualData = []): self
     {
         $apiManual = ManualTrackData::fromArray([
-            'distance'          => $response->lunghezza,
-            'ascent'            => $response->dislivello_totale,
-            'duration_forward'  => $response->durata,
+            'distance' => $response->lunghezza,
+            'ascent' => $response->dislivello_totale,
+            'duration_forward' => $response->durata,
             'duration_backward' => $response->durata,
+            'ele_min' => $response->ele_min,
+            'ele_max' => $response->ele_max,
         ]);
 
         $manual = empty($existingManualData)
@@ -44,6 +48,7 @@ readonly class TrackPropertiesData extends EcTrackPropertiesData
             description: $response->description,
             excerpt: $response->excerpt,
             manual_data: $manual,
+            ref: $response->codice_cai,
             sardegnasentieri_id: (string) $externalId,
             forestas: ForestasTrackData::fromApiResponse($externalId, $response),
         );
@@ -55,7 +60,7 @@ readonly class TrackPropertiesData extends EcTrackPropertiesData
             parent::toArray(),
             [
                 'sardegnasentieri_id' => $this->sardegnasentieri_id,
-                'forestas'            => $this->forestas->toArray(),
+                'forestas' => $this->forestas->toArray(),
             ]
         );
     }

@@ -27,9 +27,9 @@ class SardegnaSentieriClient
     public function getPoiList(): array
     {
         $response = Http::timeout(self::TIMEOUT)
-            ->get(self::BASE_URL . '/listpoi/', ['_format' => 'json']);
+            ->get(self::BASE_URL.'/listpoi/', ['_format' => 'json']);
 
-        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch POI list: ' . $response->body());
+        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch POI list: '.$response->body());
 
         return $response->json() ?? [];
     }
@@ -42,9 +42,9 @@ class SardegnaSentieriClient
     public function getPoiDetail(int $id): ApiPoiResponse
     {
         $response = Http::timeout(self::TIMEOUT)
-            ->get(self::BASE_URL . "/poi/{$id}", ['_format' => 'json']);
+            ->get(self::BASE_URL."/poi/{$id}", ['_format' => 'json']);
 
-        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch POI {$id}: " . $response->body());
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch POI {$id}: ".$response->body());
 
         return ApiPoiResponse::fromJson($response->json() ?? []);
     }
@@ -59,9 +59,9 @@ class SardegnaSentieriClient
     public function getTrackList(): array
     {
         $response = Http::timeout(self::TIMEOUT)
-            ->get(self::BASE_URL . '/list-tracks/', ['_format' => 'json']);
+            ->get(self::BASE_URL.'/list-tracks/', ['_format' => 'json']);
 
-        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch track list: ' . $response->body());
+        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch track list: '.$response->body());
 
         return $response->json() ?? [];
     }
@@ -74,9 +74,9 @@ class SardegnaSentieriClient
     public function getTrackDetail(int $id): ApiTrackResponse
     {
         $response = Http::timeout(self::TIMEOUT)
-            ->get(self::BASE_URL . "/track/{$id}", ['_format' => 'json']);
+            ->get(self::BASE_URL."/track/{$id}", ['_format' => 'json']);
 
-        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch track {$id}: " . $response->body());
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch track {$id}: ".$response->body());
 
         return ApiTrackResponse::fromJson($response->json() ?? []);
     }
@@ -91,9 +91,9 @@ class SardegnaSentieriClient
     public function getTaxonomy(string $vocabulary): array
     {
         $response = Http::timeout(self::TIMEOUT)
-            ->get(self::BASE_URL . "/tassonomia/{$vocabulary}", ['_format' => 'json']);
+            ->get(self::BASE_URL."/tassonomia/{$vocabulary}", ['_format' => 'json']);
 
-        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch taxonomy {$vocabulary}: " . $response->body());
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch taxonomy {$vocabulary}: ".$response->body());
 
         return $response->json() ?? [];
     }
@@ -111,5 +111,52 @@ class SardegnaSentieriClient
         throw_if($response->failed(), \RuntimeException::class, "Failed to download GPX from {$url}");
 
         return $response->body();
+    }
+
+    /**
+     * Get Drupal node detail by ID (used for enti/istituzioni)
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException
+     */
+    public function getNodeDetail(int $id): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get('https://www.sardegnasentieri.it/node/'.$id, ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch node {$id}: ".$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get Drupal taxonomy term by ID.
+     * Used as fallback when TipoEnte::fromDrupalId() returns null.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException
+     */
+    public function getTaxonomyTerm(int $id): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get('https://www.sardegnasentieri.it/taxonomy/term/'.$id, ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch taxonomy term {$id}: ".$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get warning type taxonomy: {id: {vid, name: {it, en}, parent}, ...}
+     *
+     * @return array<string, array<string, mixed>>
+     *
+     * @throws ConnectionException
+     */
+    public function getTaxonomyWarnings(): array
+    {
+        return $this->getTaxonomy('tipologia_di_avvertenze');
     }
 }

@@ -9,10 +9,16 @@ use App\Dto\Api\ApiTrackResponse;
 use App\Dto\Import\PoiPropertiesData;
 use App\Dto\Import\TrackPropertiesData;
 use App\Enums\StatoValidazione;
+use App\Enums\TipoEnte;
 use App\Http\Clients\SardegnaSentieriClient;
+use App\Models\EcPoi as LocalEcPoi;
 use App\Models\EcTrack;
+use App\Models\Ente;
+use App\Models\TaxonomyWarning;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Wm\WmPackage\Helpers\GlobalFileHelper;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -28,6 +34,10 @@ class SardegnaSentieriImportService
         'tipologia_poi',
     ];
 
+    private const POI_ACTIVITY_VOCABULARIES = [
+        'servizi',
+    ];
+
     private const TRACK_VOCABULARIES = [
         'categorie_fruibilita_sentieri',
         'tipologia_sentieri',
@@ -41,7 +51,11 @@ class SardegnaSentieriImportService
     private array $cache = [
         'poi_types' => [],
         'activities' => [],
+        'warnings' => [],
     ];
+
+    /** @var array<string, int|null> */
+    private array $enteCache = [];
 
     /** @var array<string, array<string, array<string, mixed>>> */
     private array $taxonomyTermsCache = [];
@@ -50,7 +64,8 @@ class SardegnaSentieriImportService
     private ?array $iconNamesCache = null;
 
     public function __construct(
-        private readonly SardegnaSentieriClient $client
+        private readonly SardegnaSentieriClient $client,
+        private readonly SardegnaSentieriMediaSyncService $mediaSync,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -60,7 +75,9 @@ class SardegnaSentieriImportService
     public function importAll(): void
     {
         $this->importPoiTaxonomies();
+        $this->importPoiActivityTaxonomies();
         $this->importTrackTaxonomies();
+        $this->importWarningTaxonomies();
     }
 
     private function importPoiTaxonomies(): void
@@ -75,6 +92,31 @@ class SardegnaSentieriImportService
                 }
 
                 $taxonomy = $this->findOrNewPoiType($data['identifier'], $data['name']);
+                $taxonomy->identifier = $data['identifier'];
+                $taxonomy->name = $data['name'];
+                $taxonomy->description = $data['description'];
+
+                if (empty($taxonomy->icon)) {
+                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                }
+
+                $taxonomy->saveQuietly();
+            }
+        }
+    }
+
+    private function importPoiActivityTaxonomies(): void
+    {
+        foreach (self::POI_ACTIVITY_VOCABULARIES as $vocabulary) {
+            $terms = $this->client->getTaxonomy($vocabulary);
+
+            foreach ($terms as $term) {
+                $data = $this->buildTaxonomyData($term);
+                if ($data === null) {
+                    continue;
+                }
+
+                $taxonomy = $this->findOrNewActivity($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
                 $taxonomy->name = $data['name'];
                 $taxonomy->description = $data['description'];
@@ -110,6 +152,31 @@ class SardegnaSentieriImportService
 
                 $taxonomy->saveQuietly();
             }
+        }
+    }
+
+    private function importWarningTaxonomies(): void
+    {
+        $terms = $this->client->getTaxonomyWarnings();
+
+        foreach ($terms as $apiId => $term) {
+            if (! is_array($term)) {
+                continue;
+            }
+
+            $nameRaw = $term['name'] ?? null;
+            $name = is_array($nameRaw) ? $nameRaw : ['it' => (string) ($nameRaw ?? '')];
+
+            if (empty($name['it'])) {
+                continue;
+            }
+
+            $identifier = 'sardegnasentieri:warning:'.$apiId;
+
+            $taxonomy = TaxonomyWarning::firstOrNew(['identifier' => $identifier]);
+            $taxonomy->identifier = $identifier;
+            $taxonomy->name = $name;
+            $taxonomy->saveQuietly();
         }
     }
 
@@ -190,6 +257,29 @@ class SardegnaSentieriImportService
         return $ids;
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function resolveWarningIds(string $apiTermId): array
+    {
+        if (isset($this->cache['warnings'][$apiTermId])) {
+            return (array) ($this->cache['warnings'][$apiTermId] ?? []);
+        }
+
+        $identifier = 'sardegnasentieri:warning:'.$apiTermId;
+
+        $ids = TaxonomyWarning::query()
+            ->where('identifier', $identifier)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $this->cache['warnings'][$apiTermId] = $ids === [] ? null : $ids;
+
+        return $ids;
+    }
+
     // -------------------------------------------------------------------------
     // POI import
     // -------------------------------------------------------------------------
@@ -227,6 +317,8 @@ class SardegnaSentieriImportService
         $ecPoi->fill($data)->saveQuietly();
 
         $this->syncPoiTaxonomies($ecPoi, $response);
+        $this->syncEntiPoi($ecPoi, $response);
+        $this->syncRelatedPoisForPoi($ecPoi, $response);
 
         return $ecPoi;
     }
@@ -241,6 +333,17 @@ class SardegnaSentieriImportService
             ->toArray();
 
         $ecPoi->taxonomyPoiTypes()->sync($poiTypeIds);
+
+        $serviziIds = collect($response->taxonomies->servizi)
+            ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'servizi'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (! empty($serviziIds)) {
+            $ecPoi->taxonomyActivities()->sync($serviziIds);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -255,6 +358,10 @@ class SardegnaSentieriImportService
     public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
     {
         $geometry = $this->getGeometryFromGpx($response->gpx);
+
+        if ($geometry === null && $response->geometryFallback !== null) {
+            $geometry = $this->convertGeoJsonGeometryToWkt($response->geometryFallback);
+        }
 
         $data = [
             'app_id' => $this->getAppId(),
@@ -290,8 +397,12 @@ class SardegnaSentieriImportService
 
         $ecTrack->fill($data)->saveQuietly();
 
+        $this->syncFromTo($ecTrack, $response);
+        $this->syncEnti($ecTrack, $response);
         $this->syncRelatedPois($ecTrack, $response);
         $this->syncTrackTaxonomies($ecTrack, $response);
+        $this->syncTrackWarnings($ecTrack, $response);
+        $this->syncTrackType($ecTrack, $response);
 
         return $ecTrack;
     }
@@ -354,17 +465,60 @@ class SardegnaSentieriImportService
         return 'MULTILINESTRING Z ('.implode(', ', $segments).')';
     }
 
+    private function syncFromTo(EcTrack $ecTrack, ApiTrackResponse $response): void
+    {
+        $from = null;
+        $to = null;
+
+        if ($response->partenza !== null) {
+            $partenzaPoi = EcPoi::whereRaw(
+                "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+                [$response->partenza, $response->partenza]
+            )->first();
+            $from = $partenzaPoi?->getTranslation('name', 'it') ?? null;
+        }
+
+        if ($response->arrivo !== null) {
+            $arrivoPoi = EcPoi::whereRaw(
+                "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+                [$response->arrivo, $response->arrivo]
+            )->first();
+            $to = $arrivoPoi?->getTranslation('name', 'it') ?? null;
+        }
+
+        if ($from !== null || $to !== null) {
+            $props = $ecTrack->properties ?? [];
+            $props['from'] = $from;
+            $props['to'] = $to;
+            $ecTrack->properties = $props;
+            $ecTrack->saveQuietly();
+        }
+    }
+
     private function syncRelatedPois(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $poiIds = collect([$response->partenza, $response->arrivo])
-            ->filter()
-            ->map(fn ($sourceId) => EcPoi::whereRaw(
-                "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
-                [$sourceId, $sourceId]
-            )->value('id'))
+        $resolveId = fn (?string $sourceId): ?int => $sourceId === null ? null : EcPoi::whereRaw(
+            "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+            [$sourceId, $sourceId]
+        )->value('id');
+
+        $partenzaId = $resolveId($response->partenza);
+
+        $correlatiIds = collect($response->poi_correlati)
+            ->map(fn ($sourceId) => $resolveId($sourceId))
             ->filter()
             ->values()
             ->toArray();
+
+        $arrivoId = $resolveId($response->arrivo);
+
+        $poiIds = array_values(array_filter(
+            array_merge(
+                $partenzaId !== null ? [$partenzaId] : [],
+                $correlatiIds,
+                $arrivoId !== null ? [$arrivoId] : [],
+            )
+        ));
 
         $ecTrack->ecPois()->sync($poiIds);
     }
@@ -386,6 +540,308 @@ class SardegnaSentieriImportService
         $allIds = array_values(array_unique(array_merge($activityIds, $tipologiaIds)));
 
         $ecTrack->taxonomyActivities()->sync($allIds);
+    }
+
+    private function syncTrackType(EcTrack $ecTrack, ApiTrackResponse $response): void
+    {
+        if ($response->type === null || $response->type === '') {
+            return;
+        }
+
+        $identifier = 'sardegnasentieri:type:'.$response->type;
+
+        $activity = TaxonomyActivity::firstOrCreate(
+            ['identifier' => $identifier],
+            ['name' => ucfirst($response->type)]
+        );
+
+        $currentIds = $ecTrack->taxonomyActivities()->pluck('taxonomy_activities.id')->toArray();
+        $allIds = array_unique(array_merge($currentIds, [$activity->id]));
+        $ecTrack->taxonomyActivities()->sync($allIds);
+    }
+
+    private function syncTrackWarnings(EcTrack $ecTrack, ApiTrackResponse $response): void
+    {
+        $warningIds = collect($response->taxonomies->tipologia_di_avvertenze)
+            ->flatMap(fn ($apiId) => $this->resolveWarningIds((string) $apiId))
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $ecTrack->taxonomyWarnings()->sync($warningIds);
+    }
+
+    private function syncRelatedPoisForPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
+    {
+        if (empty($response->poi_correlati)) {
+            return;
+        }
+
+        $ids = collect($response->poi_correlati)
+            ->map(fn (string $sourceId) => EcPoi::whereRaw(
+                "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
+                [$sourceId, $sourceId]
+            )->value('id'))
+            ->filter()
+            ->values()
+            ->toArray();
+
+        $localPoi = LocalEcPoi::find($ecPoi->id);
+        if ($localPoi !== null) {
+            $localPoi->relatedPois()->sync($ids);
+        }
+    }
+
+    private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
+    {
+        $ente = $response->ente_istituzione_societa ?? [];
+
+        $pairs = [];
+
+        $ruoliMap = [
+            'soggetto_gestore' => 'gestore',
+            'soggetto_manutentore' => 'manutentore',
+            'soggetto_rilevatore' => 'rilevatore',
+        ];
+
+        foreach ($ruoliMap as $field => $ruolo) {
+            $nodeId = isset($ente[$field]) ? (string) $ente[$field] : null;
+            if ($nodeId === null) {
+                continue;
+            }
+            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            if ($enteId !== null) {
+                $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
+            }
+        }
+
+        $operatori = is_array($ente['riferimento_operatori_guid'] ?? null)
+            ? $ente['riferimento_operatori_guid']
+            : [];
+
+        foreach ($operatori as $nodeId) {
+            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            if ($enteId !== null) {
+                $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
+            }
+        }
+
+        if (empty($pairs)) {
+            return;
+        }
+
+        DB::table('enteables')
+            ->where('enteable_id', $ecPoi->id)
+            ->where('enteable_type', EcPoi::class)
+            ->delete();
+
+        foreach ($pairs as $pair) {
+            DB::table('enteables')->insertOrIgnore([
+                'ente_id' => $pair['ente_id'],
+                'enteable_id' => $ecPoi->id,
+                'enteable_type' => EcPoi::class,
+                'ruolo' => $pair['ruolo'],
+            ]);
+        }
+    }
+
+    private function syncEnti(EcTrack $ecTrack, ApiTrackResponse $response): void
+    {
+        $ente = $response->ente_istituzione_societa ?? [];
+
+        // Collect all (enteId, ruolo) pairs — same ente can have multiple roles
+        $pairs = [];
+
+        $ruoliMap = [
+            'soggetto_gestore' => 'gestore',
+            'soggetto_manutentore' => 'manutentore',
+            'soggetto_rilevatore' => 'rilevatore',
+        ];
+
+        foreach ($ruoliMap as $field => $ruolo) {
+            $nodeId = isset($ente[$field]) ? (string) $ente[$field] : null;
+            if ($nodeId === null) {
+                continue;
+            }
+            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            if ($enteId !== null) {
+                $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
+            }
+        }
+
+        $operatori = is_array($ente['riferimento_operatori_guid'] ?? null)
+            ? $ente['riferimento_operatori_guid']
+            : [];
+
+        foreach ($operatori as $nodeId) {
+            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            if ($enteId !== null) {
+                $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
+            }
+        }
+
+        if ($response->complesso_forestale !== null) {
+            $enteId = $this->resolveOrImportEnte((int) $response->complesso_forestale);
+            if ($enteId !== null) {
+                $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'complesso_forestale'];
+            }
+        }
+
+        // Remove all existing enteables for this track, then re-insert
+        DB::table('enteables')
+            ->where('enteable_id', $ecTrack->id)
+            ->where('enteable_type', EcTrack::class)
+            ->delete();
+
+        foreach ($pairs as $pair) {
+            DB::table('enteables')->insertOrIgnore([
+                'ente_id' => $pair['ente_id'],
+                'enteable_id' => $ecTrack->id,
+                'enteable_type' => EcTrack::class,
+                'ruolo' => $pair['ruolo'],
+            ]);
+        }
+    }
+
+    private function resolveOrImportEnte(int $nodeId): ?int
+    {
+        $cacheKey = (string) $nodeId;
+
+        if (array_key_exists($cacheKey, $this->enteCache)) {
+            return $this->enteCache[$cacheKey];
+        }
+
+        // Check if already imported
+        $existing = Ente::where('sardegnasentieri_id', $cacheKey)->value('id');
+
+        if ($existing !== null) {
+            $this->enteCache[$cacheKey] = $existing;
+
+            return $existing;
+        }
+
+        $result = $this->importOrUpdateEnte($cacheKey);
+        $this->enteCache[$cacheKey] = $result;
+
+        return $result;
+    }
+
+    public function importOrUpdateEnte(string $sardegnaSentieriId): ?int
+    {
+        try {
+            $node = $this->client->getNodeDetail((int) $sardegnaSentieriId);
+            $title = $node['title'][0]['value'] ?? null;
+
+            if (empty($title)) {
+                return null;
+            }
+
+            $contattiRaw = $node['field_contatti'][0]['value'] ?? null;
+            $contatti = (is_string($contattiRaw) && $contattiRaw !== '') ? $contattiRaw : null;
+
+            $paginaWebRaw = $node['field_pagina_web'][0]['uri'] ?? null;
+            $paginaWeb = is_string($paginaWebRaw) ? $paginaWebRaw : null;
+
+            $tipoEnteId = isset($node['field_tipo_ente'][0]['target_id'])
+                ? (int) $node['field_tipo_ente'][0]['target_id']
+                : null;
+
+            /** @var TipoEnte|string|null $tipoEnteValue */
+            $tipoEnteValue = null;
+            if ($tipoEnteId !== null) {
+                $enum = TipoEnte::fromDrupalId($tipoEnteId);
+                if ($enum !== null) {
+                    $tipoEnteValue = $enum;
+                } else {
+                    try {
+                        $term = $this->client->getTaxonomyTerm($tipoEnteId);
+                        $label = $term['name'][0]['value'] ?? null;
+                        if ($label !== null) {
+                            $tipoEnteSlug = Str::slug($label);
+                            Log::warning("TipoEnte Drupal ID {$tipoEnteId} non mappato nell'enum: slug '{$tipoEnteSlug}'");
+                            $tipoEnteValue = $tipoEnteSlug;
+                        }
+                    } catch (\Exception) {
+                        Log::warning("TipoEnte Drupal ID {$tipoEnteId} non risolvibile via API");
+                    }
+                }
+            }
+
+            $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
+                ? (string) $node['field_immagine_principale'][0]['url']
+                : null;
+
+            $description = isset($node['body'][0]['value'])
+                ? trim(strip_tags((string) $node['body'][0]['value']))
+                : null;
+
+            $lat = isset($node['field_geolocalizzazione'][0]['lat'])
+                ? (float) $node['field_geolocalizzazione'][0]['lat']
+                : null;
+
+            $lon = isset($node['field_geolocalizzazione'][0]['lon'])
+                ? (float) $node['field_geolocalizzazione'][0]['lon']
+                : null;
+
+            $geometry = ($lat !== null && $lon !== null)
+                ? "POINT({$lon} {$lat})"
+                : null;
+
+            $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
+            $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
+            $ente->contatti = $contatti;
+            $ente->pagina_web = $paginaWeb;
+            if ($description !== null && $description !== '') {
+                $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
+            }
+            if ($tipoEnteValue instanceof TipoEnte) {
+                $ente->tipo_ente = $tipoEnteValue;
+            } else {
+                // Arbitrary slug (not yet in enum): bypass Eloquent enum cast
+                $rawAttrs = $ente->getAttributes();
+                $rawAttrs['tipo_ente'] = $tipoEnteValue;
+                $ente->setRawAttributes($rawAttrs, true);
+            }
+            if ($geometry !== null) {
+                $ente->geometry = $geometry;
+            }
+            $ente->properties = null;
+            $ente->saveQuietly();
+
+            if ($featureImageUrl !== null && $this->mediaSync !== null) {
+                $this->mediaSync->syncImportedImages($ente, [
+                    ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
+                ]);
+            }
+
+            return $ente->id;
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    private function convertGeoJsonGeometryToWkt(?array $geometry): ?string
+    {
+        if ($geometry === null) {
+            return null;
+        }
+
+        $type = $geometry['type'] ?? null;
+        $coordinates = $geometry['coordinates'] ?? null;
+
+        if ($type === 'LineString' && is_array($coordinates)) {
+            $points = array_map(
+                fn ($c) => count($c) >= 3
+                    ? "{$c[0]} {$c[1]} {$c[2]}"
+                    : "{$c[0]} {$c[1]} 0",
+                $coordinates
+            );
+
+            return 'MULTILINESTRING Z (('.implode(', ', $points).'))';
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------

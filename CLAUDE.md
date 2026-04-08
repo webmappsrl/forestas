@@ -182,6 +182,26 @@ vendor/bin/pest --filter=nome_test
 
 Variabili d'ambiente di testing definite in `phpunit.xml`.
 
+### Regole obbligatorie per i test
+
+**NON eseguire mai i test senza prima verificare l'isolamento del DB.** Prima di lanciare qualsiasi test:
+
+1. Verificare `phpunit.xml` — il `DB_DATABASE` deve puntare a un DB separato dal DB reale.
+2. Se il DB di test non è chiaramente isolato, NON lanciare i test — chiedere consenso esplicito all'utente.
+3. Questa regola vale anche per i subagent: istruirli esplicitamente a non lanciare test senza verifica isolamento.
+
+**Il DB reale contiene dati importati da processi lunghi — distruggerli è inaccettabile.**
+
+## Regole operative
+
+### Commit
+
+**Non eseguire mai `git commit` senza istruzione esplicita dell'utente.** Implementa, testa, poi fermati. È l'utente che controlla il codice e committa. Questa regola vale anche per i subagent: istruirli sempre a non committare.
+
+### wm-package CLAUDE.md
+
+Leggere sempre `wm-package/CLAUDE.md` quando si lavora su codice che tocca il package.
+
 ## wm-package (submodule)
 
 Il progetto dipende da `wm/wm-package` come path repository (submodule Git in `../wm-package` o `vendor/wm/wm-package`).

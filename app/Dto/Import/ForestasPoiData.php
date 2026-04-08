@@ -11,10 +11,13 @@ readonly class ForestasPoiData
     public function __construct(
         public ?string $codice,
         public array $collegamenti,
-        public ?string $come_arrivare,
+        public ?array $come_arrivare,
         public ?string $url,
         public ?string $updated_at,
         public array $zona_geografica,
+        public array $allegati,
+        public array $video,
+        public array $poi_correlati,
     ) {}
 
     public static function fromApiResponse(ApiPoiResponse $response): self
@@ -26,18 +29,24 @@ readonly class ForestasPoiData
             url: $response->url,
             updated_at: $response->updated_at,
             zona_geografica: $response->taxonomies->zona_geografica,
+            allegati: $response->allegati,
+            video: $response->video,
+            poi_correlati: $response->poi_correlati,
         );
     }
 
     public function toArray(): array
     {
         return [
-            'codice'          => $this->codice,
-            'collegamenti'    => self::listToAssoc($this->collegamenti),
-            'come_arrivare'   => $this->come_arrivare,
-            'url'             => $this->url,
-            'updated_at'      => $this->updated_at,
+            'codice' => $this->codice,
+            'collegamenti' => self::listToAssoc($this->collegamenti),
+            'come_arrivare' => $this->come_arrivare,
+            'url' => $this->url,
+            'updated_at' => $this->updated_at,
             'zona_geografica' => self::listToAssoc($this->zona_geografica),
+            'allegati' => self::listToAssoc($this->allegati),
+            'video' => self::listToAssoc($this->video),
+            'poi_correlati' => self::listToAssoc($this->poi_correlati),
         ];
     }
 
