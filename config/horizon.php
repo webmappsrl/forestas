@@ -78,6 +78,12 @@ return [
     ],
 
     'environments' => [
+        'local' => [
+            'supervisor-default' => [
+                'balance' => 'simple',
+                'maxProcesses' => 30,
+            ],
+        ],
         'develop' => [
             'supervisor-default' => [
                 'maxProcesses' => 30,

@@ -9,13 +9,17 @@ use App\Dto\Import\ForestasTrackData;
 it('converts allegati list to associative array in toArray', function () {
     $data = new ForestasTrackData(
         source_id: '42',
-        type: null,
         allegati: ['http://example.com/a.pdf', 'http://example.com/b.pdf'],
         video: [],
         gpx: [],
         url: null,
+        created_at: null,
         updated_at: null,
         zona_geografica: [],
+        codice: null,
+        data_rilievo: null,
+        info_utili: null,
+        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -29,13 +33,17 @@ it('converts allegati list to associative array in toArray', function () {
 it('converts video list to associative array in toArray', function () {
     $data = new ForestasTrackData(
         source_id: '1',
-        type: null,
         allegati: [],
         video: ['https://youtu.be/abc', 'https://youtu.be/xyz'],
         gpx: [],
         url: null,
+        created_at: null,
         updated_at: null,
         zona_geografica: [],
+        codice: null,
+        data_rilievo: null,
+        info_utili: null,
+        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -49,13 +57,17 @@ it('converts video list to associative array in toArray', function () {
 it('converts gpx list to associative array in toArray', function () {
     $data = new ForestasTrackData(
         source_id: '1',
-        type: null,
         allegati: [],
         video: [],
         gpx: ['https://example.com/track.gpx'],
         url: null,
+        created_at: null,
         updated_at: null,
         zona_geografica: [],
+        codice: null,
+        data_rilievo: null,
+        info_utili: null,
+        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -66,13 +78,17 @@ it('converts gpx list to associative array in toArray', function () {
 it('converts zona_geografica list to associative array in toArray', function () {
     $data = new ForestasTrackData(
         source_id: '1',
-        type: null,
         allegati: [],
         video: [],
         gpx: [],
         url: null,
+        created_at: null,
         updated_at: null,
         zona_geografica: [10, 20],
+        codice: null,
+        data_rilievo: null,
+        info_utili: null,
+        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -83,13 +99,17 @@ it('converts zona_geografica list to associative array in toArray', function () 
 it('preserves skip_dem_jobs in toArray', function () {
     $data = new ForestasTrackData(
         source_id: '1',
-        type: null,
         allegati: [],
         video: [],
         gpx: [],
         url: null,
+        created_at: null,
         updated_at: null,
         zona_geografica: [],
+        codice: null,
+        data_rilievo: null,
+        info_utili: null,
+        roadbook: null,
         skip_dem_jobs: true,
     );
 
