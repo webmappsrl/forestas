@@ -14,6 +14,9 @@ it('converts collegamenti list to associative array in toArray', function () {
         url: null,
         updated_at: null,
         zona_geografica: [],
+        allegati: [],
+        video: [],
+        poi_correlati: [],
     );
 
     $result = $data->toArray();
@@ -29,6 +32,9 @@ it('converts zona_geografica list to associative array in toArray', function () 
         url: null,
         updated_at: null,
         zona_geografica: [42, 99],
+        allegati: [],
+        video: [],
+        poi_correlati: [],
     );
 
     $result = $data->toArray();
@@ -44,6 +50,9 @@ it('returns empty array for empty lists', function () {
         url: null,
         updated_at: null,
         zona_geografica: [],
+        allegati: [],
+        video: [],
+        poi_correlati: [],
     );
 
     $result = $data->toArray();

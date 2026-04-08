@@ -9,6 +9,15 @@ use Wm\WmPackage\Models\EcTrack as WmEcTrack;
 
 class EcTrack extends WmEcTrack
 {
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+        $this->translatable = array_merge($this->translatable ?? [], [
+            'properties->forestas->info_utili',
+            'properties->forestas->roadbook',
+        ]);
+    }
+
     protected $fillable = [
         'name',
         'geometry',

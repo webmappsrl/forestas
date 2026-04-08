@@ -9,6 +9,14 @@ use Wm\WmPackage\Models\EcPoi as WmEcPoi;
 
 class EcPoi extends WmEcPoi
 {
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+        $this->translatable = array_merge($this->translatable ?? [], [
+            'properties->forestas->come_arrivare',
+        ]);
+    }
+
     public function relatedPois(): BelongsToMany
     {
         return $this->belongsToMany(

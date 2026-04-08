@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Nova;
 
+use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
 use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\Textarea;
+use Marshmallow\Tiptap\Tiptap;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
@@ -15,6 +16,8 @@ use Wm\WmPackage\Nova\EcPoi as WmNovaEcPoi;
 
 class EcPoi extends WmNovaEcPoi
 {
+    public static $model = \App\Models\EcPoi::class;
+
     public function cards(NovaRequest $request): array
     {
         if (! $request->resourceId) {
@@ -31,7 +34,7 @@ class EcPoi extends WmNovaEcPoi
 
         $card = new ApiLinksCard([]);
         if ($sourceId) {
-            $card->addLink('Sardegna Sentieri (JSON)', 'https://www.sardegnasentieri.it/ss/poi/'.$sourceId.'?_format=json');
+            $card->addLink('Sardegna Sentieri (JSON)', 'https://www.sardegnasentieri.it/ss/poi/' . $sourceId . '?_format=json');
         }
         if ($htmlUrl) {
             $card->addLink('Sardegna Sentieri (HTML)', $htmlUrl);
@@ -43,7 +46,7 @@ class EcPoi extends WmNovaEcPoi
     public function fields(NovaRequest $request): array
     {
         $parentFields = parent::fields($request);
-        $nonTabFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup)));
+        $nonTabFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup)));
 
         return [
             ...$nonTabFields,
@@ -59,7 +62,9 @@ class EcPoi extends WmNovaEcPoi
         return [
             Text::make('Sardegna Sentieri ID', 'properties->out_source_feature_id')->readonly(),
             Text::make('Codice', 'properties->forestas->codice'),
-            Textarea::make('Come arrivare', 'properties->forestas->come_arrivare')->readonly(),
+            NovaTabTranslatable::make([
+                Tiptap::make('Come arrivare', 'properties->forestas->come_arrivare')->readonly(),
+            ])->hideFromIndex(),
             Text::make('URL', 'properties->forestas->url')->readonly(),
             Text::make('Aggiornato il', 'properties->forestas->updated_at')->readonly(),
             KeyValue::make('Collegamenti', 'properties->forestas->collegamenti'),

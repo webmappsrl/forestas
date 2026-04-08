@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Wm\WmPackage\Models\Abstracts\GeometryModel;
+use Spatie\MediaLibrary\HasMedia;
 
 class SardegnaSentieriMediaSyncService
 {
@@ -15,7 +16,7 @@ class SardegnaSentieriMediaSyncService
     /**
      * @param  list<array{url: string, autore: string, credits: string, order: int}>  $items
      */
-    public function syncImportedImages(GeometryModel $model, array $items): void
+    public function syncImportedImages(Model&HasMedia $model, array $items): void
     {
         $manifestUrls = [];
 
@@ -41,7 +42,7 @@ class SardegnaSentieriMediaSyncService
     /**
      * @param  array{url: string, autore: string, credits: string, order: int}  $item
      */
-    private function syncOne(GeometryModel $model, array $item): void
+    private function syncOne(Model&HasMedia $model, array $item): void
     {
         $url = $item['url'];
         $disk = config('wm-media-library.disk_name');
@@ -84,7 +85,7 @@ class SardegnaSentieriMediaSyncService
     /**
      * @param  list<string>  $manifestUrls
      */
-    private function pruneRemoved(GeometryModel $model, array $manifestUrls): void
+    private function pruneRemoved(Model&HasMedia $model, array $manifestUrls): void
     {
         $keep = array_flip($manifestUrls);
 
