@@ -7,6 +7,7 @@ use App\Nova\App as NovaApp;
 use App\Nova\Dashboards\Main;
 use App\Nova\EcPoi;
 use App\Nova\EcTrack;
+use App\Nova\Ente;
 use App\Nova\FeatureCollection;
 use App\Nova\Layer;
 use App\Nova\Media as NovaMedia;
@@ -63,6 +64,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 MenuSection::make('EC', [
                     MenuItem::resource(EcPoi::class),
                     MenuItem::resource(EcTrack::class),
+                    MenuItem::resource(Ente::class),
                     MenuItem::resource(Layer::class),
                     MenuItem::resource(FeatureCollection::class),
                 ])->icon('document'),
