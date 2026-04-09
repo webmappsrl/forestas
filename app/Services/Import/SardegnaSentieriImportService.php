@@ -32,14 +32,12 @@ class SardegnaSentieriImportService
 
     private const POI_VOCABULARIES = [
         'tipologia_poi',
-    ];
-
-    private const POI_ACTIVITY_VOCABULARIES = [
         'servizi',
     ];
 
+    private const POI_ACTIVITY_VOCABULARIES = [];
+
     private const TRACK_VOCABULARIES = [
-        'categorie_fruibilita_sentieri',
         'tipologia_sentieri',
     ];
 
@@ -85,7 +83,7 @@ class SardegnaSentieriImportService
         foreach (self::POI_VOCABULARIES as $vocabulary) {
             $terms = $this->client->getTaxonomy($vocabulary);
 
-            foreach ($terms as $term) {
+            foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
                 if ($data === null) {
                     continue;
@@ -95,6 +93,10 @@ class SardegnaSentieriImportService
                 $taxonomy->identifier = $data['identifier'];
                 $taxonomy->name = $data['name'];
                 $taxonomy->description = $data['description'];
+                $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
+                    'source_id' => (string) $apiId,
+                    'vocabulary' => $vocabulary,
+                ]);
 
                 if (empty($taxonomy->icon)) {
                     $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
@@ -110,7 +112,7 @@ class SardegnaSentieriImportService
         foreach (self::POI_ACTIVITY_VOCABULARIES as $vocabulary) {
             $terms = $this->client->getTaxonomy($vocabulary);
 
-            foreach ($terms as $term) {
+            foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
                 if ($data === null) {
                     continue;
@@ -120,6 +122,10 @@ class SardegnaSentieriImportService
                 $taxonomy->identifier = $data['identifier'];
                 $taxonomy->name = $data['name'];
                 $taxonomy->description = $data['description'];
+                $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
+                    'source_id' => (string) $apiId,
+                    'vocabulary' => $vocabulary,
+                ]);
 
                 if (empty($taxonomy->icon)) {
                     $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
@@ -135,7 +141,7 @@ class SardegnaSentieriImportService
         foreach (self::TRACK_VOCABULARIES as $vocabulary) {
             $terms = $this->client->getTaxonomy($vocabulary);
 
-            foreach ($terms as $term) {
+            foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
                 if ($data === null) {
                     continue;
@@ -145,6 +151,10 @@ class SardegnaSentieriImportService
                 $taxonomy->identifier = $data['identifier'];
                 $taxonomy->name = $data['name'];
                 $taxonomy->description = $data['description'];
+                $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
+                    'source_id' => (string) $apiId,
+                    'vocabulary' => $vocabulary,
+                ]);
 
                 if (empty($taxonomy->icon)) {
                     $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
@@ -176,6 +186,10 @@ class SardegnaSentieriImportService
             $taxonomy = TaxonomyWarning::firstOrNew(['identifier' => $identifier]);
             $taxonomy->identifier = $identifier;
             $taxonomy->name = $name;
+            $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
+                'source_id' => (string) $apiId,
+                'vocabulary' => 'tipologia_di_avvertenze',
+            ]);
             $taxonomy->saveQuietly();
         }
     }
@@ -187,14 +201,14 @@ class SardegnaSentieriImportService
     /**
      * @return array<int, int>
      */
-    public function resolvePoiTypeIds(string $apiTermId): array
+    public function resolvePoiTypeIds(string $apiTermId, string $vocabulary = 'tipologia_poi'): array
     {
-        $cacheKey = 'all:'.$apiTermId;
+        $cacheKey = $vocabulary.':all:'.$apiTermId;
         if (isset($this->cache['poi_types'][$cacheKey])) {
             return (array) ($this->cache['poi_types'][$cacheKey] ?? []);
         }
 
-        $term = $this->getTaxonomyTerms('tipologia_poi')[$apiTermId] ?? null;
+        $term = $this->getTaxonomyTerms($vocabulary)[$apiTermId] ?? null;
         if (! is_array($term)) {
             $this->cache['poi_types'][$cacheKey] = null;
 
@@ -335,15 +349,13 @@ class SardegnaSentieriImportService
         $ecPoi->taxonomyPoiTypes()->sync($poiTypeIds);
 
         $serviziIds = collect($response->taxonomies->servizi)
-            ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'servizi'))
+            ->flatMap(fn ($apiId) => $this->resolvePoiTypeIds((string) $apiId, 'servizi'))
             ->filter()
             ->unique()
             ->values()
             ->toArray();
 
-        if (! empty($serviziIds)) {
-            $ecPoi->taxonomyActivities()->sync($serviziIds);
-        }
+        $ecPoi->taxonomyPoiTypes()->sync(array_values(array_unique(array_merge($poiTypeIds, $serviziIds))));
     }
 
     // -------------------------------------------------------------------------
@@ -525,21 +537,13 @@ class SardegnaSentieriImportService
 
     private function syncTrackTaxonomies(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $activityIds = collect($response->taxonomies->categorie_fruibilita_sentieri)
-            ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'categorie_fruibilita_sentieri'))
-            ->filter()
-            ->values()
-            ->toArray();
-
         $tipologiaIds = collect($response->taxonomies->tipologia_sentieri)
             ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'tipologia_sentieri'))
             ->filter()
             ->values()
             ->toArray();
 
-        $allIds = array_values(array_unique(array_merge($activityIds, $tipologiaIds)));
-
-        $ecTrack->taxonomyActivities()->sync($allIds);
+        $ecTrack->taxonomyActivities()->sync($tipologiaIds);
     }
 
     private function syncTrackType(EcTrack $ecTrack, ApiTrackResponse $response): void

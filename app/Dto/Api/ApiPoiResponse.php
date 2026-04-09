@@ -63,7 +63,7 @@ readonly class ApiPoiResponse
             addr_locality: self::optionalString($props['addr_locality'] ?? null),
             codice: self::optionalString($props['codice'] ?? null),
             collegamenti: is_array($props['collegamenti'] ?? null) ? $props['collegamenti'] : [],
-            come_arrivare: isset($props['come_arrivare']) && is_array($props['come_arrivare']) ? $props['come_arrivare'] : null,
+            come_arrivare: isset($props['come_arrivare']) && is_array($props['come_arrivare']) ? array_map(fn($v) => is_array($v) ? implode('', $v) : (string) $v, $props['come_arrivare']) : null,
             url: self::optionalString($props['url'] ?? null),
             updated_at: isset($props['updated_at']) ? (string) $props['updated_at'] : null,
             coordinates: is_array($coords) ? array_values(array_map('floatval', $coords)) : [],

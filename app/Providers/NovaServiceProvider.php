@@ -13,6 +13,7 @@ use App\Nova\Layer;
 use App\Nova\Media as NovaMedia;
 use App\Nova\TaxonomyPoiType;
 use App\Nova\TaxonomyActivity;
+use App\Nova\TaxonomyWarning;
 use App\Nova\TaxonomyWhere;
 use App\Nova\UgcPoi;
 use App\Nova\UgcTrack;
@@ -73,6 +74,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     MenuItem::resource(TaxonomyPoiType::class),
                     MenuItem::resource(TaxonomyActivity::class),
                     MenuItem::resource(TaxonomyWhere::class),
+                    MenuItem::resource(TaxonomyWarning::class),
                 ])->icon('document'),
 
                 MenuSection::make(__('Files'), [

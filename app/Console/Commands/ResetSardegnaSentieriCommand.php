@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Ente;
+use App\Models\TaxonomyWarning;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
+use Wm\WmPackage\Models\TaxonomyActivity;
+use Wm\WmPackage\Models\TaxonomyPoiType;
 
 class ResetSardegnaSentieriCommand extends Command
 {
@@ -58,23 +61,44 @@ class ResetSardegnaSentieriCommand extends Command
         }
         $this->info("Eliminati {$tracks->count()} EcTrack.");
 
-        // 2. Delete EcPois — detach all track relations first to bypass observer
+        // 2. Delete EcPois — bypass observer entirely with raw DB deletes
         $poiIds = EcPoi::where('app_id', $appId)->pluck('id');
         DB::table('ec_poi_ec_track')->whereIn('ec_poi_id', $poiIds)->delete();
-        $pois = EcPoi::where('app_id', $appId)->get();
-        foreach ($pois as $poi) {
-            $poi->taxonomyPoiTypes()->detach();
-            $poi->delete();
-        }
-        $this->info("Eliminati {$pois->count()} EcPoi.");
+        DB::table('ec_poi_related_pois')->whereIn('ec_poi_id', $poiIds)->orWhereIn('related_poi_id', $poiIds)->delete();
+        DB::table('taxonomy_activityables')->where('taxonomy_activityable_type', EcPoi::class)->whereIn('taxonomy_activityable_id', $poiIds)->delete();
+        DB::table('taxonomy_poi_typeables')->where('taxonomy_poi_typeable_type', EcPoi::class)->whereIn('taxonomy_poi_typeable_id', $poiIds)->delete();
+        $poiCount = $poiIds->count();
+        DB::table('ec_pois')->whereIn('id', $poiIds)->delete();
+        $this->info("Eliminati {$poiCount} EcPoi.");
 
-        // 3. Delete Enti (and enteables via cascade)
+        // 3. Delete Taxonomies imported from Sardegna Sentieri (identified by source_id in properties)
+        $poiTypeCount = TaxonomyPoiType::whereNotNull('properties->source_id')->count();
+        DB::table('taxonomy_poi_typeables')->whereIn('taxonomy_poi_type_id', TaxonomyPoiType::whereNotNull('properties->source_id')->pluck('id'))->delete();
+        TaxonomyPoiType::whereNotNull('properties->source_id')->delete();
+        $this->info("Eliminati {$poiTypeCount} TaxonomyPoiType.");
+
+        $activityIds = TaxonomyActivity::where(function ($q) {
+            $q->whereNotNull('properties->source_id')
+                ->orWhere('identifier', 'like', 'name:%')
+                ->orWhere('identifier', 'like', 'sardegnasentieri:%');
+        })->pluck('id');
+        $activityCount = $activityIds->count();
+        DB::table('taxonomy_activityables')->whereIn('taxonomy_activity_id', $activityIds)->delete();
+        TaxonomyActivity::whereIn('id', $activityIds)->delete();
+        $this->info("Eliminati {$activityCount} TaxonomyActivity.");
+
+        $warningCount = TaxonomyWarning::whereNotNull('properties->source_id')->count();
+        DB::table('taxonomy_warningables')->whereIn('taxonomy_warning_id', TaxonomyWarning::whereNotNull('properties->source_id')->pluck('id'))->delete();
+        TaxonomyWarning::whereNotNull('properties->source_id')->delete();
+        $this->info("Eliminati {$warningCount} TaxonomyWarning.");
+
+        // 4. Delete Enti (and enteables via cascade)
         DB::table('enteables')->delete();
         $enteCount = Ente::count();
         Ente::query()->each(fn (Ente $e) => $e->delete());
         $this->info("Eliminati {$enteCount} Ente.");
 
-        // 4. Reset sequences
+        // 5. Reset sequences
         DB::statement('ALTER SEQUENCE ec_tracks_id_seq RESTART WITH 1');
         DB::statement('ALTER SEQUENCE ec_pois_id_seq RESTART WITH 1');
         DB::statement('ALTER SEQUENCE entes_id_seq RESTART WITH 1');
