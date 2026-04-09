@@ -9,6 +9,7 @@ use App\Models\TaxonomyWarning;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
@@ -42,6 +43,15 @@ class ResetSardegnaSentieriCommand extends Command
         )) {
             return self::SUCCESS;
         }
+
+        // Kill all Horizon processes and clear all queues before reset
+        exec('pkill -9 -f "artisan horizon" 2>/dev/null');
+        sleep(2);
+        $this->call('queue:clear', ['--queue' => 'default']);
+        $this->call('queue:clear', ['--queue' => 'aws']);
+        $this->call('queue:clear', ['--queue' => 'pbf']);
+        $this->call('queue:clear', ['--queue' => 'dem']);
+        $this->call('queue:clear', ['--queue' => 'layers']);
 
         $appId = SardegnaSentieriImportService::IMPORT_APP_ID;
 
@@ -98,7 +108,21 @@ class ResetSardegnaSentieriCommand extends Command
         Ente::query()->each(fn (Ente $e) => $e->delete());
         $this->info("Eliminati {$enteCount} Ente.");
 
-        // 5. Reset sequences
+        // 5. Flush Horizon Redis data (pending/recent/failed jobs and all job hashes)
+        $prefix = config('database.redis.options.prefix', '');
+        $horizonPrefix = $prefix ? "{$prefix}horizon:*" : 'horizon:*';
+        $cursor = null;
+        $deleted = 0;
+        do {
+            [$cursor, $keys] = Redis::scan($cursor ?? 0, ['match' => $horizonPrefix, 'count' => 500]);
+            if (! empty($keys)) {
+                Redis::del($keys);
+                $deleted += count($keys);
+            }
+        } while ($cursor != 0);
+        $this->info("Horizon Redis svuotato ({$deleted} chiavi rimosse).");
+
+        // 6. Reset sequences
         DB::statement('ALTER SEQUENCE ec_tracks_id_seq RESTART WITH 1');
         DB::statement('ALTER SEQUENCE ec_pois_id_seq RESTART WITH 1');
         DB::statement('ALTER SEQUENCE entes_id_seq RESTART WITH 1');

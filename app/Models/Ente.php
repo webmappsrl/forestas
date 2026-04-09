@@ -92,4 +92,9 @@ class Ente extends Model implements HasMedia
     {
         return $this->ecTracks()->wherePivot('ruolo', 'complesso_forestale');
     }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('default');
+    }
 }
