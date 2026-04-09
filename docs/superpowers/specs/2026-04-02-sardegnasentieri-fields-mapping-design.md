@@ -271,7 +271,7 @@ Funzionalità previste nel design ma non ancora implementate nel codice:
 - **Ente non estende EcPoi** — Gli enti sono organizzazioni senza geometry obbligatoria. Tabella dedicata `entes` più appropriata.
 - `**SardegnaSentieriMediaSyncService` generalizzato** — type hint cambiato da `GeometryModel` a `Model&HasMedia` per supportare `Ente` (che estende `Model` direttamente, non `GeometryModel`). Fix applicato il 2026-04-08.
 - `**app_id` accessor su `Ente`** — necessario per il `MediaObserver` del wm-package.
-- `**from`/`to` su `ec_tracks**` — colonne aggiunte via migrazione.
+- `**from`/`to` su `ec_tracks`** — colonne aggiunte via migrazione.
 - `**tipo_ente` come enum stringa** — mapping Drupal ID → slug via `fromDrupalId()`. Fallback a slug stringa con log warning.
 - `**description` e `contatti` come jsonb translatable** — `description` importato con `strip_tags()`. `contatti` storato come HTML.
 - **Righe multiple in `enteables` per ruolo** — vincolo unique su `(ente_id, enteable_id, enteable_type, ruolo)`. Ogni ruolo esposto come relazione separata su `Ente`.

@@ -57,6 +57,7 @@ class EcPoi extends WmNovaEcPoi
             ...$regularFields,
             Tab::group(__('Details'), [
                 Tab::make(__('Info'), $this->getInfoTabFields()),
+                Tab::make(__('Accessibility'), $this->getAccessibilityTabFields()),
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
             ]),
             BelongsToMany::make('Related POIs', 'relatedPois', self::class)->collapsedByDefault(),

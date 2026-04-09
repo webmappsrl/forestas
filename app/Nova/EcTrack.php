@@ -44,6 +44,7 @@ class EcTrack extends WmNovaEcTrack
             Tab::group(__('Details'), [
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
                 Tab::make(__('Info'), $this->getInfoTabFields()),
+                Tab::make(__('Accessibility'), $this->getAccessibilityTabFields()),
                 Tab::make(__('DEM'), $this->getDemTabFields()),
             ]),
             MorphToMany::make('Warnings', 'taxonomyWarnings', TaxonomyWarning::class)->display('name')->collapsedByDefault(),
