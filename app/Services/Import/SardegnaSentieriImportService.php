@@ -971,6 +971,29 @@ class SardegnaSentieriImportService
             ->first();
     }
 
+    private const ICON_FALLBACK_MAP = [
+        'crossroads'                   => 'txn-guidepost',
+        'places-of-transhumance'       => 'txn-horse',
+        'monumental-tree'              => 'txn-olive-tree',
+        'natural-sprin'                => 'txn-spring',
+        'natural-spring'               => 'txn-spring',
+        'foresteria'                   => 'txn-lodging',
+        'natural-cave-entrance'        => 'txn-cave-entrance',
+        'rifugio'                      => 'refuge',
+        'natural-wood'                 => 'txn-natural',
+        'coast-seaside'                => 'txn-beach',
+        'nature'                       => 'txn-park',
+        'natural-park'                 => 'txn-park-alt',
+        'archaeological-site'          => 'txn-ruins',
+        'public-transport'             => 'txn-bus',
+        'tlc'                          => 'communications-tower',
+        'disabled-access'              => 'txn-wheelchair',
+        'sardegnasentieri:type:sentiero'    => 'txn-hiking',
+        'sardegnasentieri:type:itinerario'  => 'txn-trail',
+        'accessible-trails'            => 'txn-mobility-disability',
+        'educational-trails'           => 'txn-environmental-education',
+    ];
+
     private function resolveIconNameByIdentifier(string $identifier): ?string
     {
         $iconNames = $this->getIconNames();
@@ -993,7 +1016,7 @@ class SardegnaSentieriImportService
             }
         }
 
-        return null;
+        return self::ICON_FALLBACK_MAP[$identifier] ?? null;
     }
 
     /** @return array<int, string> */
