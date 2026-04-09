@@ -8,6 +8,7 @@ use App\Enums\StatoValidazione;
 use App\Nova\Filters\EcTrackRuoloFilter;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
 use Laravel\Nova\Fields\KeyValue;
+use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
@@ -17,6 +18,8 @@ use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\EcTrackApiLinksCard;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
+use Wm\WmPackage\Nova\Layer;
+use Wm\WmPackage\Nova\TaxonomyActivity;
 
 class EcTrack extends WmNovaEcTrack
 {
@@ -25,10 +28,11 @@ class EcTrack extends WmNovaEcTrack
     public function fields(NovaRequest $request): array
     {
         $parentFields = parent::fields($request);
-        $nonTabFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup)));
+        $relationTypes = [BelongsToMany::class, MorphToMany::class];
+        $regularFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
 
         return [
-            ...$nonTabFields,
+            ...$regularFields,
             Select::make('Stato validazione', 'stato_validazione')
                 ->options(
                     collect(StatoValidazione::cases())
@@ -37,12 +41,15 @@ class EcTrack extends WmNovaEcTrack
                 )
                 ->nullable()
                 ->filterable(),
-            MorphToMany::make('Warnings', 'taxonomyWarnings', TaxonomyWarning::class)->display('name'),
             Tab::group(__('Details'), [
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
                 Tab::make(__('Info'), $this->getInfoTabFields()),
                 Tab::make(__('DEM'), $this->getDemTabFields()),
             ]),
+            MorphToMany::make('Warnings', 'taxonomyWarnings', TaxonomyWarning::class)->display('name')->collapsedByDefault(),
+            BelongsToMany::make('EcPois', 'ecPois', EcPoi::class)->searchable()->collapsedByDefault(),
+            MorphToMany::make('Layers', 'layers', Layer::class)->collapsedByDefault(),
+            MorphToMany::make('Activities', 'taxonomyActivities', TaxonomyActivity::class)->display('name')->collapsedByDefault(),
         ];
     }
 
