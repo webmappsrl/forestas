@@ -14,11 +14,17 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
     protected $signature = 'taxonomy:sync-poi-type-i18n
                             {--dictionary= : Percorso al JSON (default: database/data/taxonomy_poi_types.json)}
                             {--dry-run : Mostra le modifiche senza salvare}
-                            {--force : Aggiorna anche i record che hanno già sia "it" che "en" valorizzati}';
+                            {--force : Aggiorna anche i record che hanno già it, en, fr, de ed es valorizzati}';
 
-    protected $description = 'Aggiorna taxonomy_poi_types.name (it/en) dal dizionario JSON per identifier, garantendo entrambe le lingue (fallback dizionario + valori già in DB).';
+    protected $description = 'Aggiorna taxonomy_poi_types.name (it/en/fr/de/es) dal dizionario JSON per identifier, con fallback tra dizionario e valori già in DB.';
 
-    /** @var array<string, array{it: ?string, en: ?string}> */
+    /** @var list<string> */
+    private const OPTIONAL_LOCALES = ['fr', 'de', 'es'];
+
+    /** @var list<string> */
+    private const SYNCED_LOCALES = ['it', 'en', 'fr', 'de', 'es'];
+
+    /** @var array<string, array{it: ?string, en: ?string, fr: ?string, de: ?string, es: ?string}> */
     private array $dictionary = [];
 
     public function handle(): int
@@ -52,7 +58,7 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
         /** @var TaxonomyPoiType $row */
         foreach ($query->cursor() as $row) {
             $translations = $row->getTranslations('name');
-            if (! $force && $this->hasNonEmptyLocale($translations, 'it') && $this->hasNonEmptyLocale($translations, 'en')) {
+            if (! $force && $this->hasAllSyncedLocalesNonEmpty($translations)) {
                 $skipped++;
 
                 continue;
@@ -80,7 +86,8 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
 
             [$newIt, $newEn] = $resolution;
 
-            $merged = $this->mergeNameTranslations($translations, $newIt, $newEn);
+            $optional = $this->resolveOptionalLocales($dict, $translations);
+            $merged = $this->mergeNameTranslations($translations, $newIt, $newEn, $optional);
 
             if (! $force && $this->nameLocalesMatch($translations, $merged)) {
                 $skipped++;
@@ -89,14 +96,23 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
             }
 
             if ($dryRun) {
+                $currentFr = $this->stringLocale($translations, 'fr');
+                $currentDe = $this->stringLocale($translations, 'de');
+                $currentEs = $this->stringLocale($translations, 'es');
                 $this->line(sprintf(
-                    '[dry-run] id=%d identifier=%s | it: %s -> %s | en: %s -> %s',
+                    '[dry-run] id=%d identifier=%s | it: %s -> %s | en: %s -> %s | fr: %s -> %s | de: %s -> %s | es: %s -> %s',
                     $row->id,
                     (string) $identifier,
                     $currentIt,
                     $newIt,
                     $currentEn,
-                    $newEn
+                    $newEn,
+                    $currentFr,
+                    $optional['fr'],
+                    $currentDe,
+                    $optional['de'],
+                    $currentEs,
+                    $optional['es']
                 ));
                 $updated++;
 
@@ -112,7 +128,7 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
             $this->warn("Record senza voce nel dizionario (identifier non trovato): {$missingInDict}.");
         }
         if ($unresolvableLabels > 0) {
-            $this->warn("Record con voce dizionario ma senza alcuna etichetta it/en (né in JSON né in DB): {$unresolvableLabels}.");
+            $this->warn("Record con voce dizionario ma senza alcuna etichetta it o en (né in JSON né in DB): {$unresolvableLabels}.");
         }
 
         $this->info("Completato. Aggiornati: {$updated}, saltati: {$skipped}.");
@@ -142,15 +158,50 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
 
     /**
      * @param  array<string, mixed>  $translations
+     * @param  array{fr: string, de: string, es: string}  $optional
      * @return array<string, string>
      */
-    private function mergeNameTranslations(array $translations, string $newIt, string $newEn): array
+    private function mergeNameTranslations(array $translations, string $newIt, string $newEn, array $optional): array
     {
         $merged = $translations;
         $merged['it'] = $newIt;
         $merged['en'] = $newEn;
+        foreach (self::OPTIONAL_LOCALES as $locale) {
+            $merged[$locale] = $optional[$locale];
+        }
 
         return $merged;
+    }
+
+    /**
+     * @param  array{it: ?string, en: ?string, fr: ?string, de: ?string, es: ?string}  $dict
+     * @param  array<string, mixed>  $translations
+     * @return array{fr: string, de: string, es: string}
+     */
+    private function resolveOptionalLocales(array $dict, array $translations): array
+    {
+        $out = ['fr' => '', 'de' => '', 'es' => ''];
+        foreach (self::OPTIONAL_LOCALES as $locale) {
+            $dictVal = $dict[$locale] ?? null;
+            $current = $this->stringLocale($translations, $locale);
+            $out[$locale] = $this->firstNonEmptyString($dictVal, $current);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $translations
+     */
+    private function hasAllSyncedLocalesNonEmpty(array $translations): bool
+    {
+        foreach (self::SYNCED_LOCALES as $locale) {
+            if (! $this->hasNonEmptyLocale($translations, $locale)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -159,8 +210,13 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
      */
     private function nameLocalesMatch(array $a, array $b): bool
     {
-        return $this->stringLocale($a, 'it') === $this->stringLocale($b, 'it')
-            && $this->stringLocale($a, 'en') === $this->stringLocale($b, 'en');
+        foreach (self::SYNCED_LOCALES as $locale) {
+            if ($this->stringLocale($a, $locale) !== $this->stringLocale($b, $locale)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -184,7 +240,7 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
     }
 
     /**
-     * @return array<string, array{it: ?string, en: ?string}>
+     * @return array<string, array{it: ?string, en: ?string, fr: ?string, de: ?string, es: ?string}>
      */
     private function loadDictionary(string $path): array
     {
@@ -207,24 +263,34 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
             $name = $item['name'] ?? [];
             $it = null;
             $en = null;
+            $fr = null;
+            $de = null;
+            $es = null;
             if (is_array($name)) {
-                $it = isset($name['it']) && is_string($name['it']) ? trim($name['it']) : null;
-                $en = isset($name['en']) && is_string($name['en']) ? trim($name['en']) : null;
-                if ($it === '') {
-                    $it = null;
-                }
-                if ($en === '') {
-                    $en = null;
-                }
+                $it = $this->trimmedNullableString($name['it'] ?? null);
+                $en = $this->trimmedNullableString($name['en'] ?? null);
+                $fr = $this->trimmedNullableString($name['fr'] ?? null);
+                $de = $this->trimmedNullableString($name['de'] ?? null);
+                $es = $this->trimmedNullableString($name['es'] ?? null);
             }
-            $out[strtolower($id)] = ['it' => $it, 'en' => $en];
+            $out[strtolower($id)] = ['it' => $it, 'en' => $en, 'fr' => $fr, 'de' => $de, 'es' => $es];
         }
 
         return $out;
     }
 
+    private function trimmedNullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+        $t = trim($value);
+
+        return $t === '' ? null : $t;
+    }
+
     /**
-     * @param  array{it: ?string, en: ?string}  $dict
+     * @param  array{it: ?string, en: ?string, fr: ?string, de: ?string, es: ?string}  $dict
      * @return array{0: string, 1: string}|null
      */
     private function resolveLabels(array $dict, string $currentIt, string $currentEn): ?array
