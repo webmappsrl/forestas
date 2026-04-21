@@ -1,0 +1,3893 @@
+[
+  {
+    "name": {
+      "it": "Torre",
+      "en": "Tower",
+      "fr": "Tour",
+      "de": "Turm",
+      "es": "Torre",
+      "sq": null
+    },
+    "identifier": "tower"
+  },
+  {
+    "name": {
+      "it": "Spiaggia",
+      "en": "Beach",
+      "fr": "Ile déserte",
+      "de": "Strand",
+      "es": "Palm Beach",
+      "sq": null
+    },
+    "identifier": "beach"
+  },
+  {
+    "name": {
+      "it": "Religione",
+      "en": "Religion",
+      "fr": "Religione",
+      "de": "Religion",
+      "es": "ReligiOn",
+      "sq": null
+    },
+    "identifier": "religion"
+  },
+  {
+    "name": {
+      "it": "Informazioni Turistiche",
+      "en": "Tourist information",
+      "fr": "Informations touristiques",
+      "de": "Tourist-Information",
+      "es": "Información turística",
+      "sq": null
+    },
+    "identifier": "tourist-information"
+  },
+  {
+    "name": {
+      "it": "Bivio",
+      "en": "Crossroads",
+      "fr": "Bivio",
+      "de": "Scheideweg",
+      "es": "Bivio",
+      "sq": null
+    },
+    "identifier": "crossroads"
+  },
+  {
+    "name": {
+      "it": "Podere",
+      "en": "Farm",
+      "fr": "Podere",
+      "de": "Farm",
+      "es": "Minifundio",
+      "sq": null
+    },
+    "identifier": "farm"
+  },
+  {
+    "name": {
+      "it": "Centro visite",
+      "en": "Visitor center",
+      "fr": "Centre de visites",
+      "de": "Besucherzentrum",
+      "es": "Centro de visitas",
+      "sq": null
+    },
+    "identifier": "visitor-center"
+  },
+  {
+    "name": {
+      "it": "Parcheggio",
+      "en": "Parking area",
+      "fr": "Parking",
+      "de": "Parkplatz",
+      "es": "Parking",
+      "sq": null
+    },
+    "identifier": "parking"
+  },
+  {
+    "name": {
+      "it": "Punto panoramico",
+      "en": "Panoramic point",
+      "fr": "Point de vue",
+      "de": "Panoramapunkt",
+      "es": "punto de vigilancia",
+      "sq": null
+    },
+    "identifier": "viewpoint"
+  },
+  {
+    "name": {
+      "it": "Paese",
+      "en": "Village",
+      "fr": "Pays",
+      "de": "Dorf",
+      "es": "País",
+      "sq": null
+    },
+    "identifier": "village"
+  },
+  {
+    "name": {
+      "it": "Monumento storico",
+      "en": "Historical monument",
+      "fr": "Monument historique",
+      "de": "Denkmal",
+      "es": "Monumento histórico",
+      "sq": null
+    },
+    "identifier": "historical-monument"
+  },
+  {
+    "name": {
+      "it": "Cultura",
+      "en": "Culture",
+      "fr": "Cultura",
+      "de": "Kultur",
+      "es": "Cultura",
+      "sq": null
+    },
+    "identifier": "culture"
+  },
+  {
+    "name": {
+      "it": "Natura",
+      "en": "Nature",
+      "fr": "| Natures",
+      "de": "Natur",
+      "es": "Naturaleza",
+      "sq": null
+    },
+    "identifier": "nature"
+  },
+  {
+    "name": {
+      "it": "Rifugio",
+      "en": "Mountain huts",
+      "fr": "Refuge de montagne",
+      "de": "Hütten",
+      "es": "Refugio de montaña",
+      "sq": null
+    },
+    "identifier": "alpine-hut"
+  },
+  {
+    "name": {
+      "it": "Rifugio incustodito",
+      "en": "Wilderness hut",
+      "fr": "Refuge sans surveillance",
+      "de": "Biwakhütte",
+      "es": "Refugio desatendido",
+      "sq": null
+    },
+    "identifier": "wilderness-hut"
+  },
+  {
+    "name": {
+      "it": "Punto di interesse",
+      "en": "Point of Interest",
+      "fr": "Point d’intérêt",
+      "de": "Interessenspunkt",
+      "es": "Punto de interés",
+      "sq": null
+    },
+    "identifier": "poi",
+    "description": {
+      "it": "<p>Punto di interesse generico.</p>",
+      "en": "<p>Generic point of interest.</p>",
+      "fr": "<p>Point d'intérêt général.</p>",
+      "de": "<p>Allgemeiner Interessenspunkt.</p>",
+      "es": "<p>Punto de interés general.</p>",
+      "sq": null
+    }
+  },
+  {
+    "name": {
+      "it": "Struttura ricettiva",
+      "en": "Accommodation",
+      "fr": "Structure d'accueil",
+      "de": "Beherbergung",
+      "es": "Alojamiento",
+      "sq": null
+    },
+    "identifier": "accomodation"
+  },
+  {
+    "name": {
+      "it": "Luoghi di culto",
+      "en": "Places of worship",
+      "fr": "Des lieux de culte.",
+      "de": "Kultstätten",
+      "es": "- lugares de culto.",
+      "sq": null
+    },
+    "identifier": "place-of-worship"
+  },
+  {
+    "name": {
+      "it": "Fortificazioni",
+      "en": "Fortifications",
+      "fr": "Fortification",
+      "de": "Befestigungsanlagen",
+      "es": "Fortificación",
+      "sq": null
+    },
+    "identifier": "fortification"
+  },
+  {
+    "name": {
+      "it": "Luoghi di fede",
+      "en": "Places of faith",
+      "fr": "Lieux de foi",
+      "de": "Orte des Glaubens",
+      "es": "Lugares de fe",
+      "sq": null
+    },
+    "identifier": "place-of-faith"
+  },
+  {
+    "name": {
+      "it": "Luoghi pubblici",
+      "en": "Public places",
+      "fr": "Espace public",
+      "de": "öffentlichen Plätze",
+      "es": "Lugares públicos",
+      "sq": null
+    },
+    "identifier": "public-place"
+  },
+  {
+    "name": {
+      "it": "Case e palazzi",
+      "en": "Buildings",
+      "fr": "Maisons et palais",
+      "de": "Bauten",
+      "es": "Casas y palacios",
+      "sq": null
+    },
+    "identifier": "building"
+  },
+  {
+    "name": {
+      "it": "Fotografia storica",
+      "en": "Historical photograph",
+      "fr": "Photographie historique",
+      "de": "Historisches Foto",
+      "es": "Fotografía histórica",
+      "sq": null
+    },
+    "identifier": "historical-picture"
+  },
+  {
+    "name": {
+      "it": "Ville e giardini",
+      "en": "Villas and gardens",
+      "fr": "Villas et jardins",
+      "de": "Villen und Gärten",
+      "es": "Chalés y jardines",
+      "sq": null
+    },
+    "identifier": "villa-and-garden"
+  },
+  {
+    "name": {
+      "it": "Punto di partenza",
+      "en": "Start point",
+      "fr": "Point de départ",
+      "de": "Ausgangspunkt",
+      "es": "Punto de salida",
+      "sq": null
+    },
+    "identifier": "start"
+  },
+  {
+    "name": {
+      "it": "Edifici pubblici",
+      "en": "Public buildings",
+      "fr": "Eau (captage. distribution, épuration) Bâtiments publics",
+      "de": "Öffentliche Gebäude",
+      "es": "Edificios públicos",
+      "sq": null
+    },
+    "identifier": "public-building"
+  },
+  {
+    "name": {
+      "it": "Edifici produttivi",
+      "en": "Production buildings",
+      "fr": "Bâtiments de production",
+      "de": "Produktionsgebäude",
+      "es": "Edificios productivos",
+      "sq": null
+    },
+    "identifier": "production-building"
+  },
+  {
+    "name": {
+      "it": "Edifici Storici",
+      "en": "Historical buildings",
+      "fr": "Bâtiments historiques",
+      "de": "Historische Bauwerke",
+      "es": "Edificios históricos",
+      "sq": null
+    },
+    "identifier": "historical-building"
+  },
+  {
+    "name": {
+      "it": "Sport",
+      "en": "Sport",
+      "fr": "Sport",
+      "de": "Sport",
+      "es": "Deporte",
+      "sq": null
+    },
+    "identifier": "sport"
+  },
+  {
+    "name": {
+      "it": "Monumenti",
+      "en": "Monuments",
+      "fr": "Monumenti",
+      "de": "Denkmäler",
+      "es": "Monumento",
+      "sq": null
+    },
+    "identifier": "monument"
+  },
+  {
+    "name": {
+      "it": "Frazioni",
+      "en": "Hamlets",
+      "fr": "Fractions",
+      "de": "Weiler",
+      "es": "Fracciones",
+      "sq": null
+    },
+    "identifier": "hamlet"
+  },
+  {
+    "name": {
+      "it": "Quartieri e piazze",
+      "en": "Neighborhoods and squares",
+      "fr": "Quartiers et places",
+      "de": "Nachbarschaften und Plätze",
+      "es": "Barrios y plazas",
+      "sq": null
+    },
+    "identifier": "neighborhood-and-square"
+  },
+  {
+    "name": {
+      "it": "Sito Archeologico",
+      "en": "Archaeological site",
+      "fr": "Archéologie",
+      "de": "Archäologische Stätte",
+      "es": "Yacimiento arqueológico",
+      "sq": null
+    },
+    "identifier": "archaeological-site"
+  },
+  {
+    "name": {
+      "it": "Bar",
+      "en": "Bar",
+      "fr": "Bar",
+      "de": "Bar",
+      "es": "Bar",
+      "sq": null
+    },
+    "identifier": "bar"
+  },
+  {
+    "name": {
+      "it": "Supermercato",
+      "en": "Supermarket",
+      "fr": "Supermarché",
+      "de": "Supermarkt",
+      "es": "Supermercado",
+      "sq": null
+    },
+    "identifier": "food-market"
+  },
+  {
+    "name": {
+      "it": "Gastronomia",
+      "en": "Gastronomy",
+      "fr": "Gastronomique",
+      "de": "Gastronomie",
+      "es": "Gastronomia",
+      "sq": null
+    },
+    "identifier": "gastronomy"
+  },
+  {
+    "name": {
+      "it": "Storia e cultura",
+      "en": "History and culture",
+      "fr": "Histoire et Culture",
+      "de": "Geschichte und Kultur",
+      "es": "Historia y Cultura",
+      "sq": null
+    },
+    "identifier": "history-and-culture"
+  },
+  {
+    "name": {
+      "it": "Punti salienti della nostra guida turistica",
+      "en": "Highlights from our tour guide",
+      "fr": "Faits saillants de notre guide touristique",
+      "de": "Highlights von unserem Reiseleiter",
+      "es": "Lo más destacado de nuestra guía turística",
+      "sq": null
+    },
+    "identifier": "highlight"
+  },
+  {
+    "name": {
+      "it": "Museo",
+      "en": "Museum",
+      "fr": "Musée",
+      "de": "Museum",
+      "es": "Museos",
+      "sq": null
+    },
+    "identifier": "museum"
+  },
+  {
+    "name": {
+      "it": "Ristorante",
+      "en": "Restaurant",
+      "fr": "Ristorante",
+      "de": "Restaurant",
+      "es": "Ristorante",
+      "sq": null
+    },
+    "identifier": "restaurant"
+  },
+  {
+    "name": {
+      "it": "Panificio",
+      "en": "Bakery",
+      "fr": "Boulangerie",
+      "de": "Bäckerei",
+      "es": "Horno de pan",
+      "sq": null
+    },
+    "identifier": "bakery"
+  },
+  {
+    "name": {
+      "it": "Pizzeria",
+      "en": "Pizzeria",
+      "fr": "Pizzeria",
+      "de": "Pizzeria",
+      "es": "Pizzeria",
+      "sq": null
+    },
+    "identifier": "pizzeria"
+  },
+  {
+    "name": {
+      "it": "Degustazione",
+      "en": "Tasting",
+      "fr": "Dégustation",
+      "de": "Verkostung",
+      "es": "Degustación",
+      "sq": null
+    },
+    "identifier": "tasting"
+  },
+  {
+    "name": {
+      "it": "Punto di interesse storico",
+      "en": "Historic point of interest",
+      "fr": "Point d'intérêt historique",
+      "de": "Historischer Ort von Interesse",
+      "es": "Punto de interés histórico",
+      "sq": null
+    },
+    "identifier": "historical"
+  },
+  {
+    "name": {
+      "it": "Palazzo",
+      "en": "Palace",
+      "fr": "Palazzo",
+      "de": "Schloss",
+      "es": "Palazzo",
+      "sq": null
+    },
+    "identifier": "palace"
+  },
+  {
+    "name": {
+      "it": "Parco",
+      "en": "Park",
+      "fr": "Parc",
+      "de": "Park",
+      "es": "Parque",
+      "sq": null
+    },
+    "identifier": "park"
+  },
+  {
+    "name": {
+      "it": "Adatto ai bambini",
+      "en": "Suitable for children",
+      "fr": "adaptée aux enfants",
+      "de": "Kindertauglich",
+      "es": "Apto para niños",
+      "sq": null
+    },
+    "identifier": "suitablle-for-children"
+  },
+  {
+    "name": {
+      "it": "Giardino Storico",
+      "en": "Historical Garden",
+      "fr": "jardin historique",
+      "de": "Historischer Garten",
+      "es": "jardín histórico",
+      "sq": null
+    },
+    "identifier": "historical-garden"
+  },
+  {
+    "name": {
+      "it": "Patrimonio Unesco",
+      "en": "Unesco heritage",
+      "fr": "Patrimoine de l'UNESCO",
+      "de": "UNESCO Welterbe",
+      "es": "Patrimonio de la UNESCO",
+      "sq": null
+    },
+    "identifier": "unesco-heritage"
+  },
+  {
+    "name": {
+      "it": "Torre campanile",
+      "en": "Bell tower",
+      "fr": "Tour clocher",
+      "de": "Glockenturm",
+      "es": "Torre campanario",
+      "sq": null
+    },
+    "identifier": "bell-tower"
+  },
+  {
+    "name": {
+      "it": "Bagni pubblici",
+      "en": "Public toilets",
+      "fr": "Des toilettes publiques.",
+      "de": "Öffentliche Toilette",
+      "es": "BAÑOS",
+      "sq": null
+    },
+    "identifier": "public-toilet"
+  },
+  {
+    "name": {
+      "it": "Teatro",
+      "en": "Theater",
+      "fr": "Théâtre",
+      "de": "Hörsaal",
+      "es": "Teatros",
+      "sq": null
+    },
+    "identifier": "theater"
+  },
+  {
+    "name": {
+      "it": "Fontana",
+      "en": "Drinking fountain",
+      "fr": "Fontana",
+      "de": "Trinkbrunnen",
+      "es": "Fuente",
+      "sq": null
+    },
+    "identifier": "fountain"
+  },
+  {
+    "name": {
+      "it": "Servizi",
+      "en": "Services",
+      "fr": "Prestations proposées",
+      "de": "Services",
+      "es": "Servicios",
+      "sq": null
+    },
+    "identifier": "service"
+  },
+  {
+    "name": {
+      "it": "Cimitero",
+      "en": "Cemetery",
+      "fr": "Cimetières",
+      "de": "Friedhof",
+      "es": "Cementerio",
+      "sq": null
+    },
+    "identifier": "cemetery"
+  },
+  {
+    "name": {
+      "it": "Mangiare e Bere",
+      "en": "Eating and Drinking",
+      "fr": "Et de manger et de boire.",
+      "de": "Essen und Trinken",
+      "es": "comer y beber.",
+      "sq": null
+    },
+    "identifier": "eating-drinking"
+  },
+  {
+    "name": {
+      "it": "Parco Naturale",
+      "en": "Natural Park",
+      "fr": "Réserve naturelle",
+      "de": "Der Naturpark",
+      "es": "parque natural",
+      "sq": null
+    },
+    "identifier": "natural-park"
+  },
+  {
+    "name": {
+      "it": "Servizio Bici",
+      "en": "Bike service",
+      "fr": "Lcation de vélos",
+      "de": "Fahrrad-Service",
+      "es": "Servicio de bicicletas",
+      "sq": null
+    },
+    "identifier": "bike-service"
+  },
+  {
+    "name": {
+      "it": "Centro esposizioni e congressi",
+      "en": "Exhibition and conference center",
+      "fr": "Centre d'exposition et de congrès",
+      "de": "Ausstellungs- und Konferenzzentrum",
+      "es": "Centro de exposiciones y congresos",
+      "sq": null
+    },
+    "identifier": "conference-centre",
+    "description": null
+  },
+  {
+    "name": {
+      "it": "Porto",
+      "en": "Harbor",
+      "fr": "Port",
+      "de": "Harbor",
+      "es": "Oporto",
+      "sq": null
+    },
+    "identifier": "harbor"
+  },
+  {
+    "name": {
+      "it": "Bancomat",
+      "en": "ATM",
+      "fr": "Guichet automatique bancaire",
+      "de": "Geldautomat",
+      "es": "Cajero automatico",
+      "sq": null
+    },
+    "identifier": "atm"
+  },
+  {
+    "name": {
+      "it": "Farmacia",
+      "en": "Pharmacy",
+      "fr": "Pharmacie",
+      "de": "Pharmazie",
+      "es": "Farmacia",
+      "sq": null
+    },
+    "identifier": "pharmacy"
+  },
+  {
+    "name": {
+      "it": "Stazione Treni",
+      "en": "Train station",
+      "fr": "La gare.",
+      "de": "Bahnhof",
+      "es": "Estación de tren.",
+      "sq": null
+    },
+    "identifier": "train-station"
+  },
+  {
+    "name": {
+      "it": "Albero monumentale",
+      "en": "Monumental tree",
+      "fr": "Arbre monumental",
+      "de": "Monumentaler Baum",
+      "es": "Árbol monumental",
+      "sq": null
+    },
+    "identifier": "monumental-tree"
+  },
+  {
+    "name": {
+      "it": "Moda e Made in Italy",
+      "en": "Fashion and Made in Italy",
+      "fr": "Mode et Made in Italy",
+      "de": "Mode und Made in Italy",
+      "es": "Moda y Made in Italy",
+      "sq": null
+    },
+    "identifier": "fashion-made-in-italy"
+  },
+  {
+    "name": {
+      "it": "Meta dell'escursione",
+      "en": "Route destination",
+      "fr": "Objectif de l'excursion",
+      "de": "Route Ziel",
+      "es": "Meta de la excursión",
+      "sq": null
+    },
+    "identifier": "destination"
+  },
+  {
+    "name": {
+      "it": "Gelato",
+      "en": "Ice cream",
+      "fr": "Crème glacée",
+      "de": "Eiskrem",
+      "es": "Tipo helado",
+      "sq": null
+    },
+    "identifier": "ice-cream"
+  },
+  {
+    "name": {
+      "it": "Paesaggio",
+      "en": "Landscape",
+      "fr": "Paysage",
+      "de": "Landschaft",
+      "es": "Paisaje",
+      "sq": null
+    },
+    "identifier": "landscape"
+  },
+  {
+    "name": {
+      "it": "Parco Artistico",
+      "en": "Art Park",
+      "fr": "Parc Artistique",
+      "de": "Art Park",
+      "es": "Parque Artístico",
+      "sq": null
+    },
+    "identifier": "art-park"
+  },
+  {
+    "name": {
+      "it": "Trasporto pubblico",
+      "en": "Public transport",
+      "fr": "Transports en commun",
+      "de": "ÖPV/ ÖPNV",
+      "es": "Transporte público",
+      "sq": null
+    },
+    "identifier": "public-transport"
+  },
+  {
+    "name": {
+      "it": "Cantina e degustazione di vini",
+      "en": "Winery and wine tasting",
+      "fr": "Cave et dégustation de vins",
+      "de": "Weingut und Weinprobe",
+      "es": "Bodega y cata de vinos",
+      "sq": null
+    },
+    "identifier": "winery-and-wine-tasting"
+  },
+  {
+    "name": {
+      "it": "Negozio",
+      "en": "Shop",
+      "fr": "Boutique",
+      "de": "Shop",
+      "es": "Tienda",
+      "sq": null
+    },
+    "identifier": "shop"
+  },
+  {
+    "name": {
+      "it": "Hotel",
+      "en": "Hotel",
+      "fr": "Hôtel",
+      "de": "Hotel",
+      "es": "Hoteles",
+      "sq": null
+    },
+    "identifier": "hotel"
+  },
+  {
+    "name": {
+      "it": "Attenzione!",
+      "en": "Attention!",
+      "fr": "Attention !",
+      "de": "Achtung!",
+      "es": "¡Atención",
+      "sq": null
+    },
+    "identifier": "attention"
+  },
+  {
+    "name": {
+      "it": "Elementi Naturalistici",
+      "en": "Naturalistic element",
+      "fr": "Éléments naturalistes",
+      "de": "Naturalistisches Element",
+      "es": "Elementos naturalistas",
+      "sq": null
+    },
+    "identifier": "elementi-naturalistici"
+  },
+  {
+    "name": {
+      "it": "Camping",
+      "en": "Camping",
+      "fr": "Camping",
+      "de": "Camping",
+      "es": "Camping",
+      "sq": null
+    },
+    "identifier": "camping"
+  },
+  {
+    "name": {
+      "it": "Osteria",
+      "en": "Tavern",
+      "fr": "Osteria",
+      "de": "Taverne",
+      "es": "Posada",
+      "sq": null
+    },
+    "identifier": "osteria"
+  },
+  {
+    "name": {
+      "it": "B&B",
+      "en": "B&B",
+      "fr": "B B",
+      "de": "A quie..",
+      "es": "B",
+      "sq": null
+    },
+    "identifier": "b-and-b"
+  },
+  {
+    "name": {
+      "it": "Bivacco",
+      "en": "Shelter",
+      "fr": "Bivouac",
+      "de": "Schutz",
+      "es": "Vivac",
+      "sq": null
+    },
+    "identifier": "bivacco"
+  },
+  {
+    "name": {
+      "it": "Casa Vacanze",
+      "en": "Holiday home",
+      "fr": "- \"Riz-à-la-maison\".",
+      "de": "Ferienhaus",
+      "es": "Vivienda vacacional",
+      "sq": null
+    },
+    "identifier": "casa-vacanze"
+  },
+  {
+    "name": {
+      "it": "Ostello",
+      "en": "Hostel",
+      "fr": "Auberge de jeunesse",
+      "de": "Gästehaus",
+      "es": "Albergue",
+      "sq": null
+    },
+    "identifier": "ostello"
+  },
+  {
+    "name": {
+      "it": "Locanda",
+      "en": "Inn",
+      "fr": "Locanda",
+      "de": "Gasthaus",
+      "es": "Posada",
+      "sq": null
+    },
+    "identifier": "locanda"
+  },
+  {
+    "name": {
+      "it": "Residence",
+      "en": "Residence",
+      "fr": "Résidences",
+      "de": "Wohnsitz",
+      "es": "Residencia",
+      "sq": null
+    },
+    "identifier": "residence"
+  },
+  {
+    "name": {
+      "it": "Foresteria",
+      "en": "Guesthouse",
+      "fr": "Dépendance.",
+      "de": "Pension",
+      "es": "CASA DE HUÉSPEDES.",
+      "sq": null
+    },
+    "identifier": "foresteria"
+  },
+  {
+    "name": {
+      "it": "Alimentari",
+      "en": "Grocery store",
+      "fr": "Alimentaires",
+      "de": "Lebensmittelgeschäft",
+      "es": "para productos alimentarios",
+      "sq": null
+    },
+    "identifier": "shop-convenience"
+  },
+  {
+    "name": {
+      "it": "Casalinghi",
+      "en": "Housewares store",
+      "fr": "Articles ménagers",
+      "de": "Haushaltswarengeschäft",
+      "es": "Artículos para el hogar",
+      "sq": null
+    },
+    "identifier": "shop-houseware"
+  },
+  {
+    "name": {
+      "it": "Macelleria",
+      "en": "Butcher shop",
+      "fr": "Boucherie",
+      "de": "Metzgerei",
+      "es": "Carnicería",
+      "sq": null
+    },
+    "identifier": "shop-butcher"
+  },
+  {
+    "name": {
+      "it": "Panetteria",
+      "en": "Bread shop",
+      "fr": "Boulangerie",
+      "de": "Brotladen",
+      "es": "Panaderia",
+      "sq": null
+    },
+    "identifier": "shop-bakery"
+  },
+  {
+    "name": {
+      "it": "Prodotti locali",
+      "en": "Local produce shop",
+      "fr": "VALORISER LES PRODUITS LOCAUX n u l l",
+      "de": "Einheimische Produkte",
+      "es": "Productos locales",
+      "sq": null
+    },
+    "identifier": "shop-farm"
+  },
+  {
+    "name": {
+      "it": "Fruttivendolo",
+      "en": "Greengrocer",
+      "fr": "Primeur.",
+      "de": "Gemüsehändler",
+      "es": "Verdulero.",
+      "sq": null
+    },
+    "identifier": "shop-greengrocer"
+  },
+  {
+    "name": {
+      "it": "Edicola",
+      "en": "Newsstand",
+      "fr": "Point presse",
+      "de": "Zeitungsstand",
+      "es": "Edículo",
+      "sq": null
+    },
+    "identifier": "shop-kiosk"
+  },
+  {
+    "name": {
+      "it": "Articoli da regalo",
+      "en": "Gift shop",
+      "fr": "Articles cadeaux",
+      "de": "Gift shop",
+      "es": "Artículos de regalo",
+      "sq": null
+    },
+    "identifier": "shop-gift"
+  },
+  {
+    "name": {
+      "it": "Tabaccaio",
+      "en": "Tobacco shop",
+      "fr": "Débit de tabac",
+      "de": "Tabak",
+      "es": "Estanquero",
+      "sq": null
+    },
+    "identifier": "shop-tobacco"
+  },
+  {
+    "name": {
+      "it": "Cartoleria",
+      "en": "Stationery store",
+      "fr": "Produits de papeterie",
+      "de": "Schreibwarengeschäft",
+      "es": "PAPELERÍA",
+      "sq": null
+    },
+    "identifier": "shop-stationery"
+  },
+  {
+    "name": {
+      "it": "Vivaio",
+      "en": "Garden center",
+      "fr": "Pépinière viticole",
+      "de": "garden center.",
+      "es": "vivero",
+      "sq": null
+    },
+    "identifier": "shop-garden-centre"
+  },
+  {
+    "name": {
+      "it": "Fiorista",
+      "en": "Florist",
+      "fr": "Fleuriste",
+      "de": "Floristen",
+      "es": "- Florista.",
+      "sq": null
+    },
+    "identifier": "shop-florist"
+  },
+  {
+    "name": {
+      "it": "Pasticceria",
+      "en": "Pastry shop",
+      "fr": "Pâtisserie",
+      "de": "Bäckerei und Konditorei",
+      "es": "Repostería",
+      "sq": null
+    },
+    "identifier": "shop-pastry"
+  },
+  {
+    "name": {
+      "it": "Merceria",
+      "en": "Haberdashery",
+      "fr": "Mercerie",
+      "de": "Herrenausstatter",
+      "es": "Mercería",
+      "sq": null
+    },
+    "identifier": "shop-sewing"
+  },
+  {
+    "name": {
+      "it": "Abbigliamento",
+      "en": "Clothing store",
+      "fr": "Vêtements",
+      "de": "Bekleidungsgeschäft",
+      "es": "Vestimenta",
+      "sq": null
+    },
+    "identifier": "shop-clothes"
+  },
+  {
+    "name": {
+      "it": "Affittacamere",
+      "en": "Guesthouse",
+      "fr": "Affittacamere",
+      "de": "Pension",
+      "es": "Alquiler de habitaciones",
+      "sq": null
+    },
+    "identifier": "tourism-guest-house"
+  },
+  {
+    "name": {
+      "it": "Falesia di arrampicata",
+      "en": "Climbing rock areas",
+      "fr": "Falaise d'escalade",
+      "de": "Kletterfelsen",
+      "es": "Acantilado de escalada",
+      "sq": null
+    },
+    "identifier": "climbing-crag"
+  },
+  {
+    "name": {
+      "it": "Cappella",
+      "en": "Chapel",
+      "fr": "Chapelle",
+      "de": "Kapelle",
+      "es": "Capilla",
+      "sq": null
+    },
+    "identifier": "chapel"
+  },
+  {
+    "name": {
+      "it": "Castello",
+      "en": "Castle",
+      "fr": "Château",
+      "de": "Schloss",
+      "es": "Castillo",
+      "sq": null
+    },
+    "identifier": "castle"
+  },
+  {
+    "name": {
+      "it": "Chiesa",
+      "en": "Church",
+      "fr": "chiesa",
+      "de": "Kirche",
+      "es": "Iglesia",
+      "sq": null
+    },
+    "identifier": "church"
+  },
+  {
+    "name": {
+      "it": "Sorgente",
+      "en": "Natural spring",
+      "fr": "Sources",
+      "de": "Natuerliche Quellen",
+      "es": "Origen",
+      "sq": null
+    },
+    "identifier": "natural-spring"
+  },
+  {
+    "name": {
+      "it": "Acquedotto",
+      "en": "Aqueduct",
+      "fr": "Acquedotto",
+      "de": "Aquädukt",
+      "es": "Red hídrica",
+      "sq": null
+    },
+    "identifier": "historic-aqueduct"
+  },
+  {
+    "name": {
+      "it": "Punto di arrivo",
+      "en": "Arrival",
+      "fr": "Point d’arrivée",
+      "de": "Ankunft",
+      "es": "Punto de llegada",
+      "sq": null
+    },
+    "identifier": "arrival"
+  },
+  {
+    "name": {
+      "it": "Campo sportivo",
+      "en": "Pitch",
+      "fr": "Terrain sportif",
+      "de": "Pitch",
+      "es": "Campo de deportes",
+      "sq": null
+    },
+    "identifier": "leisure-pitch"
+  },
+  {
+    "name": {
+      "it": "Cascata",
+      "en": "Waterfall",
+      "fr": "Chute d'eau",
+      "de": "Wasser- fall",
+      "es": "Cascata",
+      "sq": null
+    },
+    "identifier": "waterway-waterfall"
+  },
+  {
+    "name": {
+      "it": "Cartello di segnaletica",
+      "en": "Guidepost",
+      "fr": "Panneau de signalisation",
+      "de": "Führungsstab",
+      "es": "Cartel de señalización",
+      "sq": null
+    },
+    "identifier": "information-guidepost"
+  },
+  {
+    "name": {
+      "it": "Diga",
+      "en": "Dam",
+      "fr": "Barrage",
+      "de": "Damm",
+      "es": "Represa",
+      "sq": null
+    },
+    "identifier": "waterway-dam"
+  },
+  {
+    "name": {
+      "it": "Fermata bus",
+      "en": "Bus stop",
+      "fr": "Arrêt de bus",
+      "de": "Bushaltestelle",
+      "es": "Parada de autobús",
+      "sq": null
+    },
+    "identifier": "highway-bus-stop"
+  },
+  {
+    "name": {
+      "it": "Foresta",
+      "en": "Forest",
+      "fr": "Forêt",
+      "de": "Wälder",
+      "es": "Selva",
+      "sq": null
+    },
+    "identifier": "natural-wood"
+  },
+  {
+    "name": {
+      "it": "Grotta",
+      "en": "Cave",
+      "fr": "Grotte",
+      "de": "Cave",
+      "es": "Cueva",
+      "sq": null
+    },
+    "identifier": "natural-cave-entrance"
+  },
+  {
+    "name": {
+      "it": "Lago",
+      "en": "Lake",
+      "fr": "Lago",
+      "de": "Lake",
+      "es": "Lago",
+      "sq": null
+    },
+    "identifier": "water-lake"
+  },
+  {
+    "name": {
+      "it": "Linea elettrica",
+      "en": "Power line",
+      "fr": "Ligne électrique",
+      "de": "Netzkabel",
+      "es": "Línea eléctrica",
+      "sq": null
+    },
+    "identifier": "power-line"
+  },
+  {
+    "name": {
+      "it": "Località",
+      "en": "Locality",
+      "fr": "Lieudit",
+      "de": "Ortlichkeit",
+      "es": "Localidad",
+      "sq": null
+    },
+    "identifier": "place-locality"
+  },
+  {
+    "name": {
+      "it": "Monastero",
+      "en": "Monastery",
+      "fr": "Monastère",
+      "de": "Abtei",
+      "es": "Monasterio",
+      "sq": null
+    },
+    "identifier": "amenity-monastery"
+  },
+  {
+    "name": {
+      "it": "Pannello informativo",
+      "en": "Information board",
+      "fr": "Panneau D'INFORMATION",
+      "de": "Hinweistafel",
+      "es": "(panel info)",
+      "sq": null
+    },
+    "identifier": "information-panel"
+  },
+  {
+    "name": {
+      "it": "Pista per cavalli",
+      "en": "Paddock",
+      "fr": "piste cavalière",
+      "de": "Fahrerlager",
+      "es": "camino de herradura",
+      "sq": null
+    },
+    "identifier": "paddock"
+  },
+  {
+    "name": {
+      "it": "Podere storico",
+      "en": "Manor",
+      "fr": "Domaine historique",
+      "de": "Rittergut",
+      "es": "Finca histórica",
+      "sq": null
+    },
+    "identifier": "historic-manor"
+  },
+  {
+    "name": {
+      "it": "Collina",
+      "en": "Hill",
+      "fr": "Colline",
+      "de": "Hügel",
+      "es": "Colina",
+      "sq": null
+    },
+    "identifier": "natural-hill"
+  },
+  {
+    "name": {
+      "it": "Ponte",
+      "en": "Bridge",
+      "fr": "Pont",
+      "de": "Brücke",
+      "es": "Puente",
+      "sq": null
+    },
+    "identifier": "highway-bridge"
+  },
+  {
+    "name": {
+      "it": "Rovine",
+      "en": "Ruins",
+      "fr": "Ruine",
+      "de": "Ruine",
+      "es": "Las ruinas",
+      "sq": null
+    },
+    "identifier": "historic-ruins"
+  },
+  {
+    "name": {
+      "it": "Sbarra / cancello",
+      "en": "Gate",
+      "fr": "Barre / portail",
+      "de": "Tor",
+      "es": "Barra / cancela",
+      "sq": null
+    },
+    "identifier": "barrier-gate"
+  },
+  {
+    "name": {
+      "it": "Seccatoio",
+      "en": "Drying shed",
+      "fr": "Sèche-linge",
+      "de": "Trockenschuppen",
+      "es": "Enjugador",
+      "sq": null
+    },
+    "identifier": "squeegee"
+  },
+  {
+    "name": {
+      "it": "Passo / sella",
+      "en": "Mountain pass / saddle",
+      "fr": "Pas / selle",
+      "de": "Bergpass / Sattel",
+      "es": "Paso / sillín",
+      "sq": null
+    },
+    "identifier": "natural-saddle"
+  },
+  {
+    "name": {
+      "it": "Oliveto",
+      "en": "Olive grove",
+      "fr": "Oliveraie",
+      "de": "Olivenpflanzung",
+      "es": "Olivares",
+      "sq": null
+    },
+    "identifier": "trees-olive"
+  },
+  {
+    "name": {
+      "it": "Vetta",
+      "en": "Peak",
+      "fr": "Sommet",
+      "de": "Spitze",
+      "es": "Cima",
+      "sq": null
+    },
+    "identifier": "natural-peak"
+  },
+  {
+    "name": {
+      "it": "Escursionismo",
+      "en": "Hiking",
+      "fr": "Randonnée pédestre",
+      "de": "Wandern",
+      "es": "Senderismo",
+      "sq": null
+    },
+    "identifier": "hiking-poi"
+  },
+  {
+    "name": {
+      "it": "Pieve",
+      "en": "Pieve",
+      "fr": "Pieve",
+      "de": "Pieve",
+      "es": "Pieve",
+      "sq": null
+    },
+    "identifier": "pieve"
+  },
+  {
+    "name": {
+      "it": "Municipio",
+      "en": "Town hall",
+      "fr": "Administration communale",
+      "de": "Rathaus Ulm",
+      "es": "Municipio",
+      "sq": null
+    },
+    "identifier": "amenity-townhall"
+  },
+  {
+    "name": {
+      "it": "Ospedale",
+      "en": "Hospital",
+      "fr": "Hôpital",
+      "de": "Krankenhaus",
+      "es": "Ospedale",
+      "sq": null
+    },
+    "identifier": "amenity-hospital"
+  },
+  {
+    "name": {
+      "it": "Servizio Taxi",
+      "en": "Taxi service",
+      "fr": "Taxis Métropolitains, j'écoute ?",
+      "de": "Taxiservice",
+      "es": "Taxi del centro de la ciudad.",
+      "sq": null
+    },
+    "identifier": "amenity-taxi"
+  },
+  {
+    "name": {
+      "it": "Installazione",
+      "en": "Installation",
+      "fr": "Installazione",
+      "de": "Installation",
+      "es": "Instalación",
+      "sq": null
+    },
+    "identifier": "installation"
+  },
+  {
+    "name": {
+      "it": "Mulino",
+      "en": "Mill",
+      "fr": "Moulin",
+      "de": "Mühle",
+      "es": "Molino",
+      "sq": null
+    },
+    "identifier": "mill"
+  },
+  {
+    "name": {
+      "it": "Ruota Orizzontale",
+      "en": "Horizontal wheel",
+      "fr": "Roue horizontale",
+      "de": "Horizontales Rad",
+      "es": "Rueda horizontal",
+      "sq": null
+    },
+    "identifier": "horizontal-wheel"
+  },
+  {
+    "name": {
+      "it": "Maestà",
+      "en": "Majesty",
+      "fr": "Majesté.",
+      "de": "Majesty",
+      "es": "Majestad",
+      "sq": null
+    },
+    "identifier": "majesty"
+  },
+  {
+    "name": {
+      "it": "Maestà delle abitazioni",
+      "en": "Majesty of housing",
+      "fr": "Majesté des habitations",
+      "de": "Majestät des Wohnens",
+      "es": "Majestad de las viviendas",
+      "sq": null
+    },
+    "identifier": "majesty-of-housing"
+  },
+  {
+    "name": {
+      "it": "Strade da ammirare",
+      "en": "Majesty of the streets",
+      "fr": "Routes à admirer",
+      "de": "Majestät der Straßen",
+      "es": "Calles para admirar",
+      "sq": null
+    },
+    "identifier": "majesty-of-streets"
+  },
+  {
+    "name": {
+      "it": "Sacello",
+      "en": "Sacellum",
+      "fr": "Sacello",
+      "de": "Sacellum",
+      "es": "Sacelio",
+      "sq": null
+    },
+    "identifier": "sacellum"
+  },
+  {
+    "name": {
+      "it": "Maestà delle Fonti",
+      "en": "Majesty of fountains",
+      "fr": "Majesté des Sources",
+      "de": "Majestät der Brunnen",
+      "es": "Majestad de las Fuentes",
+      "sq": null
+    },
+    "identifier": "majesty-of-fountains"
+  },
+  {
+    "name": {
+      "it": "Proposta di restauro",
+      "en": "Restoration proposal",
+      "fr": "Proposition de restauration",
+      "de": "Restaurierungsvorschlag",
+      "es": "Propuesta de restauración",
+      "sq": null
+    },
+    "identifier": "restoration-proposal"
+  },
+  {
+    "name": {
+      "it": "Acquidoccio",
+      "en": "Street gutter",
+      "fr": "Aquidoccio",
+      "de": "Straßenrinne",
+      "es": "aliviadero o desagüe con dispositivo de entrega",
+      "sq": null
+    },
+    "identifier": "watery"
+  },
+  {
+    "name": {
+      "it": "Canale di drenaggio",
+      "en": "Drainage channel",
+      "fr": "Canal de drainage.",
+      "de": "Entwässerungsrinne",
+      "es": "canal de desagüe",
+      "sq": null
+    },
+    "identifier": "drainage-channel"
+  },
+  {
+    "name": {
+      "it": "Ruota Verticale",
+      "en": "Vertical wheel",
+      "fr": "Roue verticale",
+      "de": "Vertikales Rad",
+      "es": "Rueda vertical",
+      "sq": null
+    },
+    "identifier": "vertical-wheel"
+  },
+  {
+    "name": {
+      "it": "Maestà delocalizzata",
+      "en": "Relocated majesty",
+      "fr": "Majesté délocalisée",
+      "de": "Verlegte Majestät",
+      "es": "Majestad deslocalizada",
+      "sq": null
+    },
+    "identifier": "relocated-majesty"
+  },
+  {
+    "name": {
+      "it": "Portale",
+      "en": "Portal",
+      "fr": "Portail",
+      "de": "Portal",
+      "es": "Portale",
+      "sq": null
+    },
+    "identifier": "portal"
+  },
+  {
+    "name": {
+      "it": "Maestà delle chiese",
+      "en": "Majesty of churches",
+      "fr": "Majesté des églises",
+      "de": "Majestät der Kirchen",
+      "es": "Majestad de las iglesias",
+      "sq": null
+    },
+    "identifier": "majesty-of-churches"
+  },
+  {
+    "name": {
+      "it": "Ospizio",
+      "en": "Hospice",
+      "fr": "Ospizio",
+      "de": "Hospiz",
+      "es": "centro de acogida",
+      "sq": null
+    },
+    "identifier": "hospice"
+  },
+  {
+    "name": {
+      "it": "Oratorio",
+      "en": "Oratory",
+      "fr": "Oratorio",
+      "de": "Oratorium",
+      "es": "Oratorio",
+      "sq": null
+    },
+    "identifier": "oratory"
+  },
+  {
+    "name": {
+      "it": "Maestà dei Ponti",
+      "en": "Majesty of the bridges",
+      "fr": "Majesté des Ponts",
+      "de": "Majestät der Brücken",
+      "es": "Majestad de los Puentes",
+      "sq": null
+    },
+    "identifier": "majesty-of-bridges"
+  },
+  {
+    "name": {
+      "it": "Essiccatoio / Metato",
+      "en": "Dryer / Metato",
+      "fr": "Séchoir / Métate",
+      "de": "Trockner / Metato",
+      "es": "Secador / Metato",
+      "sq": null
+    },
+    "identifier": "dryer-metato"
+  },
+  {
+    "name": {
+      "it": "Pilastro",
+      "en": "Pillar",
+      "fr": "Pilier",
+      "de": "Säule",
+      "es": "Pilar",
+      "sq": null
+    },
+    "identifier": "pillar"
+  },
+  {
+    "name": {
+      "it": "Cippo di confine",
+      "en": "Boundary marker",
+      "fr": "borne",
+      "de": "Boundary marker",
+      "es": "Amojonamiento",
+      "sq": null
+    },
+    "identifier": "boundary-marker"
+  },
+  {
+    "name": {
+      "it": "Maestà delle stalle",
+      "en": "Majesty of the stables",
+      "fr": "Majesté des écuries",
+      "de": "Majestät der Ställe",
+      "es": "Majestad de los establos",
+      "sq": null
+    },
+    "identifier": "majesty-of-stables"
+  },
+  {
+    "name": {
+      "it": "Fonte Battesimale",
+      "en": "Baptismal font",
+      "fr": "Fonts baptismaux",
+      "de": "Taufbecken",
+      "es": "Pila bautismal",
+      "sq": null
+    },
+    "identifier": "baptismal-font"
+  },
+  {
+    "name": {
+      "it": "Targa con Iscrizione",
+      "en": "Plate with Inscription",
+      "fr": "Plaque d'immatriculation avec inscription",
+      "de": "Schild mit Beschriftung",
+      "es": "Matrícula con inscripción",
+      "sq": null
+    },
+    "identifier": "plate-with-inscription"
+  },
+  {
+    "name": {
+      "it": "Muro con arco",
+      "en": "Wall with arch",
+      "fr": "Mur avec arc",
+      "de": "Wand mit Bogen",
+      "es": "Pared con arco",
+      "sq": null
+    },
+    "identifier": "wall-with-arch"
+  },
+  {
+    "name": {
+      "it": "Casa",
+      "en": "House",
+      "fr": "Maison",
+      "de": "Haus",
+      "es": "Casa",
+      "sq": null
+    },
+    "identifier": "house"
+  },
+  {
+    "name": {
+      "it": "Casa torre",
+      "en": "Tower house",
+      "fr": "Maison-tour",
+      "de": "Wohnturm",
+      "es": "Casa torre",
+      "sq": null
+    },
+    "identifier": "tower-house"
+  },
+  {
+    "name": {
+      "it": "Mascherone",
+      "en": "Mascaron",
+      "fr": "Mascherone",
+      "de": "Mascaron",
+      "es": "Mascarones",
+      "sq": null
+    },
+    "identifier": "mascaron"
+  },
+  {
+    "name": {
+      "it": "Nucleo storico",
+      "en": "Historic center",
+      "fr": "noyau historique",
+      "de": "Altstadt von Bologna",
+      "es": "centro histórico",
+      "sq": null
+    },
+    "identifier": "historical-core"
+  },
+  {
+    "name": {
+      "it": "Casa con balcone",
+      "en": "House with balcony",
+      "fr": "avec balcon",
+      "de": "Haus mit Balkon",
+      "es": "Casa con balcón",
+      "sq": null
+    },
+    "identifier": "house-with-balcony"
+  },
+  {
+    "name": {
+      "it": "Concio",
+      "en": "Ashlar",
+      "fr": "Pierre de taille",
+      "de": "Werkstein",
+      "es": "Sillar",
+      "sq": null
+    },
+    "identifier": "ashlar"
+  },
+  {
+    "name": {
+      "it": "Annesso rustico",
+      "en": "Rustic outbuilding",
+      "fr": "Annexe rustique",
+      "de": "Rustikaler Nebenbau",
+      "es": "Anexo rústico",
+      "sq": null
+    },
+    "identifier": "rustic-annex"
+  },
+  {
+    "name": {
+      "it": "Ghiacciaia",
+      "en": "Icebox",
+      "fr": "Glacière",
+      "de": "Eisschrank",
+      "es": "fábrica de hielo",
+      "sq": null
+    },
+    "identifier": "icebox"
+  },
+  {
+    "name": {
+      "it": "Capanne",
+      "en": "Huts",
+      "fr": "Hutte",
+      "de": "Hütten:",
+      "es": "- En cabanas.",
+      "sq": null
+    },
+    "identifier": "hut"
+  },
+  {
+    "name": {
+      "it": "Maestà delle Vigne",
+      "en": "Majesty of the vineyards",
+      "fr": "Majesté des Vignes",
+      "de": "Majestät der Weinberge",
+      "es": "Majestad de las Viñas",
+      "sq": null
+    },
+    "identifier": "majesty-of-vineyards"
+  },
+  {
+    "name": {
+      "it": "Santuario",
+      "en": "Sanctuary",
+      "fr": "Sanctuaire",
+      "de": "Heiligtum",
+      "es": "Santuario",
+      "sq": null
+    },
+    "identifier": "sanctuary"
+  },
+  {
+    "name": {
+      "it": "Muro a secco",
+      "en": "Dry stone",
+      "fr": "mur de pierres sèches",
+      "de": "trockene Steinfüllung",
+      "es": "En la pared de yeso.",
+      "sq": null
+    },
+    "identifier": "dry-stone"
+  },
+  {
+    "name": {
+      "it": "Convento",
+      "en": "Convent",
+      "fr": "Couvent",
+      "de": "KONVENT",
+      "es": "Convento",
+      "sq": null
+    },
+    "identifier": "convent"
+  },
+  {
+    "name": {
+      "it": "Insediamento",
+      "en": "Settlement",
+      "fr": "Autres observations",
+      "de": "Abrechnung",
+      "es": "instalación",
+      "sq": null
+    },
+    "identifier": "settlement"
+  },
+  {
+    "name": {
+      "it": "Borgo",
+      "en": "Hamlet",
+      "fr": "Borgo",
+      "de": "Hamlet",
+      "es": "Borgo",
+      "sq": null
+    },
+    "identifier": "borgo"
+  },
+  {
+    "name": {
+      "it": "Lapide commemorativa",
+      "en": "Memorial stone",
+      "fr": "Pierre tombale commémorative",
+      "de": "Gedenkstein (6)",
+      "es": "Placa conmemorativa",
+      "sq": null
+    },
+    "identifier": "memorial-stone"
+  },
+  {
+    "name": {
+      "it": "Elemento decorativo",
+      "en": "Decorative element",
+      "fr": "Élément décoratif",
+      "de": "Dekoratives Element",
+      "es": "Elemento decorativo",
+      "sq": null
+    },
+    "identifier": "decorative-element"
+  },
+  {
+    "name": {
+      "it": "Corte",
+      "en": "Courtyard",
+      "fr": "Corte",
+      "de": "Hof",
+      "es": "Corte",
+      "sq": null
+    },
+    "identifier": "courtyard"
+  },
+  {
+    "name": {
+      "it": "Casa rurale",
+      "en": "Rural house",
+      "fr": "Ferme.",
+      "de": "Casa Rural",
+      "es": "Casa rural",
+      "sq": null
+    },
+    "identifier": "rural-house"
+  },
+  {
+    "name": {
+      "it": "Lavatoio",
+      "en": "Washhouse",
+      "fr": "Lavatoio",
+      "de": "Waschhaus",
+      "es": "Lavadero",
+      "sq": null
+    },
+    "identifier": "washhouse"
+  },
+  {
+    "name": {
+      "it": "Portico",
+      "en": "Portico",
+      "fr": "Portique",
+      "de": "Portico",
+      "es": "Pórtico",
+      "sq": null
+    },
+    "identifier": "portico"
+  },
+  {
+    "name": {
+      "it": "Cinta muraria",
+      "en": "Defensive wall",
+      "fr": "Muraille",
+      "de": "Wehrmauer",
+      "es": "Muralla",
+      "sq": null
+    },
+    "identifier": "defensive-wall"
+  },
+  {
+    "name": {
+      "it": "Edifici rurali",
+      "en": "Rural buildings",
+      "fr": "Bâtiments ruraux",
+      "de": "Ländliche Bebauung:",
+      "es": "Edificios rurales",
+      "sq": null
+    },
+    "identifier": "rural-building"
+  },
+  {
+    "name": {
+      "it": "Casa forte",
+      "en": "Strong house",
+      "fr": "Maison forte",
+      "de": "Starkes Haus",
+      "es": "Casa Forte",
+      "sq": null
+    },
+    "identifier": "strong-house"
+  },
+  {
+    "name": {
+      "it": "Battistero",
+      "en": "Baptistery",
+      "fr": "Baptistère",
+      "de": "Baptisterium",
+      "es": "Baptisterio",
+      "sq": null
+    },
+    "identifier": "baptistery"
+  },
+  {
+    "name": {
+      "it": "Edifici religiosi",
+      "en": "Religious buildings",
+      "fr": "Bâtiments religieux",
+      "de": "Sakrale Bauwerke",
+      "es": "Edificios religiosos",
+      "sq": null
+    },
+    "identifier": "religious-building"
+  },
+  {
+    "name": {
+      "it": "Loggiato",
+      "en": "Loggia",
+      "fr": "Loggiato",
+      "de": "Loggia",
+      "es": "Logia",
+      "sq": null
+    },
+    "identifier": "loggia"
+  },
+  {
+    "name": {
+      "it": "Canonica",
+      "en": "Rectory",
+      "fr": "Presbytère",
+      "de": "Pfarrhaus",
+      "es": "Casona.",
+      "sq": null
+    },
+    "identifier": "clergy-house"
+  },
+  {
+    "name": {
+      "it": "Architrave",
+      "en": "Architrave",
+      "fr": "Architrave",
+      "de": "Bekleidungswinkel:",
+      "es": "Arquitrabe",
+      "sq": null
+    },
+    "identifier": "architrave"
+  },
+  {
+    "name": {
+      "it": "Epigrafe",
+      "en": "Epigraphy",
+      "fr": "Épigraphe",
+      "de": "Epigraphik",
+      "es": "Epígrafe",
+      "sq": null
+    },
+    "identifier": "epigraphy"
+  },
+  {
+    "name": {
+      "it": "Nicchia",
+      "en": "Niche",
+      "fr": "Nicchia",
+      "de": "Nische",
+      "es": "Nicho",
+      "sq": null
+    },
+    "identifier": "niche"
+  },
+  {
+    "name": {
+      "it": "Elementi architettonici puntuali",
+      "en": "Punctual architectural elements",
+      "fr": "Éléments architecturaux ponctuels",
+      "de": "Pünktliche architektonische Elemente",
+      "es": "Elementos arquitectónicos puntuales",
+      "sq": null
+    },
+    "identifier": "punctual-architectural-element"
+  },
+  {
+    "name": {
+      "it": "Statua Votiva",
+      "en": "Votive statue",
+      "fr": "Statue Votive",
+      "de": "Votivstatue",
+      "es": "Estatua votiva",
+      "sq": null
+    },
+    "identifier": "votive-statue"
+  },
+  {
+    "name": {
+      "it": "Stemma gentilizio",
+      "en": "Coat of arms",
+      "fr": "Armoiries de la gentillesse",
+      "de": "Wappen",
+      "es": "Escudo gentilicio",
+      "sq": null
+    },
+    "identifier": "coat-of-arms"
+  },
+  {
+    "name": {
+      "it": "Selciato storico",
+      "en": "Historical pavement",
+      "fr": "Pavé historique",
+      "de": "Historischer Bürgersteig",
+      "es": "Calzada histórica",
+      "sq": null
+    },
+    "identifier": "historical-pavement"
+  },
+  {
+    "name": {
+      "it": "Sentiero storico",
+      "en": "Historic trail",
+      "fr": "Sentier historique",
+      "de": "Historischer Weg",
+      "es": "Sendero histórico",
+      "sq": null
+    },
+    "identifier": "historic-trail"
+  },
+  {
+    "name": {
+      "it": "Spazi aperti e infrastrutture viarie",
+      "en": "Open spaces and road infrastructures",
+      "fr": "Espaces ouverts et infrastructures routières",
+      "de": "Freiflächen und Straßeninfrastrukturen",
+      "es": "Espacios abiertos e infraestructuras viarias",
+      "sq": null
+    },
+    "identifier": "open-spaces-and-road-infrastructures"
+  },
+  {
+    "name": {
+      "it": "Fogliaia",
+      "en": "Leaf composting area",
+      "fr": "Feuille",
+      "de": "Blattkompostierungsbereich",
+      "es": "Fogliaia",
+      "sq": null
+    },
+    "identifier": "fogliaia"
+  },
+  {
+    "name": {
+      "it": "Strutture civili",
+      "en": "Civil structures",
+      "fr": "Structures civiles",
+      "de": "Zivile Strukturen",
+      "es": "Estructuras civiles",
+      "sq": null
+    },
+    "identifier": "civil-structure"
+  },
+  {
+    "name": {
+      "it": "Forno",
+      "en": "Bread oven",
+      "fr": "Four",
+      "de": "Brotbackofen: <P>",
+      "es": "Horno",
+      "sq": null
+    },
+    "identifier": "forno"
+  },
+  {
+    "name": {
+      "it": "Fienile",
+      "en": "Barn",
+      "fr": "Hangar agricole",
+      "de": "Scheune",
+      "es": "Galpón",
+      "sq": null
+    },
+    "identifier": "barn"
+  },
+  {
+    "name": {
+      "it": "Càntigos de crèsia",
+      "en": "Sacred songs (Cantigos de crèsia)",
+      "fr": "Càntigos de crèsia",
+      "de": "Heilige Lieder (Cantigos de crèsia)",
+      "es": "Càntigos de crèsia",
+      "sq": null
+    },
+    "identifier": "cantigos-de-cresia"
+  },
+  {
+    "name": {
+      "it": "Cantu a tenore",
+      "en": "Cantu a tenore (polyphonic singing)",
+      "fr": "Cantu à teneur",
+      "de": "Cantu a tenore (polyphoner Gesang)",
+      "es": "Cantu a tenor",
+      "sq": null
+    },
+    "identifier": "cantu-a-tenore"
+  },
+  {
+    "name": {
+      "it": "Organitos e fisarmònicas",
+      "en": "Barrel organs and accordions",
+      "fr": "Organitos et fisarmònicas",
+      "de": "Drehorgeln und Akkordeons",
+      "es": "Organitos y acordeones",
+      "sq": null
+    },
+    "identifier": "organitos-e-fisarmonicas"
+  },
+  {
+    "name": {
+      "it": "Launeddas",
+      "en": "Launeddas (Sardinian woodwind)",
+      "fr": "Launeddas",
+      "de": "Launeddas (Sardinian woodwind)",
+      "es": "Launeddas",
+      "sq": null
+    },
+    "identifier": "launeddas"
+  },
+  {
+    "name": {
+      "it": "Poesia campidanesa",
+      "en": "Campidanese poetry",
+      "fr": "Poésie campidanaise",
+      "de": "Campidanesische Poesie",
+      "es": "Poesía campidanesa",
+      "sq": null
+    },
+    "identifier": "poesia-campidanesa"
+  },
+  {
+    "name": {
+      "it": "Poesia a mutos",
+      "en": "Poetry a mutos",
+      "fr": "Poésie muette",
+      "de": "Poesie a mutos",
+      "es": "Poesía a mutos",
+      "sq": null
+    },
+    "identifier": "poesia-a-mutos"
+  },
+  {
+    "name": {
+      "it": "Arrepentina",
+      "en": "Arrepentina (improvised poetry)",
+      "fr": "Arrepentina",
+      "de": "Arrepentina (improvisierte Poesie)",
+      "es": "Arrepentina",
+      "sq": null
+    },
+    "identifier": "arrepentina"
+  },
+  {
+    "name": {
+      "it": "Chiterra",
+      "en": "Chiterra (Sardinian guitar)",
+      "fr": "Chiterra",
+      "de": "Chiterra (sardische Gitarre)",
+      "es": "Chiterra",
+      "sq": null
+    },
+    "identifier": "chiterra"
+  },
+  {
+    "name": {
+      "it": "Poesia logudoresa",
+      "en": "Logudorese poetry",
+      "fr": "Poésie logudorienne",
+      "de": "Logudorese Poesie",
+      "es": "Poesía logudoresa",
+      "sq": null
+    },
+    "identifier": "poesia-logudoresa"
+  },
+  {
+    "name": {
+      "it": "Rete Monte Pisano",
+      "en": "Monte Pisano network",
+      "fr": "Réseau Monte Pisano",
+      "de": "Netzwerk Monte Pisano",
+      "es": "Red Monte Pisano",
+      "sq": null
+    },
+    "identifier": "rete-monte-pisano"
+  },
+  {
+    "name": {
+      "it": "Ufficio postale",
+      "en": "Post office",
+      "fr": "Poste",
+      "de": "Postamt",
+      "es": "Correo postal",
+      "sq": null
+    },
+    "identifier": "post-office"
+  },
+  {
+    "name": {
+      "it": "Area picnic",
+      "en": "Picnic area",
+      "fr": "Aire de pique nique",
+      "de": "Rastplatz",
+      "es": "Área de picnic",
+      "sq": null
+    },
+    "identifier": "picnic-area"
+  },
+  {
+    "name": {
+      "it": "Attrazione turistica",
+      "en": "Tourist attraction",
+      "fr": "Attraction tourristique",
+      "de": "Sehenswürdigkeit",
+      "es": "Atracción turística",
+      "sq": null
+    },
+    "identifier": "tourism"
+  },
+  {
+    "name": {
+      "it": "Mercato",
+      "en": "Marketplace",
+      "fr": "Marché",
+      "de": "Marktplatz",
+      "es": "mercado",
+      "sq": null
+    },
+    "identifier": "marketplace"
+  },
+  {
+    "name": {
+      "it": "Agriturismo",
+      "en": "Farmhouse",
+      "fr": "Agrotourisme",
+      "de": "Landhaus",
+      "es": "Agroturismo",
+      "sq": null
+    },
+    "identifier": "farmhouse"
+  },
+  {
+    "name": {
+      "it": "Eccellenza ambientale",
+      "en": "Environmental excellence",
+      "fr": "Excellence environnementale",
+      "de": ".",
+      "es": "Excelencia medioambiental",
+      "sq": null
+    },
+    "identifier": "eccellenze-ambientali"
+  },
+  {
+    "name": {
+      "it": "Carabinieri forestali",
+      "en": "Carabinieri forestry service",
+      "fr": "Carabiniers forestiers",
+      "de": "Carabinieri Forstdienst",
+      "es": "Carabineros forestales",
+      "sq": null
+    },
+    "identifier": "forest-police"
+  },
+  {
+    "name": {
+      "it": "Area costiera",
+      "en": "Coastal area",
+      "fr": "Zone côtière",
+      "de": "Küstengebiet",
+      "es": "Zona costera",
+      "sq": null
+    },
+    "identifier": "coast-seaside",
+    "description": {
+      "it": "<p>Mare e dintorni</p>",
+      "en": "<p>Sea and surrounding area</p>",
+      "fr": "<p>Mer et environs</p>",
+      "de": "<p>Meer und Umgebung</p>",
+      "es": "<p>Mar y alrededores</p>",
+      "sq": null
+    }
+  },
+  {
+    "name": {
+      "it": "Luoghi della transumanza",
+      "en": "Places of transhumance",
+      "fr": "Lieux de transhumance",
+      "de": "Orte der Wandertierhaltung",
+      "es": "Lugares de la trashumancia",
+      "sq": null
+    },
+    "identifier": "places-of-transhumance"
+  },
+  {
+    "name": {
+      "it": "Educazione ambientale",
+      "en": "Environmental education",
+      "fr": "Éducation à l'environnement",
+      "de": "Umweltbildung",
+      "es": "Educación Ambiental",
+      "sq": null
+    },
+    "identifier": "environmental-education",
+    "description": {
+      "it": "<p>Luoghi per l'educazione ambientale all'aperto</p>",
+      "en": "<p>Outdoor environmental education sites</p>",
+      "fr": "<p>Lieux pour l'éducation environnementale en plein air</p>",
+      "de": "<p>Umwelterziehungsstätten im Freien</p>",
+      "es": "<p>Lugares para la educación ambiental al aire libre</p>",
+      "sq": null
+    }
+  },
+  {
+    "name": {
+      "it": "TLC",
+      "en": "TLC",
+      "fr": "TLC",
+      "de": "TLC",
+      "es": "TLC",
+      "sq": null
+    },
+    "identifier": "tlc",
+    "description": {
+      "it": "<p>Visibilità di stazioni per telecomunicazioni, segnale telefonico o ricezione della telefonia mobile</p>",
+      "en": "<p>Visibility of telecommunications sites, phone signal, or mobile reception</p>",
+      "fr": "<p>Visibilité des stations pour les télécommunications, le signal téléphonique ou la réception de la téléphonie mobile</p>",
+      "de": "<p>Sichtbarkeit von Telekommunikationsstandorten, Telefonsignal oder mobilem Empfang</p>",
+      "es": "<p>Visibilidad de estaciones de telecomunicaciones, señal telefónica o recepción de telefonía móvil</p>",
+      "sq": null
+    }
+  },
+  {
+    "name": {
+      "it": "Accesso per i disabili",
+      "en": "Disabled access",
+      "fr": "Accès pour les personnes à mobilité réduite",
+      "de": "Barrierefreier Zugang",
+      "es": "Accesos para discapacitados.",
+      "sq": null
+    },
+    "identifier": "disabled-access",
+    "description": {
+      "it": "<p>Punti di accesso con servizi per disabili</p>",
+      "en": "<p>Access points with services for people with disabilities</p>",
+      "fr": "<p>Points d'accès avec services pour personnes handicapées</p>",
+      "de": "<p>Zugangspunkte mit Dienstleistungen für Menschen mit Behinderungen</p>",
+      "es": "<p>Puntos de acceso con servicios para discapacitados</p>",
+      "sq": null
+    }
+  },
+  {
+    "name": {
+      "it": "Area sosta attrezzata",
+      "en": "Equipped rest area",
+      "fr": "Aire de stationnement équipée",
+      "de": "Ausgestatteter Ruhebereich",
+      "es": "Zona de aparcamiento equipada",
+      "sq": null
+    },
+    "identifier": "equipped-rest-area"
+  },
+  {
+    "name": {
+      "it": "Biblioteca",
+      "en": "Library",
+      "fr": "Bibliotheque",
+      "de": "Bibliothek",
+      "es": "Bibliotecas",
+      "sq": null
+    },
+    "identifier": "library"
+  },
+  {
+    "name": {
+      "it": "Città",
+      "en": "City",
+      "fr": "Ville",
+      "de": "Stadt",
+      "es": "Ciudad",
+      "sq": null
+    },
+    "identifier": "city"
+  },
+  {
+    "name": {
+      "it": "Attracco",
+      "en": "Ferry terminal",
+      "fr": "amarrage",
+      "de": "FÄHRE",
+      "es": "atraque",
+      "sq": null
+    },
+    "identifier": "ferry-terminal"
+  },
+  {
+    "name": {
+      "it": "Villaggio prefabbricato",
+      "en": "Prefabricated structures",
+      "fr": "Village préfabriqué",
+      "de": "Vorgefertigte Strukturen",
+      "es": "Pueblo prefabricado",
+      "sq": null
+    },
+    "identifier": "prefabricated-structures"
+  },
+  {
+    "name": {
+      "it": "Sorgente - fonte naturale",
+      "en": "Natural spring",
+      "fr": "Source - source naturelle",
+      "de": "Natuerliche Quellen",
+      "es": "Fuente - fuente natural",
+      "sq": null
+    },
+    "identifier": "natural-sprin"
+  },
+  {
+    "name": {
+      "it": "Strade sterrate",
+      "en": "Dirt roads",
+      "fr": "Chemins de terre",
+      "de": "Schotter.",
+      "es": "Caminos de tierra",
+      "sq": null
+    },
+    "identifier": "dirt-roads"
+  },
+  {
+    "name": {
+      "it": "Strade da guidare",
+      "en": "Roads to drive",
+      "fr": "Routes à conduire",
+      "de": "Straßen zum Fahren",
+      "es": "Carreteras para conducir",
+      "sq": null
+    },
+    "identifier": "roads-to-drive"
+  },
+  {
+    "name": {
+      "it": "Risorse e prospezioni",
+      "en": "Resources and surveys",
+      "fr": "Ressources et prospections",
+      "de": "Ressourcen und Umfragen",
+      "es": "Recursos y prospección",
+      "sq": null
+    },
+    "identifier": "risorse-e-prospezioni"
+  },
+  {
+    "name": {
+      "it": "Punti geologia",
+      "en": "Geology points",
+      "fr": "Points géologie",
+      "de": "Geologiepunkte",
+      "es": "Puntos geología",
+      "sq": null
+    },
+    "identifier": "punti-geologia"
+  },
+  {
+    "name": {
+      "it": "Guado",
+      "en": "Ford",
+      "fr": "Gué",
+      "de": "Ford",
+      "es": "Glasto",
+      "sq": null
+    },
+    "identifier": "ford"
+  },
+  {
+    "name": {
+      "it": "Motoabbigliamento",
+      "en": "Motorcycle clothing store",
+      "fr": "Moto-habillement",
+      "de": "Motorradbekleidungsgeschäft",
+      "es": "Motoequipaje",
+      "sq": null
+    },
+    "identifier": "shop-motoabbigliamento"
+  },
+  {
+    "name": {
+      "it": "Bed and breakfast",
+      "en": "Bed and breakfast",
+      "fr": "Bed and Breakfast",
+      "de": "Übernachtung mit Frühstück",
+      "es": "Dormir y desayuno.",
+      "sq": null
+    },
+    "identifier": "bed-and-breakfast"
+  },
+  {
+    "name": {
+      "it": "Geosito",
+      "en": "Geosite",
+      "fr": "Géosite",
+      "de": "Geosit",
+      "es": "Geosito",
+      "sq": null
+    },
+    "identifier": "geosito"
+  },
+  {
+    "name": {
+      "it": "Ristorazione",
+      "en": "Catering",
+      "fr": "Restauration",
+      "de": "Catering",
+      "es": "RestauraciÃ³n",
+      "sq": null
+    },
+    "identifier": "catering"
+  },
+  {
+    "name": {
+      "it": "Cave e Miniere",
+      "en": "Caves and mines",
+      "fr": "Carrières et mines",
+      "de": "Höhlen und Minen",
+      "es": "Canteras y minas",
+      "sq": null
+    },
+    "identifier": "mine"
+  },
+  {
+    "name": {
+      "it": "Prodotti",
+      "en": "Products",
+      "fr": "Produits",
+      "de": "Produkte",
+      "es": "Productos",
+      "sq": null
+    },
+    "identifier": "product"
+  },
+  {
+    "name": {
+      "it": "Fontana storica",
+      "en": "Historic fountain",
+      "fr": "Fontaine historique",
+      "de": "Historischer Brunnen",
+      "es": "Fuente histórica",
+      "sq": null
+    },
+    "identifier": "historical-fontain"
+  },
+  {
+    "name": {
+      "it": "Area sosta Camper",
+      "en": "Motorhome parking area",
+      "fr": "AIRE DE STATIONNEMENT POUR CAMPING-CARS",
+      "de": "Wohnmobilstellplatz",
+      "es": "Zona de aparcamiento Camper",
+      "sq": null
+    },
+    "identifier": "camper-parking-area"
+  },
+  {
+    "name": {
+      "it": "Aspetti selvicolturali",
+      "en": "Silvicultural aspects",
+      "fr": "Aspects sylvicoles",
+      "de": "Waldbauliche Aspekte",
+      "es": "Aspectos forestales",
+      "sq": null
+    },
+    "identifier": "silvicultural-aspects"
+  },
+  {
+    "name": {
+      "it": "Partenza-Arrivo",
+      "en": "Start-End",
+      "fr": "départ-arrivée",
+      "de": "Start - Ende",
+      "es": "Salida/Llegada",
+      "sq": null
+    },
+    "identifier": "start-end"
+  },
+  {
+    "name": {
+      "it": "Evento",
+      "en": "Event",
+      "fr": "Evénementiel",
+      "de": "Event",
+      "es": "Evento",
+      "sq": null
+    },
+    "identifier": "event"
+  },
+  {
+    "name": {
+      "it": "Comunità della valle",
+      "en": "Valley community",
+      "fr": "Communauté de la vallée",
+      "de": "Talgemeinschaft",
+      "es": "Comunidades del valle",
+      "sq": null
+    },
+    "identifier": "valley-community"
+  },
+  {
+    "name": {
+      "it": "Enti",
+      "en": "Public authority",
+      "fr": "Entités",
+      "de": "Behörde",
+      "es": "Organismos",
+      "sq": null
+    },
+    "identifier": "public-authority"
+  },
+  {
+    "name": {
+      "it": "Scuola",
+      "en": "School",
+      "fr": "- Scolaire",
+      "de": "Schule",
+      "es": "Centro",
+      "sq": null
+    },
+    "identifier": "school"
+  },
+  {
+    "name": {
+      "it": "Dormire",
+      "en": "Sleep",
+      "fr": "Dormir",
+      "de": "Schlaf",
+      "es": "dormir",
+      "sq": null
+    },
+    "identifier": "sleep"
+  },
+  {
+    "name": {
+      "it": "Luogo di interesse pubblico",
+      "en": "Place of public interest",
+      "fr": "Lieu d'intérêt public",
+      "de": "Ort von öffentlichem Interesse",
+      "es": "Luogo di interesse pubblico",
+      "sq": null
+    },
+    "identifier": "place-of-public-interest"
+  },
+  {
+    "name": {
+      "it": "Borghi e frazioni",
+      "en": "Villages and hamlets",
+      "fr": "Borghi e frazioni",
+      "de": "Villages and hamlets",
+      "es": "Borghi e frazioni",
+      "sq": null
+    },
+    "identifier": "villages-and-hamlets"
+  },
+  {
+    "name": {
+      "it": "Punto acqua",
+      "en": "Water point",
+      "fr": "Punto acqua",
+      "de": "Water point",
+      "es": "Punto acqua",
+      "sq": null
+    },
+    "identifier": "water-point"
+  },
+  {
+    "name": {
+      "it": "Segnaletica verticale",
+      "en": "Vertical signage",
+      "fr": "Segnaletica verticale",
+      "de": "Vertical signage",
+      "es": "Segnaletica verticale",
+      "sq": null
+    },
+    "identifier": "vertical-guide"
+  },
+  {
+    "name": {
+      "it": "DAE (defibrillatore automatico esterno)",
+      "en": "AED (automated external defibrillator)",
+      "fr": "DAE (defibrillatore automatico esterno)",
+      "de": "AED (automated external defibrillator)",
+      "es": "DAE (defibrillatore automatico esterno)",
+      "sq": null
+    },
+    "identifier": "dae"
+  },
+  {
+    "name": {
+      "it": "Colonna ricarica e-bike",
+      "en": "E-bike charging station",
+      "fr": "Colonna ricarica e-bike",
+      "de": "E-bike charging station",
+      "es": "Colonna ricarica e-bike",
+      "sq": null
+    },
+    "identifier": "e-bike-charger"
+  },
+  {
+    "name": {
+      "it": "Ausili disponibili",
+      "en": "Aids available",
+      "fr": "Ausili disponibili",
+      "de": "Aids available",
+      "es": "Ausili disponibili",
+      "sq": null
+    },
+    "identifier": "accessibility-aids"
+  },
+  {
+    "name": {
+      "it": "Fiume",
+      "en": "River",
+      "fr": "Fiume",
+      "de": "River",
+      "es": "Fiume",
+      "sq": null
+    },
+    "identifier": "river"
+  },
+  {
+    "name": {
+      "it": "Centrale Elettrica",
+      "en": "Power Plant",
+      "fr": "Centrale Elettrica",
+      "de": "Power Plant",
+      "es": "Centrale Elettrica",
+      "sq": null
+    },
+    "identifier": "power-plant"
+  },
+  {
+    "name": {
+      "it": "Torre avvistamento forestale",
+      "en": "Forestry watchtower",
+      "fr": "Torre avvistamento forestale",
+      "de": "Forestry watchtower",
+      "es": "Torre avvistamento forestale",
+      "sq": null
+    },
+    "identifier": "watchtower"
+  },
+  {
+    "name": {
+      "it": "Torrente / Fosso",
+      "en": "Stream / Ditch",
+      "fr": "Torrente / Fosso",
+      "de": "Stream / Ditch",
+      "es": "Torrente / Fosso",
+      "sq": null
+    },
+    "identifier": "stream"
+  },
+  {
+    "name": {
+      "it": "Traghetto",
+      "en": "Ferry",
+      "fr": "Traghetto",
+      "de": "Ferry",
+      "es": "Traghetto",
+      "sq": null
+    },
+    "identifier": "ferry"
+  },
+  {
+    "name": {
+      "it": "Rifugio in autogestione",
+      "en": "Self-managed shelters",
+      "fr": "Rifugio in autogestione",
+      "de": "Self-managed shelters",
+      "es": "Rifugio in autogestione",
+      "sq": null
+    },
+    "identifier": "self-managed-hut"
+  },
+  {
+    "name": {
+      "it": "Guide Turistiche e Ambientali",
+      "en": "Tourist and environmental guides",
+      "fr": "Guide Turistiche e Ambientali",
+      "de": "Tourist and environmental guides",
+      "es": "Guide Turistiche e Ambientali",
+      "sq": null
+    },
+    "identifier": "tourist-environmental-guides"
+  },
+  {
+    "name": {
+      "it": "Azienda Agricola",
+      "en": "Farm",
+      "fr": "Azienda Agricola",
+      "de": "Farm",
+      "es": "Azienda Agricola",
+      "sq": null
+    },
+    "identifier": "agricultural-company"
+  },
+  {
+    "name": {
+      "it": "Associazione Sportiva",
+      "en": "Sports association",
+      "fr": "Associazione Sportiva",
+      "de": "Sports association",
+      "es": "Associazione Sportiva",
+      "sq": null
+    },
+    "identifier": "sports-association"
+  },
+  {
+    "name": {
+      "it": "Rifugio, presidi abitati",
+      "en": "Mountain refuge (staffed)",
+      "fr": "Rifugio, presidi abitati",
+      "de": "Mountain refuge (staffed)",
+      "es": "Rifugio, presidi abitati",
+      "sq": null
+    },
+    "identifier": "rifugio"
+  },
+  {
+    "name": {
+      "it": "Ville",
+      "en": "Villas",
+      "fr": "Ville",
+      "de": "Villas",
+      "es": "Ville",
+      "sq": null
+    },
+    "identifier": "ville"
+  },
+  {
+    "name": {
+      "it": "Arte e Cultura",
+      "en": "Art and Culture",
+      "fr": "Arte e Cultura",
+      "de": "Art and Culture",
+      "es": "Arte e Cultura",
+      "sq": null
+    },
+    "identifier": "arte-cultura"
+  },
+  {
+    "name": {
+      "it": "Urbano",
+      "en": "Urban",
+      "fr": "Urbano",
+      "de": "Urban",
+      "es": "Urbano",
+      "sq": null
+    },
+    "identifier": "urbano"
+  },
+  {
+    "name": {
+      "it": "Panorama",
+      "en": "Panorama",
+      "fr": "Panorama",
+      "de": "Panorama",
+      "es": "Panorama",
+      "sq": null
+    },
+    "identifier": "panorama"
+  },
+  {
+    "name": {
+      "it": "Ciclovia",
+      "en": "Cycle path",
+      "fr": "Ciclovia",
+      "de": "Cycle path",
+      "es": "Ciclovia",
+      "sq": null
+    },
+    "identifier": "cycle-path"
+  },
+  {
+    "name": {
+      "it": "Funivia",
+      "en": "Cable car",
+      "fr": "Funivia",
+      "de": "Cable car",
+      "es": "Funivia",
+      "sq": null
+    },
+    "identifier": "cable-car"
+  },
+  {
+    "name": {
+      "it": "Orto botanico",
+      "en": "Botanical garden",
+      "fr": "Orto botanico",
+      "de": "Botanical garden",
+      "es": "Orto botanico",
+      "sq": null
+    },
+    "identifier": "botanical-garden"
+  },
+  {
+    "name": {
+      "it": "Osservatorio astronomico",
+      "en": "Astronomical observatory",
+      "fr": "Osservatorio astronomico",
+      "de": "Astronomical observatory",
+      "es": "Osservatorio astronomico",
+      "sq": null
+    },
+    "identifier": "astronomical-observatory"
+  },
+  {
+    "name": {
+      "it": "Terme",
+      "en": "Thermal Baths",
+      "fr": "Terme",
+      "de": "Thermal Baths",
+      "es": "Terme",
+      "sq": null
+    },
+    "identifier": "thermal-baths"
+  },
+  {
+    "name": {
+      "it": "Stabilimenti termali",
+      "en": "Thermal Establishments",
+      "fr": "Stabilimenti termali",
+      "de": "Thermal Establishments",
+      "es": "Stabilimenti termali",
+      "sq": null
+    },
+    "identifier": "thermal-establishments"
+  },
+  {
+    "name": {
+      "it": "Appuntamenti",
+      "en": "Appointments",
+      "fr": "Appuntamenti",
+      "de": "Appointments",
+      "es": "Appuntamenti",
+      "sq": null
+    },
+    "identifier": "appointments"
+  },
+  {
+    "name": {
+      "it": "Assaggi e Visite",
+      "en": "Visits and Tastings",
+      "fr": "Assaggi e Visite",
+      "de": "Visits and Tastings",
+      "es": "Assaggi e Visite",
+      "sq": null
+    },
+    "identifier": "visits-and-tastings"
+  },
+  {
+    "name": {
+      "it": "Baita",
+      "en": "Chalet",
+      "fr": "Baita",
+      "de": "Chalet",
+      "es": "Baita",
+      "sq": null
+    },
+    "identifier": "chalet"
+  },
+  {
+    "name": {
+      "it": "Balneazione",
+      "en": "Swimming",
+      "fr": "Balneazione",
+      "de": "Swimming",
+      "es": "Balneazione",
+      "sq": null
+    },
+    "identifier": "swimming"
+  },
+  {
+    "name": {
+      "it": "Biancane",
+      "en": "Biancane",
+      "fr": "Biancane",
+      "de": "Biancane",
+      "es": "Biancane",
+      "sq": null
+    },
+    "identifier": "biancane"
+  },
+  {
+    "name": {
+      "it": "Bicicletta",
+      "en": "Bike",
+      "fr": "Bicicletta",
+      "de": "Bike",
+      "es": "Bicicletta",
+      "sq": null
+    },
+    "identifier": "bike"
+  },
+  {
+    "name": {
+      "it": "Birrificio",
+      "en": "Brewery",
+      "fr": "Birrificio",
+      "de": "Brewery",
+      "es": "Birrificio",
+      "sq": null
+    },
+    "identifier": "brewery"
+  },
+  {
+    "name": {
+      "it": "Caseificio",
+      "en": "Cheese factory",
+      "fr": "Caseificio",
+      "de": "Cheese factory",
+      "es": "Caseificio",
+      "sq": null
+    },
+    "identifier": "cheese-factory"
+  },
+  {
+    "name": {
+      "it": "Dimore storiche",
+      "en": "Historical Residences",
+      "fr": "Dimore storiche",
+      "de": "Historical Residences",
+      "es": "Dimore storiche",
+      "sq": null
+    },
+    "identifier": "historical-residences"
+  },
+  {
+    "name": {
+      "it": "Ecosostenibile",
+      "en": "Eco friendly",
+      "fr": "Ecosostenibile",
+      "de": "Eco friendly",
+      "es": "Ecosostenibile",
+      "sq": null
+    },
+    "identifier": "eco-friendly"
+  },
+  {
+    "name": {
+      "it": "Flora",
+      "en": "Flora",
+      "fr": "Flora",
+      "de": "Flora",
+      "es": "Flora",
+      "sq": null
+    },
+    "identifier": "flora"
+  },
+  {
+    "name": {
+      "it": "Fumarole",
+      "en": "Fumaroles",
+      "fr": "Fumarole",
+      "de": "Fumaroles",
+      "es": "Fumarole",
+      "sq": null
+    },
+    "identifier": "fumaroles"
+  },
+  {
+    "name": {
+      "it": "Guide Canyoning",
+      "en": "Canyoning guides",
+      "fr": "Guide Canyoning",
+      "de": "Canyoning guides",
+      "es": "Guide Canyoning",
+      "sq": null
+    },
+    "identifier": "canyoning-guides"
+  },
+  {
+    "name": {
+      "it": "Parco avventura",
+      "en": "Adventure Park",
+      "fr": "Parco avventura",
+      "de": "Adventure Park",
+      "es": "Parco avventura",
+      "sq": null
+    },
+    "identifier": "adventure-park"
+  },
+  {
+    "name": {
+      "it": "Punto Noleggio",
+      "en": "Rental point",
+      "fr": "Punto Noleggio",
+      "de": "Rental point",
+      "es": "Punto Noleggio",
+      "sq": null
+    },
+    "identifier": "rental-point"
+  },
+  {
+    "name": {
+      "it": "Punto Timbro Credenziali VF",
+      "en": "VF Credentials Stamp Point",
+      "fr": "Punto Timbro Credenziali VF",
+      "de": "VF Credentials Stamp Point",
+      "es": "Punto Timbro Credenziali VF",
+      "sq": null
+    },
+    "identifier": "vf-credentials-point"
+  },
+  {
+    "name": {
+      "it": "Boudinage",
+      "en": "Boudinage",
+      "fr": "Boudinage",
+      "de": "Boudinage",
+      "es": "Boudinage",
+      "sq": null
+    },
+    "identifier": "boudinage"
+  },
+  {
+    "name": {
+      "it": "Faglie",
+      "en": "Faults",
+      "fr": "Faglie",
+      "de": "Faults",
+      "es": "Faglie",
+      "sq": null
+    },
+    "identifier": "tectonics"
+  },
+  {
+    "name": {
+      "it": "Pieghe",
+      "en": "Folds",
+      "fr": "Pieghe",
+      "de": "Folds",
+      "es": "Pieghe",
+      "sq": null
+    },
+    "identifier": "folds"
+  },
+  {
+    "name": {
+      "it": "Foliature",
+      "en": "Foliations",
+      "fr": "Foliature",
+      "de": "Foliations",
+      "es": "Foliature",
+      "sq": null
+    },
+    "identifier": "foliations"
+  },
+  {
+    "name": {
+      "it": "Fossili",
+      "en": "Fossils",
+      "fr": "Fossili",
+      "de": "Fossils",
+      "es": "Fossili",
+      "sq": null
+    },
+    "identifier": "fossils"
+  },
+  {
+    "name": {
+      "it": "Fratture, Diaclasi, Vene",
+      "en": "Fractures, Joints, Veins",
+      "fr": "Fratture, Diaclasi, Vene",
+      "de": "Fractures, Joints, Veins",
+      "es": "Fratture, Diaclasi, Vene",
+      "sq": null
+    },
+    "identifier": "fractures-joints-veins"
+  },
+  {
+    "name": {
+      "it": "Lineazioni",
+      "en": "Lineations",
+      "fr": "Lineazioni",
+      "de": "Lineations",
+      "es": "Lineazioni",
+      "sq": null
+    },
+    "identifier": "lineations"
+  },
+  {
+    "name": {
+      "it": "Rocce metamorfiche",
+      "en": "Metamorphic rocks",
+      "fr": "Rocce metamorfiche",
+      "de": "Metamorphic rocks",
+      "es": "Rocce metamorfiche",
+      "sq": null
+    },
+    "identifier": "metamorphic-rocks"
+  },
+  {
+    "name": {
+      "it": "Strutture primarie, Rocce sedimentarie, Rocce magmatiche",
+      "en": "Primary structures, sedimentary, magmatic rocks",
+      "fr": "Strutture primarie, Rocce sedimentarie, Rocce magmatiche",
+      "de": "Primary structures, sedimentary, magmatic rocks",
+      "es": "Strutture primarie, Rocce sedimentarie, Rocce magmatiche",
+      "sq": null
+    },
+    "identifier": "primary-structures"
+  },
+  {
+    "name": {
+      "it": "Zone di taglio",
+      "en": "Shear zones",
+      "fr": "Zone di taglio",
+      "de": "Shear zones",
+      "es": "Zone di taglio",
+      "sq": null
+    },
+    "identifier": "shear-zones"
+  },
+  {
+    "name": {
+      "it": "Rocce sedimentarie",
+      "en": "Sedimentary rocks",
+      "fr": "Rocce sedimentarie",
+      "de": "Sedimentary rocks",
+      "es": "Rocce sedimentarie",
+      "sq": null
+    },
+    "identifier": "sedimentary-rocks"
+  },
+  {
+    "name": {
+      "it": "Geologia urbana",
+      "en": "Street geology",
+      "fr": "Geologia urbana",
+      "de": "Street geology",
+      "es": "Geologia urbana",
+      "sq": null
+    },
+    "identifier": "street-geology"
+  },
+  {
+    "name": {
+      "it": "Autostrada",
+      "en": "Motorway",
+      "fr": "Autostrada",
+      "de": "Motorway",
+      "es": "Autostrada",
+      "sq": null
+    },
+    "identifier": "motorway"
+  },
+  {
+    "name": {
+      "it": "Piazza",
+      "en": "Square",
+      "fr": "Piazza",
+      "de": "Square",
+      "es": "Piazza",
+      "sq": null
+    },
+    "identifier": "square"
+  },
+  {
+    "name": {
+      "it": "Ferrovia",
+      "en": "Railway",
+      "fr": "Ferrovia",
+      "de": "Railway",
+      "es": "Ferrovia",
+      "sq": null
+    },
+    "identifier": "railway"
+  },
+  {
+    "name": {
+      "it": "Accesso per sedie a rotelle",
+      "en": "Wheelchair access",
+      "fr": "Accesso per sedie a rotelle",
+      "de": "Wheelchair access",
+      "es": "Accesso per sedie a rotelle",
+      "sq": null
+    },
+    "identifier": "accessibility-wheelchair-access"
+  },
+  {
+    "name": {
+      "it": "Parcheggio per disabili",
+      "en": "Accessible parking",
+      "fr": "Parcheggio per disabili",
+      "de": "Accessible parking",
+      "es": "Parcheggio per disabili",
+      "sq": null
+    },
+    "identifier": "accessible-parking"
+  },
+  {
+    "name": {
+      "it": "Servizi igienici per disabili",
+      "en": "Accessible toilets",
+      "fr": "Servizi igienici per disabili",
+      "de": "Accessible toilets",
+      "es": "Servizi igienici per disabili",
+      "sq": null
+    },
+    "identifier": "accessibility-toilets"
+  },
+  {
+    "name": {
+      "it": "Disabilità visiva",
+      "en": "Visual disability",
+      "fr": "Disabilità visiva",
+      "de": "Visual disability",
+      "es": "Disabilità visiva",
+      "sq": null
+    },
+    "identifier": "accessibility-visual-disability"
+  },
+  {
+    "name": {
+      "it": "Ipovedente accompagnato",
+      "en": "Low vision assisted",
+      "fr": "Ipovedente accompagnato",
+      "de": "Low vision assisted",
+      "es": "Ipovedente accompagnato",
+      "sq": null
+    },
+    "identifier": "accessibility-low-vision-assisted"
+  },
+  {
+    "name": {
+      "it": "Bambini e anziani",
+      "en": "Children and elderly",
+      "fr": "Bambini e anziani",
+      "de": "Children and elderly",
+      "es": "Bambini e anziani",
+      "sq": null
+    },
+    "identifier": "children-elderly"
+  },
+  {
+    "name": {
+      "it": "Disabilità cognitiva",
+      "en": "Cognitive disability",
+      "fr": "Disabilità cognitiva",
+      "de": "Cognitive disability",
+      "es": "Disabilità cognitiva",
+      "sq": null
+    },
+    "identifier": "accessibility-cognitive-disability"
+  },
+  {
+    "name": {
+      "it": "Ausilio uditivo",
+      "en": "Hearing aid",
+      "fr": "Ausilio uditivo",
+      "de": "Hearing aid",
+      "es": "Ausilio uditivo",
+      "sq": null
+    },
+    "identifier": "accessibility-hearing-aid"
+  },
+  {
+    "name": {
+      "it": "Accessi",
+      "en": "Access",
+      "fr": "Accessi",
+      "de": "Access",
+      "es": "Accessi",
+      "sq": null
+    },
+    "identifier": "access"
+  },
+  {
+    "name": {
+      "it": "Boschi",
+      "en": "Woods",
+      "fr": "Boschi",
+      "de": "Woods",
+      "es": "Boschi",
+      "sq": null
+    },
+    "identifier": "woods"
+  },
+  {
+    "name": {
+      "it": "Guide",
+      "en": "Guides",
+      "fr": "Guide",
+      "de": "Guides",
+      "es": "Guide",
+      "sq": null
+    },
+    "identifier": "guides"
+  },
+  {
+    "name": {
+      "it": "Produttori di tipicità",
+      "en": "Producers of typical products",
+      "fr": "Produttori di tipicità",
+      "de": "Producers of typical products",
+      "es": "Produttori di tipicità",
+      "sq": null
+    },
+    "identifier": "producers-typical-products"
+  },
+  {
+    "name": {
+      "it": "Riserve naturali",
+      "en": "Natural reserves",
+      "fr": "Riserve naturali",
+      "de": "Natural reserves",
+      "es": "Riserve naturali",
+      "sq": null
+    },
+    "identifier": "natural-reserves"
+  },
+  {
+    "name": {
+      "it": "Storia e Arte",
+      "en": "History and Art",
+      "fr": "Storia e Arte",
+      "de": "History and Art",
+      "es": "Storia e Arte",
+      "sq": null
+    },
+    "identifier": "history-art"
+  },
+  {
+    "name": {
+      "it": "Zone umide",
+      "en": "Wetlands",
+      "fr": "Zone umide",
+      "de": "Wetlands",
+      "es": "Zone umide",
+      "sq": null
+    },
+    "identifier": "wetlands"
+  },
+  {
+    "name": {
+      "it": "Disabilità motoria",
+      "en": "Motor disability",
+      "fr": "Disabilità motoria",
+      "de": "Motor disability",
+      "es": "Disabilità motoria",
+      "sq": null
+    },
+    "identifier": "accessibility-motor-disability"
+  },
+  {
+    "name": {
+      "it": "Associazione culturale",
+      "en": "Cultural association",
+      "fr": "Associazione culturale",
+      "de": "Cultural association",
+      "es": "Associazione culturale",
+      "sq": null
+    },
+    "identifier": "cultural-association"
+  },
+  {
+    "name": {
+      "it": "Associazione Promozione Sociale APS",
+      "en": "Social promotion association (APS)",
+      "fr": "Associazione Promozione Sociale APS",
+      "de": "Social promotion association (APS)",
+      "es": "Associazione Promozione Sociale APS",
+      "sq": null
+    },
+    "identifier": "social-promotion-association-aps"
+  },
+  {
+    "name": {
+      "it": "Trasporto joelette",
+      "en": "Joelette transport",
+      "fr": "Trasporto joelette",
+      "de": "Joelette transport",
+      "es": "Trasporto joelette",
+      "sq": null
+    },
+    "identifier": "accessibility-transport-joelette"
+  },
+  {
+    "name": {
+      "it": "Braille",
+      "en": "Braille",
+      "fr": "Braille",
+      "de": "Braille",
+      "es": "Braille",
+      "sq": null
+    },
+    "identifier": "accessibility-braille"
+  },
+  {
+    "name": {
+      "it": "Carrozzina con motore",
+      "en": "Power wheelchair",
+      "fr": "Carrozzina con motore",
+      "de": "Power wheelchair",
+      "es": "Carrozzina con motore",
+      "sq": null
+    },
+    "identifier": "accessibility-power-wheelchair"
+  },
+  {
+    "name": {
+      "it": "Disabilità uditiva",
+      "en": "Hearing disability",
+      "fr": "Disabilità uditiva",
+      "de": "Hearing disability",
+      "es": "Disabilità uditiva",
+      "sq": null
+    },
+    "identifier": "accessibility-hearing-disability"
+  },
+  {
+    "name": {
+      "it": "Ipovedente con cane",
+      "en": "Low vision guide dog",
+      "fr": "Ipovedente con cane",
+      "de": "Low vision guide dog",
+      "es": "Ipovedente con cane",
+      "sq": null
+    },
+    "identifier": "accessibility-low-vision-guide-dog"
+  },
+  {
+    "name": {
+      "it": "Linguaggio dei segni",
+      "en": "Sign language",
+      "fr": "Linguaggio dei segni",
+      "de": "Sign language",
+      "es": "Linguaggio dei segni",
+      "sq": null
+    },
+    "identifier": "accessibility-sign-language"
+  },
+  {
+    "name": {
+      "it": "Archeologia industriale",
+      "en": "Industrial archaeology",
+      "fr": "Archeologia industriale",
+      "de": "Industrial archaeology",
+      "es": "Archeologia industriale",
+      "sq": null
+    },
+    "identifier": "industrial-archaeology"
+  },
+  {
+    "name": {
+      "it": "Noleggio bici",
+      "en": "Bike rental",
+      "fr": "Noleggio bici",
+      "de": "Bike rental",
+      "es": "Noleggio bici",
+      "sq": null
+    },
+    "identifier": "bike-rental"
+  },
+  {
+    "name": {
+      "it": "Attraversamento pedonale",
+      "en": "Pedestrian crossing",
+      "fr": "Attraversamento pedonale",
+      "de": "Pedestrian crossing",
+      "es": "Attraversamento pedonale",
+      "sq": null
+    },
+    "identifier": "pedestrian-crossing"
+  },
+  {
+    "name": {
+      "it": "Sottopassaggio pedonale",
+      "en": "Pedestrian underpass",
+      "fr": "Sottopassaggio pedonale",
+      "de": "Pedestrian underpass",
+      "es": "Sottopassaggio pedonale",
+      "sq": null
+    },
+    "identifier": "pedestrian-underpass"
+  },
+  {
+    "name": {
+      "it": "Acciottolato",
+      "en": "Cobbled",
+      "fr": "Acciottolato",
+      "de": "Cobbled",
+      "es": "Acciottolato",
+      "sq": null
+    },
+    "identifier": "cobbled"
+  },
+  {
+    "name": {
+      "it": "Paese abbandonato",
+      "en": "Abandoned village",
+      "fr": "Paese abbandonato",
+      "de": "Abandoned village",
+      "es": "Paese abbandonato",
+      "sq": null
+    },
+    "identifier": "abandoned-village"
+  },
+  {
+    "name": {
+      "it": "Borgo abbandonato",
+      "en": "Abandoned hamlet",
+      "fr": "Borgo abbandonato",
+      "de": "Abandoned hamlet",
+      "es": "Borgo abbandonato",
+      "sq": null
+    },
+    "identifier": "abandoned-hamlet"
+  },
+  {
+    "name": {
+      "it": "Scalinata",
+      "en": "Stairway",
+      "fr": "Scalinata",
+      "de": "Stairway",
+      "es": "Scalinata",
+      "sq": null
+    },
+    "identifier": "steps"
+  },
+  {
+    "name": {
+      "it": "Zona industriale",
+      "en": "Industrial area",
+      "fr": "Zona industriale",
+      "de": "Industrial area",
+      "es": "Zona industriale",
+      "sq": null
+    },
+    "identifier": "industrial-area"
+  },
+  {
+    "name": {
+      "it": "Passaggio a livello",
+      "en": "Level crossing",
+      "fr": "Passaggio a livello",
+      "de": "Level crossing",
+      "es": "Passaggio a livello",
+      "sq": null
+    },
+    "identifier": "level-crossing"
+  },
+  {
+    "name": {
+      "it": "Tunnel",
+      "en": "Tunnel",
+      "fr": "Tunnel",
+      "de": "Tunnel",
+      "es": "Tunnel",
+      "sq": null
+    },
+    "identifier": "tunnel"
+  },
+  {
+    "name": {
+      "it": "Gola",
+      "en": "Gorge",
+      "fr": "Gola",
+      "de": "Gorge",
+      "es": "Gola",
+      "sq": null
+    },
+    "identifier": "gorge"
+  },
+  {
+    "name": {
+      "it": "Inizio sentiero",
+      "en": "Trailhead",
+      "fr": "Inizio sentiero",
+      "de": "Trailhead",
+      "es": "Inizio sentiero",
+      "sq": null
+    },
+    "identifier": "trailhead"
+  },
+  {
+    "name": {
+      "it": "Prato",
+      "en": "Meadow",
+      "fr": "Prato",
+      "de": "Meadow",
+      "es": "Prato",
+      "sq": null
+    },
+    "identifier": "meadow"
+  },
+  {
+    "name": {
+      "it": "Altopiano",
+      "en": "Plateau",
+      "fr": "Altopiano",
+      "de": "Plateau",
+      "es": "Altopiano",
+      "sq": null
+    },
+    "identifier": "plateau"
+  },
+  {
+    "name": {
+      "it": "Mulattiera",
+      "en": "Mule track",
+      "fr": "Mulattiera",
+      "de": "Mule track",
+      "es": "Mulattiera",
+      "sq": null
+    },
+    "identifier": "mule-track"
+  },
+  {
+    "name": {
+      "it": "Lungolago",
+      "en": "Lakeside",
+      "fr": "Lungolago",
+      "de": "Lakeside",
+      "es": "Lungolago",
+      "sq": null
+    },
+    "identifier": "lakeside"
+  },
+  {
+    "name": {
+      "it": "Rotonda",
+      "en": "Roundabout",
+      "fr": "Rotonda",
+      "de": "Roundabout",
+      "es": "Rotonda",
+      "sq": null
+    },
+    "identifier": "roundabout"
+  },
+  {
+    "name": {
+      "it": "Giardino",
+      "en": "Garden",
+      "fr": "Giardino",
+      "de": "Garden",
+      "es": "Giardino",
+      "sq": null
+    },
+    "identifier": "garden"
+  },
+  {
+    "name": {
+      "it": "Avvertenze",
+      "en": "Warnings",
+      "fr": "Avvertenze",
+      "de": "Warnings",
+      "es": "Avvertenze",
+      "sq": null
+    },
+    "identifier": "warnings"
+  }
+]
