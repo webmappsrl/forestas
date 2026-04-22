@@ -97,6 +97,19 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        'sardegnasentieri' => [
+            'driver' => 'mysql',
+            'host' => env('DB_SARDEGNASENTIERI_HOST', 'host.docker.internal'),
+            'port' => env('DB_SARDEGNASENTIERI_PORT', '3307'),
+            'database' => env('DB_SARDEGNASENTIERI_DATABASE', 'sardegnasentieri'),
+            'username' => env('DB_SARDEGNASENTIERI_USERNAME', 'readonly'),
+            'password' => env('DB_SARDEGNASENTIERI_PASSWORD', 'readonly'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

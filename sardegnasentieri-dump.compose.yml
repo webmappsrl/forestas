@@ -1,0 +1,17 @@
+services:
+  db-sardegnasentieri:
+    image: mysql:8.0
+    container_name: "mysql-sardegnasentieri-dump"
+    environment:
+      MYSQL_ROOT_PASSWORD: readonly
+      MYSQL_USER: readonly
+      MYSQL_PASSWORD: readonly
+      MYSQL_DATABASE: sardegnasentieri
+    volumes:
+      - "./storage/dump:/docker-entrypoint-initdb.d:ro"
+      - "sardegnasentieri-pgdata:/var/lib/mysql"
+    ports:
+      - "3307:3306"
+
+volumes:
+  sardegnasentieri-pgdata:
