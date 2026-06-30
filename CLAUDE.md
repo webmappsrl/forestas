@@ -214,3 +214,18 @@ Il package fornisce:
 - Migrazioni (da pubblicare con `--tag=wm-package-migrations`)
 
 Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
+
+## Decisioni architetturali
+
+### Analisi overlay mancanti (oc:8153)
+- **Gli overlay sono `FeatureCollection` model**, non Layer. Gestiti via campo JSONB `config_overlays` su `apps`, configurabile in Nova con campo Flexible (`ConfigOverlaysResolver`). `AppConfigService::config()` li risolve in `MAP.controls.overlays`.
+- **`config_overlays` contiene ID assoluti** delle FC. Un ID sbagliato non produce errore — l'overlay scompare silenziosamente. Sempre configurare *dopo* aver creato le FC, usando gli ID reali del DB target.
+- **Pattern corretto: GeoJSON su MinIO** (`mode: upload`), non `mode: external` che creerebbe dipendenza runtime da Geohub.
+- **App Geohub per Forestas: id=32** ("Sardegna Sentieri") — API: `GET https://geohub.webmapp.it/api/v2/app/webmapp/32/config.json`
+- **Raccomandazione: seeder idempotente** (`database/seeders/OverlaysSeeder.php`) per garantire riproducibilità su tutti gli ambienti inclusa produzione futura.
+
+## Feature disponibili
+
+| Feature | Ticket | Moduli toccati | Note |
+|---|---|---|---|
+| Analisi overlay mancanti | oc:8153 | `docs/features/8153-analisi-overlay-mancanti/` | Analisi pura: documenta stato attuale, overlay mancanti per ambiente, pattern da seguire. Input per oc:7605 |
