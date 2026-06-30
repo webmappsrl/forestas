@@ -11,10 +11,12 @@ use App\Nova\Ente;
 use App\Nova\FeatureCollection;
 use App\Nova\Layer;
 use App\Nova\Media as NovaMedia;
-use App\Nova\TaxonomyPoiType;
 use App\Nova\TaxonomyActivity;
+use App\Nova\TaxonomyPoiType;
+use App\Nova\TaxonomyTheme as NovaTaxonomyTheme;
 use App\Nova\TaxonomyWarning;
 use App\Nova\TaxonomyWhere;
+use App\Nova\Tile as NovaTile;
 use App\Nova\UgcPoi;
 use App\Nova\UgcTrack;
 use App\Nova\User as NovaUser;
@@ -52,6 +54,8 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                         ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
                     MenuItem::resource(NovaMedia::class)
                         ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
+                    MenuItem::resource(NovaTile::class)
+                        ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
                 ])->icon('user')
                     ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
                     ->collapsable()
@@ -73,6 +77,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 MenuSection::make('Taxonomies', [
                     MenuItem::resource(TaxonomyPoiType::class),
                     MenuItem::resource(TaxonomyActivity::class),
+                    MenuItem::resource(NovaTaxonomyTheme::class),
                     MenuItem::resource(TaxonomyWhere::class),
                     MenuItem::resource(TaxonomyWarning::class),
                 ])->icon('document'),
