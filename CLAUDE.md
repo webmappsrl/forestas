@@ -166,6 +166,18 @@ Credenziali default: `laravel` / `laravelminio`. Bucket: `wmfe`.
 
 Il sistema di icone globale è gestito tramite `GlobalFileHelper` (wm-package) che carica e mantiene aggiornato `icons.json` in MinIO.
 
+## Import dati
+
+**Forestas usa un import custom da Sardegna Sentieri (piattaforma Drupal), non l'import standard da GeoHub.**
+
+- Comando: `sardegnasentieri:import` (`app/Console/Commands/ImportSardegnaSentieriCommand.php`)
+- Service: `app/Services/Import/SardegnaSentieriImportService.php` — importa tassonomie (poi types, activities), POI e Track direttamente dalle API di `sardegnasentieri.it`
+- Client HTTP: `app/Http/Clients/SardegnaSentieriClient.php`
+- Job asincroni: `app/Jobs/Import/ImportSardegnaSentieriPoiJob.php`, `ImportSardegnaSentieriTrackJob.php`
+- Forestas ha una sola app (id 1, costante `SardegnaSentieriImportService::IMPORT_APP_ID`)
+
+**Il flusso di import da GeoHub presente in wm-package (`ImportTaxonomyActivityJob`, `ImportTaxonomyJob`, `wm-geohub-import.php`, ecc.) non è usato in questo progetto — va ignorato quando si indaga su bug di import in Forestas.** Se un bug riguarda tassonomie/POI/track importati, la causa va cercata in `SardegnaSentieriImportService`, non nei job GeoHub del package.
+
 ## Testing
 
 Il progetto usa Pest. Configurazione in `phpunit.xml`:

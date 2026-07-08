@@ -18,12 +18,13 @@ use App\Models\TaxonomyWarning;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Wm\WmPackage\Helpers\GlobalFileHelper;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
+use Wm\WmPackage\Services\StorageService;
 
 class SardegnaSentieriImportService
 {
@@ -91,8 +92,10 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewPoiType($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->name = $data['name'];
-                $taxonomy->description = $data['description'];
+                $taxonomy->setTranslation('name', 'it', $data['name']);
+                if ($data['description'] !== null) {
+                    $taxonomy->setTranslation('description', 'it', $data['description']);
+                }
                 $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
                     'source_id' => (string) $apiId,
                     'vocabulary' => $vocabulary,
@@ -120,8 +123,10 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewActivity($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->name = $data['name'];
-                $taxonomy->description = $data['description'];
+                $taxonomy->setTranslation('name', 'it', $data['name']);
+                if ($data['description'] !== null) {
+                    $taxonomy->setTranslation('description', 'it', $data['description']);
+                }
                 $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
                     'source_id' => (string) $apiId,
                     'vocabulary' => $vocabulary,
@@ -149,8 +154,10 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewActivity($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->name = $data['name'];
-                $taxonomy->description = $data['description'];
+                $taxonomy->setTranslation('name', 'it', $data['name']);
+                if ($data['description'] !== null) {
+                    $taxonomy->setTranslation('description', 'it', $data['description']);
+                }
                 $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
                     'source_id' => (string) $apiId,
                     'vocabulary' => $vocabulary,
@@ -554,10 +561,14 @@ class SardegnaSentieriImportService
 
         $identifier = 'sardegnasentieri:type:'.$response->type;
 
-        $activity = TaxonomyActivity::firstOrCreate(
-            ['identifier' => $identifier],
-            ['name' => ucfirst($response->type)]
-        );
+        $activity = TaxonomyActivity::firstOrNew(['identifier' => $identifier]);
+        if (! $activity->exists) {
+            $activity->setTranslation('name', 'it', ucfirst($response->type));
+        }
+        if (empty($activity->icon)) {
+            $activity->icon = $this->resolveIconNameByIdentifier($identifier);
+        }
+        $activity->saveQuietly();
 
         $currentIds = $ecTrack->taxonomyActivities()->pluck('taxonomy_activities.id')->toArray();
         $allIds = array_unique(array_merge($currentIds, [$activity->id]));
@@ -997,10 +1008,6 @@ class SardegnaSentieriImportService
     private function resolveIconNameByIdentifier(string $identifier): ?string
     {
         $iconNames = $this->getIconNames();
-        if (empty($iconNames)) {
-            return null;
-        }
-
         $needle = $this->normalizeKey($identifier);
 
         foreach ($iconNames as $iconName) {
@@ -1026,7 +1033,7 @@ class SardegnaSentieriImportService
             return $this->iconNamesCache;
         }
 
-        $iconsData = GlobalFileHelper::getJsonContent('icons.json', 'icons');
+        $iconsData = $this->readIconsJson();
         $icons = is_array($iconsData['icons'] ?? null) ? $iconsData['icons'] : [];
 
         $this->iconNamesCache = [];
@@ -1038,6 +1045,29 @@ class SardegnaSentieriImportService
         }
 
         return $this->iconNamesCache;
+    }
+
+    /**
+     * Legge icons.json direttamente dal path scritto da wm:generate-icons
+     * (Wm\WmPackage\Services\StorageService::getShardBasePath($appId).'icons.json'),
+     * bypassando GlobalFileHelper che costruisce un path diverso (bug noto in wm-package,
+     * cerca /{shard}/json/icons.json invece di /{shard}/{appId}/icons.json) e non trova mai il file.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readIconsJson(): ?array
+    {
+        $path = app(StorageService::class)->getShardBasePath(self::IMPORT_APP_ID).'icons.json';
+
+        if (! Storage::disk('wmfe')->exists($path)) {
+            return null;
+        }
+
+        $content = Storage::disk('wmfe')->get($path);
+
+        $decoded = json_decode($content, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function normalizeKey(string $value): string
