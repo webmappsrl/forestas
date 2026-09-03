@@ -11541,11 +11541,11 @@
         },
         {
             "name": "wm/wm-package",
-            "version": "dev-main",
+            "version": "dev-develop",
             "dist": {
                 "type": "path",
                 "url": "./wm-package",
-                "reference": "cc79ae37dedd5bdc82699995694d3ad0a536d27f"
+                "reference": "2e347a8c7263113fdad527a7fe6ae477d79a09ba"
             },
             "require": {
                 "chillerlan/php-qrcode": "^5.0",
@@ -11616,6 +11616,7 @@
                     "Wm\\WmPackage\\Database\\Factories\\": "database/factories/",
                     "Wm\\WmPackage\\Http\\Controllers\\": "src/Http/Controllers",
                     "Wm\\WmPackage\\Nova\\Fields\\IconSelect\\": "src/Nova/Fields/IconSelect/src/",
+                    "Wm\\WmPackage\\Nova\\Fields\\TranslationsBuilder\\": "src/Nova/Fields/TranslationsBuilder/src/",
                     "Wm\\WmPackage\\Nova\\Fields\\LayerFeatures\\": "src/Nova/Fields/LayerFeatures/src/",
                     "Wm\\WmPackage\\Nova\\Fields\\FeatureCollectionMap\\": "src/Nova/Fields/FeatureCollectionMap/src/",
                     "Wm\\WmPackage\\Nova\\Cards\\LayerAnalytics\\": "src/Nova/Cards/LayerAnalytics/src/",

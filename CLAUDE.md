@@ -226,3 +226,27 @@ Il package fornisce:
 - Migrazioni (da pubblicare con `--tag=wm-package-migrations`)
 
 Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
+
+## Feature disponibili
+
+| Feature | Ticket | Moduli toccati | Note |
+|---|---|---|---|
+| Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
+
+## Decisioni architetturali
+
+### Fix identifier TaxonomyWhere (oc:8469)
+- L'identifier di `TaxonomyWhere` deriva da `properties['source']` + id della
+  sorgente (`osmfeatures-r276369`, `osm2cai-142`), **mai dal nome**: i nomi da
+  OSMFeatures sono instabili e, su alfabeti non latini, `Str::slug()` restituisce
+  stringa vuota. I record creati a mano da Nova prendono come sorgente il nome
+  della piattaforma (`Str::slug(config('app.name'))` → `forestas`)
+- I test della feature vivono nella suite di `wm-package`, che usa il DB
+  **`wm_package`** (vedi `wm-package/phpunit.xml.dist`), distinto da `forestas`.
+  Il DB va creato una volta con PostGIS abilitato
+- Il `phpunit.xml` di **forestas** non ha isolamento DB (`DB_CONNECTION` e
+  `DB_DATABASE` sono commentati): lanciare la suite del progetto girerebbe sul DB
+  reale. Da sistemare prima di scrivere test lato progetto
+- La licenza Nova e' scaduta: le versioni dalla 5.8.0 in poi rispondono HTTP 402.
+  Sia forestas sia wm-package vanno tenuti su `laravel/nova 5.7.6`. Il rinnovo
+  diventa obbligatorio prima di passare a Laravel 13
