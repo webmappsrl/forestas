@@ -46,6 +46,7 @@ class EcTrack extends WmNovaEcTrack
                 Tab::make(__('Info'), $this->getInfoTabFields()),
                 Tab::make(__('Accessibility'), $this->getAccessibilityTabFields()),
                 Tab::make(__('DEM'), $this->getDemTabFields()),
+                Tab::make(__('Style'), $this->getStyleTabFields()),
             ]),
             MorphToMany::make('Warnings', 'taxonomyWarnings', TaxonomyWarning::class)->display('name')->collapsedByDefault(),
             BelongsToMany::make('EcPois', 'ecPois', EcPoi::class)->searchable()->collapsedByDefault(),
