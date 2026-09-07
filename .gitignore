@@ -28,3 +28,7 @@ build/
 auth.json
 .claude/settings.local.json
 .worktrees/
+
+# Specifica OpenAPI generata da Scramble (oc:8333): rigenerabile con
+# `php artisan scramble:export`, la doc si serve da /docs/api.
+/api.json
