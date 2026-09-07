@@ -6,5 +6,8 @@
     "Wheres": "Wheres",
     "Where": "Where",
     "Warnings": "Warnings",
-    "Warning": "Warning"
+    "Warning": "Warning",
+    "The SUS client is not allowed to access this endpoint.": "The SUS client is not allowed to access this endpoint.",
+    "Tools": "Tools",
+    "SUS API documentation": "SUS API documentation"
 }

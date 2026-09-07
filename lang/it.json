@@ -6,5 +6,8 @@
     "Wheres": "Zone geografiche",
     "Where": "Zona geografica",
     "Warnings": "Avvertenze",
-    "Warning": "Avvertenza"
+    "Warning": "Avvertenza",
+    "The SUS client is not allowed to access this endpoint.": "Il client SUS non ha accesso a questo endpoint.",
+    "Tools": "Strumenti",
+    "SUS API documentation": "Documentazione API SUS"
 }
