@@ -3815,7 +3815,7 @@
       <p class="subtitle">Integrazione Catasto Sentieri (Forestas) ↔ SUS (Regione Sardegna)</p>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"percorso","label":"Dalla domanda al sentiero","focus":["presenta","raccoglie","preistruttoria","coda","approva","chiude"],"note":"Il percorso di un'istanza accolta, dalla presentazione al sentiero accatastato."},{"id":"numero","label":"Ciclo del numero","focus":["preistruttoria","coda","approva","rigetto"],"note":"Il codice REI viene riservato in preistruttoria, confermato all'approvazione o liberato al rigetto."},{"id":"aperti","label":"Punti da confermare","focus":["coda","chiude","manutenzione","ufficio"],"note":"Dove il modello e' una nostra proposta e cosa resta fuori da questo tag."}]</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"percorso","label":"Dalla domanda al sentiero","focus":["presenta","raccoglie","preistruttoria","coda","approva","chiude"],"note":"Il percorso di un'istanza accolta, dalla presentazione al sentiero accatastato."},{"id":"numero","label":"Ciclo del numero","focus":["preistruttoria","errore","coda","approva","rigetto"],"note":"Il numero si riserva solo se il controllo formale passa; e' confermato alla convalida o liberato al rigetto."},{"id":"aperti","label":"Cosa resta aperto","focus":["preistruttoria","coda","manutenzione","ufficio"],"note":"Il set minimo di dati e' il nodo ancora da chiudere con Engineering; procedura 05 e variazioni d'ufficio sono di un tag successivo."}]</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
       <div class="guided-view-copy">
@@ -3925,9 +3925,10 @@
         <path data-edge-from="preistruttoria" data-edge-to="coda" data-edge-label="conserva" data-edge-key="4" data-edge-id="e5" data-composition-points="300,401;300,414;430,414;430,457" d="M 300 401 L 300 414 L 430 414 L 430 457" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <path data-edge-from="coda" data-edge-to="approva" data-edge-label="ok" data-edge-key="5" data-edge-id="e6" data-composition-points="430,457;430,414;500,414;500,401" d="M 430 457 L 430 414 L 500 414 L 500 401" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="coda" data-edge-to="rigetto" data-edge-label="respinge" data-edge-key="6" data-edge-id="e7" data-composition-points="430,525;430,538;625,538;625,589" d="M 430 525 L 430 538 L 625 538 L 625 589" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="approva" data-edge-to="chiude" data-edge-label="esito · verso da confermare" data-edge-key="7" data-edge-id="e8" data-composition-points="500,333;500,290;625,290;625,269" d="M 500 333 L 500 290 L 625 290 L 625 269" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="chiude" data-edge-to="approva" data-edge-label="interroga esito" data-edge-key="7" data-edge-id="e8" data-composition-points="625,269;625,290;500,290;500,333" d="M 625 269 L 625 290 L 500 290 L 500 333" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="chiude" data-edge-to="esito_istante" data-edge-key="8" data-edge-id="e9" data-composition-points="625,217;625,145" d="M 625 217 L 625 145" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <path data-edge-from="ufficio" data-edge-to="approva" data-edge-key="9" data-edge-id="e10" data-composition-points="500,713;500,538;500,538;500,401" d="M 500 713 L 500 538 L 500 538 L 500 401" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="preistruttoria" data-edge-to="errore" data-edge-label="non passa" data-edge-key="10" data-edge-id="e11" data-composition-points="300,401;300,476;300,476;300,589" d="M 300 401 L 300 476 L 300 476 L 300 589" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
 
         <!-- Nodes -->
         <g id="node-presenta" data-node-id="presenta" data-node-label="Presenta" tabindex="0" role="button" aria-label="Focus Presenta, istanza + GPX, Istante — cittadino o ente proponente › Presentazione" aria-pressed="false" data-node-kind="external" data-node-sublabel="istanza + GPX" data-node-context="Istante — cittadino o ente proponente › Presentazione">
@@ -4008,15 +4009,15 @@
           <text data-detail="context" x="625" y="255" class="t-muted" font-size="8" text-anchor="middle">procedimento</text>
         </g>
 
-        <g id="node-preistruttoria" data-node-id="preistruttoria" data-node-label="Prevalida" tabindex="0" role="button" aria-label="Focus Prevalida, calcola e riserva, Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione" aria-pressed="false" data-node-kind="backend" data-node-sublabel="calcola e riserva" data-node-tag="oc:8490" data-node-context="Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione">
-          <title>Prevalida · calcola e riserva · Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione · oc:8490</title>
+        <g id="node-preistruttoria" data-node-id="preistruttoria" data-node-label="Prevalida" tabindex="0" role="button" aria-label="Focus Prevalida, controllo formale, Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione" aria-pressed="false" data-node-kind="backend" data-node-sublabel="controllo formale" data-node-tag="oc:8490" data-node-context="Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione">
+          <title>Prevalida · controllo formale · Catasto Sentieri — Laravel Webmapp (owner del dato) › Prevalidazione · oc:8490</title>
           <rect x="254" y="333" width="92" height="68" rx="6" class="c-mask"/>
           <rect x="254" y="333" width="92" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(260 339) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-detail-anchor x="300" y="354" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Prevalida</text>
-          <text data-detail="context" x="300" y="371" class="t-muted" font-size="8" text-anchor="middle">calcola e riserva</text>
+          <text data-detail="context" x="300" y="371" class="t-muted" font-size="8" text-anchor="middle">controllo formale</text>
         <text data-detail="fine" x="300" y="389" class="t-backend" font-size="7" text-anchor="middle">oc:8490</text>
         </g>
 
@@ -4033,17 +4034,17 @@
         <text data-detail="fine" x="500" y="389" class="t-database" font-size="7" text-anchor="middle">oc:8491</text>
         </g>
 
-        <g id="node-coda" data-node-id="coda" data-node-label="Valida" tabindex="0" role="button" aria-label="Focus Valida, approva o respinge, Operatore Forestas — istruttoria › Prevalidazione" aria-pressed="false" data-node-kind="security" data-node-sublabel="approva o respinge" data-node-tag="da confermare" data-node-context="Operatore Forestas — istruttoria › Prevalidazione">
-          <title>Valida · approva o respinge · Operatore Forestas — istruttoria › Prevalidazione · da confermare</title>
+        <g id="node-coda" data-node-id="coda" data-node-label="Convalida" tabindex="0" role="button" aria-label="Focus Convalida, approva o respinge, Operatore Forestas — istruttoria › Prevalidazione" aria-pressed="false" data-node-kind="security" data-node-sublabel="approva o respinge" data-node-tag="oc:8491" data-node-context="Operatore Forestas — istruttoria › Prevalidazione">
+          <title>Convalida · approva o respinge · Operatore Forestas — istruttoria › Prevalidazione · oc:8491</title>
           <rect x="384" y="457" width="92" height="68" rx="6" class="c-mask"/>
           <rect x="384" y="457" width="92" height="68" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(390 463) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-detail-anchor x="430" y="478" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Valida</text>
+          <text data-detail-anchor x="430" y="478" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Convalida</text>
           <text data-detail="context" x="430" y="495" class="t-muted" font-size="8" text-anchor="middle">approva o respinge</text>
-        <text data-detail="fine" x="430" y="513" class="t-security" font-size="7" text-anchor="middle">da confermare</text>
+        <text data-detail="fine" x="430" y="513" class="t-security" font-size="7" text-anchor="middle">oc:8491</text>
         </g>
 
         <g id="node-rigetto" data-node-id="rigetto" data-node-label="Respinta" tabindex="0" role="button" aria-label="Focus Respinta, REI liberato, Esito negativo › Istruttoria ed esito" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="REI liberato" data-node-context="Esito negativo › Istruttoria ed esito">
@@ -4084,6 +4085,20 @@
           <text data-detail="context" x="500" y="751" class="t-muted" font-size="8" text-anchor="middle">senza istanza</text>
         </g>
 
+        <g id="node-errore" data-node-id="errore" data-node-label="Errore" tabindex="0" role="button" aria-label="Focus Errore, nessun numero, Esito negativo › Prevalidazione" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="nessun numero" data-node-context="Esito negativo › Prevalidazione">
+          <title>Errore · nessun numero · Esito negativo › Prevalidazione</title>
+          <rect x="254" y="589" width="92" height="52" rx="6" class="c-mask"/>
+          <rect x="254" y="589" width="92" height="52" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(260 595) scale(0.6875)">
+            <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
+            <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
+            <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
+            <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
+          </g>
+          <text data-detail-anchor x="300" y="610" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Errore</text>
+          <text data-detail="context" x="300" y="627" class="t-muted" font-size="8" text-anchor="middle">nessun numero</text>
+        </g>
+
         <!-- Edge labels -->
         <g data-detail="context" data-edge-from="presenta" data-edge-to="raccoglie" data-edge-label="istanza + GPX" data-edge-key="0" data-edge-id="e1">
           <rect x="117.8" y="146" width="72.4" height="14" rx="3" class="c-mask"/>
@@ -4110,12 +4125,16 @@
           <rect x="503.3" y="518" width="48.4" height="14" rx="3" class="c-mask"/>
           <text x="527.5" y="528" class="t-security" font-size="8" text-anchor="middle">respinge</text>
         </g>
-        <g data-detail="context" data-edge-from="approva" data-edge-to="chiude" data-edge-label="esito · verso da confermare" data-edge-key="7" data-edge-id="e8">
-          <rect x="492.7" y="270" width="139.6" height="14" rx="3" class="c-mask"/>
-          <text x="562.5" y="280" class="t-database" font-size="8" text-anchor="middle">esito · verso da confermare</text>
+        <g data-detail="context" data-edge-from="chiude" data-edge-to="approva" data-edge-label="interroga esito" data-edge-key="7" data-edge-id="e8">
+          <rect x="521.5" y="270" width="82" height="14" rx="3" class="c-mask"/>
+          <text x="562.5" y="280" class="t-backend" font-size="8" text-anchor="middle">interroga esito</text>
         </g>
 
 
+        <g data-detail="context" data-edge-from="preistruttoria" data-edge-to="errore" data-edge-label="non passa" data-edge-key="10" data-edge-id="e11">
+          <rect x="273.4" y="456" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
+          <text x="300" y="466" class="t-security" font-size="8" text-anchor="middle">non passa</text>
+        </g>
 
         <!-- Legend -->
         <g data-legend-bridge>
@@ -4308,24 +4327,36 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
-          <h3>Perche&#39; l&#39;istanza vive nel Catasto</h3>
+          <h3>La prevalida e&#39; un controllo formale</h3>
         </div>
         <ul>
-          <li>&bull; Il SUS e&#39; uno sportello e non conserva i dati (Ivan, call 30/07/2026)</li>
-          <li>&bull; Un&#39;istruttoria puo&#39; durare e richiedere integrazioni</li>
-          <li>&bull; L&#39;istanza attende nel Catasto, l&#39;unico dei due che persiste</li>
+          <li>&bull; Automatica, senza intervento umano: l&#39;API dice dov&#39;e&#39; l&#39;errore</li>
+          <li>&bull; Un MP3 al posto del GPX, o una traccia fuori dalla Sardegna: errore subito</li>
+          <li>&bull; Il numero si riserva solo se il controllo passa</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Il dato vive nel Catasto</h3>
+        </div>
+        <ul>
+          <li>&bull; Il SUS e&#39; uno sportello e non conserva i dati (Ivan, 30/07/2026)</li>
+          <li>&bull; Le istanze restano nel Catasto come modello separato dai sentieri</li>
+          <li>&bull; Diventano EcTrack solo alla convalida; il SUS interroga per l&#39;esito</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot amber"></div>
-          <h3>Da confermare con Engineering</h3>
+          <h3>Ancora da chiudere</h3>
         </div>
         <ul>
-          <li>&bull; Che l&#39;istruttoria della 02 avvenga nel Catasto e non nel backoffice SUS</li>
-          <li>&bull; Coerente col vincolo di persistenza, ma non dichiarato in call</li>
-          <li>&bull; Verso della notifica esito: push dal Catasto o polling dal SUS</li>
+          <li>&bull; Set minimo di dati scambiati: PDF di Piccioli + Excel di Schirru</li>
+          <li>&bull; Quando il SUS trasmette: a ogni salvataggio o a istanza completa</li>
+          <li>&bull; Durata della riserva di un numero non confermato</li>
         </ul>
       </div>
 
@@ -4336,8 +4367,8 @@
         </div>
         <ul>
           <li>&bull; oc:8333 infrastruttura API SUS — in test</li>
-          <li>&bull; oc:8489 codice REI · oc:8490 preistruttoria · oc:8491 validazione</li>
-          <li>&bull; Fuori scope: procedura 05 e variazioni d&#39;ufficio (tag successivo)</li>
+          <li>&bull; oc:8492 opt-in nel package — prerequisito degli altri tre</li>
+          <li>&bull; oc:8489 codice REI · oc:8490 prevalida · oc:8491 convalida istanze</li>
         </ul>
       </div>
     </div>

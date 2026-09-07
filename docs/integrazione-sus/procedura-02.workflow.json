@@ -24,22 +24,23 @@
         "label": "Ciclo del numero",
         "focus": [
           "preistruttoria",
+          "errore",
           "coda",
           "approva",
           "rigetto"
         ],
-        "note": "Il codice REI viene riservato in preistruttoria, confermato all'approvazione o liberato al rigetto."
+        "note": "Il numero si riserva solo se il controllo formale passa; e' confermato alla convalida o liberato al rigetto."
       },
       {
         "id": "aperti",
-        "label": "Punti da confermare",
+        "label": "Cosa resta aperto",
         "focus": [
+          "preistruttoria",
           "coda",
-          "chiude",
           "manutenzione",
           "ufficio"
         ],
-        "note": "Dove il modello e' una nostra proposta e cosa resta fuori da questo tag."
+        "note": "Il set minimo di dati e' il nodo ancora da chiudere con Engineering; procedura 05 e variazioni d'ufficio sono di un tag successivo."
       }
     ],
     "output": "index.html"
@@ -98,8 +99,7 @@
     "raccoglie",
     "preistruttoria",
     "coda",
-    "approva",
-    "chiude"
+    "approva"
   ],
   "nodes": [
     {
@@ -156,7 +156,7 @@
       "col": 2,
       "type": "backend",
       "label": "Prevalida",
-      "sublabel": "calcola e riserva",
+      "sublabel": "controllo formale",
       "tag": "oc:8490"
     },
     {
@@ -173,9 +173,9 @@
       "lane": "operatore",
       "col": 3,
       "type": "security",
-      "label": "Valida",
+      "label": "Convalida",
       "sublabel": "approva o respinge",
-      "tag": "da confermare"
+      "tag": "oc:8491"
     },
     {
       "id": "rigetto",
@@ -200,6 +200,14 @@
       "type": "external",
       "label": "D'ufficio",
       "sublabel": "senza istanza"
+    },
+    {
+      "id": "errore",
+      "lane": "rigetti",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Errore",
+      "sublabel": "nessun numero"
     }
   ],
   "edges": [
@@ -275,12 +283,12 @@
     },
     {
       "id": "e8",
-      "from": "approva",
-      "to": "chiude",
-      "label": "esito · verso da confermare",
-      "variant": "dashed",
-      "fromSide": "top",
-      "toSide": "bottom",
+      "from": "chiude",
+      "to": "approva",
+      "label": "interroga esito",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
       "route": "drop"
     },
     {
@@ -299,25 +307,44 @@
       "fromSide": "top",
       "toSide": "bottom",
       "route": "drop"
+    },
+    {
+      "id": "e11",
+      "from": "preistruttoria",
+      "to": "errore",
+      "label": "non passa",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Perche' l'istanza vive nel Catasto",
+      "title": "La prevalida e' un controllo formale",
       "items": [
-        "Il SUS e' uno sportello e non conserva i dati (Ivan, call 30/07/2026)",
-        "Un'istruttoria puo' durare e richiedere integrazioni",
-        "L'istanza attende nel Catasto, l'unico dei due che persiste"
+        "Automatica, senza intervento umano: l'API dice dov'e' l'errore",
+        "Un MP3 al posto del GPX, o una traccia fuori dalla Sardegna: errore subito",
+        "Il numero si riserva solo se il controllo passa"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Il dato vive nel Catasto",
+      "items": [
+        "Il SUS e' uno sportello e non conserva i dati (Ivan, 30/07/2026)",
+        "Le istanze restano nel Catasto come modello separato dai sentieri",
+        "Diventano EcTrack solo alla convalida; il SUS interroga per l'esito"
       ]
     },
     {
       "dot": "amber",
-      "title": "Da confermare con Engineering",
+      "title": "Ancora da chiudere",
       "items": [
-        "Che l'istruttoria della 02 avvenga nel Catasto e non nel backoffice SUS",
-        "Coerente col vincolo di persistenza, ma non dichiarato in call",
-        "Verso della notifica esito: push dal Catasto o polling dal SUS"
+        "Set minimo di dati scambiati: PDF di Piccioli + Excel di Schirru",
+        "Quando il SUS trasmette: a ogni salvataggio o a istanza completa",
+        "Durata della riserva di un numero non confermato"
       ]
     },
     {
@@ -325,8 +352,8 @@
       "title": "Ticket",
       "items": [
         "oc:8333 infrastruttura API SUS — in test",
-        "oc:8489 codice REI · oc:8490 preistruttoria · oc:8491 validazione",
-        "Fuori scope: procedura 05 e variazioni d'ufficio (tag successivo)"
+        "oc:8492 opt-in nel package — prerequisito degli altri tre",
+        "oc:8489 codice REI · oc:8490 prevalida · oc:8491 convalida istanze"
       ]
     }
   ]
