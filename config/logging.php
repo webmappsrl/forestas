@@ -131,6 +131,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'sus' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/sus.log'),
+            'level' => 'info',
+            'days' => 90,
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
