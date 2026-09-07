@@ -88,6 +88,25 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
                     ->collapsable()
                     ->collapsedByDefault(),
+
+                // Sezione Tools: wm-package cerca una MenuSection con questo nome
+                // e vi appende Horizon, Minio, Kibana e i comandi DB
+                // (WmPackageServiceProvider:519-556). Se non la trova la crea lui
+                // con icona 'briefcase' — dichiararla qui permette di aggiungere
+                // voci di progetto, mantenendo lo stesso aspetto.
+                //
+                // Attenzione: il package ricostruisce la sezione conservando solo
+                // icon e collapsable, quindi canSee() e collapsedByDefault()
+                // verrebbero scartati. La visibilita' della singola voce va
+                // impostata sul MenuItem, non sulla sezione.
+                MenuSection::make(__('Tools'), [
+                    // Documentazione delle API SUS generata da Scribe (oc:8333),
+                    // consegnata a Engineering per l'integrazione con il SUS.
+                    MenuItem::externalLink(__('SUS API documentation'), url('/docs/api/sus'))
+                        ->openInNewTab()
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
+                ])->icon('briefcase')
+                    ->collapsable(),
             ];
         });
     }
@@ -126,7 +145,11 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     protected function gate(): void
     {
         Gate::define('viewNova', function (User $user) {
-            return ! $user->hasRole('Guest');
+            // Il client SUS (oc:8333) e' un canale programmatico verso un ente
+            // esterno: non deve accedere al backoffice. Il gate resta una
+            // blacklist di ruoli — portarlo a can('access-nova') escluderebbe
+            // Validator e Contributor, che oggi passano.
+            return ! $user->hasAnyRole(['Guest', 'Sus']);
         });
     }
 
