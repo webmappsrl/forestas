@@ -198,6 +198,38 @@ esterno. Verificato che nel documento non compaiano `Scramble`, `orchestrator`,
 `wm-package`, `tymon`, `referrer`, `middleware`, `blacklist` ne' codici ticket.
 **Da ricontrollare quando si aggiungono endpoint.**
 
+**Provisioning del client con un'azione Nova, non dai campi Ruoli.** La
+procedura documentata inizialmente — creare l'utente da Nova e assegnargli il
+ruolo dalla sua scheda — non era eseguibile: `app/Nova/User.php` e' lo
+scaffolding di default e non estende `AbstractUserResource` del package, dove
+vivono i campi Ruoli e Permessi. Quei campi quindi non compaiono affatto.
+
+Sono state valutate e scartate due vie:
+
+- **Estendere `AbstractUserResource`.** I campi sarebbero comparsi ma in
+  **sola lettura** per chi non e' in `WM_SUPER_ADMIN_EMAILS` (default
+  `team@webmapp.it`), quindi il ruolo non sarebbe stato assegnabile comunque.
+  Inoltre l'estensione porta con se' i campi Permessi e le relazioni UGC:
+  modifica ampia della scheda utente, fuori dal tema di questo ticket. Un
+  commit in questo senso e' stato fatto e poi annullato.
+- **Popolare `wm-package.super_admin_emails` a runtime** con le email degli
+  Administrator. Scartata dopo aver verificato chi usa quella funzione:
+  `RolesAndPermissionsService::allowsUser()` governa anche `AppPolicy` (chi puo'
+  gestire le App) e lo scope di `ImportEcPoiFromOsm`. Allargare l'allowlist
+  avrebbe dato privilegi molto oltre la gestione dei ruoli.
+
+L'azione `CreateSusClient` fa una cosa sola: crea l'utenza, le assegna il ruolo
+`Sus` e invalida la cache dei permessi di Spatie. E' visibile solo agli
+Administrator, quindi Forestas gestisce il proprio client senza dipendere da
+Webmapp e senza che nessuno entri nell'allowlist.
+
+La password e' un **campo del form precompilato con un valore casuale**, non un
+messaggio a fine esecuzione: il toast di Nova dura pochi secondi e non e'
+selezionabile, mentre dal form si copia prima di confermare. Il campo e' `Text`
+e non `Password` perche' mascherato non sarebbe leggibile. Se l'email esiste
+gia' l'azione si ferma senza modificare nulla, cosi' una riesecuzione
+accidentale non puo' rompere un'integrazione attiva.
+
 ## Follow-up
 
 - **Errore PHPStan preesistente** in `app/Http/Clients/SardegnaSentieriClient.php:160`

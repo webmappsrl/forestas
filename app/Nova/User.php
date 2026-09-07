@@ -103,6 +103,8 @@ class User extends Resource
      */
     public function actions(NovaRequest $request): array
     {
-        return [];
+        return [
+            new Actions\CreateSusClient,
+        ];
     }
 }
