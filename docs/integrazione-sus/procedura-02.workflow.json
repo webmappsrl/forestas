@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Procedura 02 — proposta di nuovo sentiero",
+    "subtitle": "Integrazione Catasto Sentieri (Forestas) ↔ SUS (Regione Sardegna)",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "percorso",
+        "label": "Dalla domanda al sentiero",
+        "focus": [
+          "presenta",
+          "raccoglie",
+          "preistruttoria",
+          "coda",
+          "approva",
+          "chiude"
+        ],
+        "note": "Il percorso di un'istanza accolta, dalla presentazione al sentiero accatastato."
+      },
+      {
+        "id": "numero",
+        "label": "Ciclo del numero",
+        "focus": [
+          "preistruttoria",
+          "coda",
+          "approva",
+          "rigetto"
+        ],
+        "note": "Il codice REI viene riservato in preistruttoria, confermato all'approvazione o liberato al rigetto."
+      },
+      {
+        "id": "aperti",
+        "label": "Punti da confermare",
+        "focus": [
+          "coda",
+          "chiude",
+          "manutenzione",
+          "ufficio"
+        ],
+        "note": "Dove il modello e' una nostra proposta e cosa resta fuori da questo tag."
+      }
+    ],
+    "output": "index.html"
+  },
+  "lanes": [
+    {
+      "id": "istante",
+      "label": "Istante — cittadino o ente proponente"
+    },
+    {
+      "id": "sus",
+      "label": "SUS — sportello Engineering (non conserva i dati)"
+    },
+    {
+      "id": "catasto",
+      "label": "Catasto Sentieri — Laravel Webmapp (owner del dato)"
+    },
+    {
+      "id": "operatore",
+      "label": "Operatore Forestas — istruttoria"
+    },
+    {
+      "id": "rigetti",
+      "label": "Esito negativo",
+      "variant": "exception"
+    },
+    {
+      "id": "fuori",
+      "label": "Fuori scope — tag successivo",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "presentazione",
+      "label": "Presentazione",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "prevalidazione",
+      "label": "Prevalidazione",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "esito",
+      "label": "Istruttoria ed esito",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "presenta",
+    "raccoglie",
+    "preistruttoria",
+    "coda",
+    "approva",
+    "chiude"
+  ],
+  "nodes": [
+    {
+      "id": "presenta",
+      "lane": "istante",
+      "col": 0,
+      "type": "external",
+      "label": "Presenta",
+      "sublabel": "istanza + GPX"
+    },
+    {
+      "id": "vede",
+      "lane": "istante",
+      "col": 3,
+      "type": "external",
+      "label": "Riceve",
+      "sublabel": "dati e mappa"
+    },
+    {
+      "id": "esito_istante",
+      "lane": "istante",
+      "col": 5,
+      "type": "external",
+      "label": "Esito",
+      "sublabel": "accolta o no"
+    },
+    {
+      "id": "raccoglie",
+      "lane": "sus",
+      "col": 1,
+      "type": "frontend",
+      "label": "Trasmette",
+      "sublabel": "non persiste"
+    },
+    {
+      "id": "riscontro",
+      "lane": "sus",
+      "col": 3,
+      "type": "frontend",
+      "label": "Riscontro",
+      "sublabel": "al proponente"
+    },
+    {
+      "id": "chiude",
+      "lane": "sus",
+      "col": 5,
+      "type": "frontend",
+      "label": "Chiude",
+      "sublabel": "procedimento"
+    },
+    {
+      "id": "preistruttoria",
+      "lane": "catasto",
+      "col": 2,
+      "type": "backend",
+      "label": "Prevalida",
+      "sublabel": "calcola e riserva",
+      "tag": "oc:8490"
+    },
+    {
+      "id": "approva",
+      "lane": "catasto",
+      "col": 4,
+      "type": "database",
+      "label": "Sentiero",
+      "sublabel": "EcTrack + REI",
+      "tag": "oc:8491"
+    },
+    {
+      "id": "coda",
+      "lane": "operatore",
+      "col": 3,
+      "type": "security",
+      "label": "Valida",
+      "sublabel": "approva o respinge",
+      "tag": "da confermare"
+    },
+    {
+      "id": "rigetto",
+      "lane": "rigetti",
+      "col": 5,
+      "type": "messagebus",
+      "label": "Respinta",
+      "sublabel": "REI liberato"
+    },
+    {
+      "id": "manutenzione",
+      "lane": "fuori",
+      "col": 1,
+      "type": "external",
+      "label": "Proc. 05",
+      "sublabel": "manutenzioni"
+    },
+    {
+      "id": "ufficio",
+      "lane": "fuori",
+      "col": 4,
+      "type": "external",
+      "label": "D'ufficio",
+      "sublabel": "senza istanza"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "presenta",
+      "to": "raccoglie",
+      "label": "istanza + GPX",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop"
+    },
+    {
+      "id": "e2",
+      "from": "raccoglie",
+      "to": "preistruttoria",
+      "label": "API SUS",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop",
+      "labelDy": 11
+    },
+    {
+      "id": "e3",
+      "from": "preistruttoria",
+      "to": "riscontro",
+      "label": "dati + numero riservato",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "drop",
+      "labelDy": 20
+    },
+    {
+      "id": "e4",
+      "from": "riscontro",
+      "to": "vede",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "id": "e5",
+      "from": "preistruttoria",
+      "to": "coda",
+      "label": "conserva",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop",
+      "labelDy": 8
+    },
+    {
+      "id": "e6",
+      "from": "coda",
+      "to": "approva",
+      "label": "ok",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "drop",
+      "labelDy": 19
+    },
+    {
+      "id": "e7",
+      "from": "coda",
+      "to": "rigetto",
+      "label": "respinge",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop"
+    },
+    {
+      "id": "e8",
+      "from": "approva",
+      "to": "chiude",
+      "label": "esito · verso da confermare",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "drop"
+    },
+    {
+      "id": "e9",
+      "from": "chiude",
+      "to": "esito_istante",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "id": "e10",
+      "from": "ufficio",
+      "to": "approva",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "drop"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Perche' l'istanza vive nel Catasto",
+      "items": [
+        "Il SUS e' uno sportello e non conserva i dati (Ivan, call 30/07/2026)",
+        "Un'istruttoria puo' durare e richiedere integrazioni",
+        "L'istanza attende nel Catasto, l'unico dei due che persiste"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Da confermare con Engineering",
+      "items": [
+        "Che l'istruttoria della 02 avvenga nel Catasto e non nel backoffice SUS",
+        "Coerente col vincolo di persistenza, ma non dichiarato in call",
+        "Verso della notifica esito: push dal Catasto o polling dal SUS"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Ticket",
+      "items": [
+        "oc:8333 infrastruttura API SUS — in test",
+        "oc:8489 codice REI · oc:8490 preistruttoria · oc:8491 validazione",
+        "Fuori scope: procedura 05 e variazioni d'ufficio (tag successivo)"
+      ]
+    }
+  ]
+}
