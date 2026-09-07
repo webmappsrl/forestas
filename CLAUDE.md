@@ -10,6 +10,11 @@ Stack: Laravel 12, PHP 8.4, PostgreSQL + PostGIS, Nova 5, Elasticsearch 8, Redis
 # Formattazione codice
 composer format
 
+# Revocare il token del client SUS (oc:8333) — NON ruotare JWT_SECRET
+docker exec -it php-${APP_NAME} php artisan tinker --execute="
+\Tymon\JWTAuth\Facades\JWTAuth::setToken('<token-da-revocare>')->invalidate(true);
+"
+
 # Avvio ambiente locale completo (serve + horizon + pail + vite)
 composer dev
 
@@ -49,9 +54,14 @@ docker exec -it php-${APP_NAME} php artisan optimize
 docker exec -it php-${APP_NAME} php artisan vendor:publish --tag=wm-package-migrations
 docker exec -it php-${APP_NAME} php artisan migrate
 
+# 3-bis. Database di test (una volta per ambiente). Il file .env.testing e'
+# versionato, quindi non va creato: serve solo il database.
+docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d postgres -c "CREATE DATABASE forestas_testing;"
+docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d forestas_testing -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
 # 4. Creare ruoli base
 docker exec -it php-${APP_NAME} php artisan tinker --execute="
-foreach (['Administrator', 'Editor', 'Validator', 'Guest'] as \$name) {
+foreach (['Administrator', 'Editor', 'Validator', 'Guest', 'Contributor', 'Sus'] as \$name) {
     \Spatie\Permission\Models\Role::firstOrCreate(['name' => \$name, 'guard_name' => 'web']);
 }
 "
@@ -196,11 +206,20 @@ Variabili d'ambiente di testing definite in `phpunit.xml`.
 
 ### Regole obbligatorie per i test
 
-**NON eseguire mai i test senza prima verificare l'isolamento del DB.** Prima di lanciare qualsiasi test:
+**L'isolamento e' ora garantito** (oc:8333): `phpunit.xml` imposta
+`DB_DATABASE=forestas_testing` e `.env.testing` (versionato) punta allo stesso
+database. `RefreshDatabase` e' attivo sui test in `tests/Feature`.
 
-1. Verificare `phpunit.xml` — il `DB_DATABASE` deve puntare a un DB separato dal DB reale.
-2. Se il DB di test non è chiaramente isolato, NON lanciare i test — chiedere consenso esplicito all'utente.
-3. Questa regola vale anche per i subagent: istruirli esplicitamente a non lanciare test senza verifica isolamento.
+Resta comunque obbligatorio, prima di lanciare la suite:
+
+1. Verificare che `phpunit.xml` e `.env.testing` puntino a `forestas_testing`.
+2. Verificare che il database `forestas_testing` esista sulla macchina (vedi
+   Setup progetto, passo 3-bis): se non esiste i test falliscono con
+   "database does not exist", non ricadono sul DB reale.
+3. Se l'isolamento non e' verificabile, NON lanciare i test — chiedere consenso
+   esplicito all'utente.
+4. Questa regola vale anche per i subagent: istruirli esplicitamente a non
+   lanciare test senza verifica isolamento.
 
 **Il DB reale contiene dati importati da processi lunghi — distruggerli è inaccettabile.**
 
@@ -231,9 +250,53 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
 
 | Feature | Ticket | Moduli toccati | Note |
 |---|---|---|---|
+| Branch API SUS | oc:8333 | `routes/sus.php`, `app/Http/Controllers/Api/Sus/`, `app/Http/Middleware/`, `config/logging.php`, `config/scramble.php`, `wm-package/routes/api.php` | Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo scaffolding: nessuna logica di business |
 | Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
 
 ## Decisioni architetturali
+
+### Gestione del client SUS (oc:8333)
+- **Creazione e rotazione si fanno da Nova**, non da comandi artisan: il
+  resource utente espone `Password::make()` e `RoleBooleanGroup` per i ruoli
+  (`wm-package/src/Nova/AbstractUserResource.php:66,71`), riservati a chi passa
+  `RolesAndPermissionsService::allowsUser()`. Nessun `sus:create-client` /
+  `sus:rotate-client`: aggiungerebbero un secondo modo di fare la stessa cosa,
+  con la password esposta nello scrollback del terminale
+- La blacklist JWT e' attiva (`config/jwt.php:220` → `blacklist_enabled`
+  default `true`), quindi un singolo token si invalida con
+  `JWTAuth::invalidate()` — unica operazione senza interfaccia Nova, vedi
+  snippet in "Comandi utili"
+- **Non ruotare mai `JWT_SECRET` per revocare un token**: sembra la soluzione
+  ovvia ma invalida i token di *tutti* gli utenti della piattaforma, non solo
+  del client SUS. Nessun utente mobile ha token con `exp` (`JWT_TTL` non e'
+  impostato), quindi sarebbe un logout di massa senza possibilita' di rientro
+  automatico
+- Cambiare la password del client **non** invalida il token gia' emesso: sono
+  due azioni distinte e in caso di compromissione servono entrambe — la revoca
+  via blacklist taglia l'accesso in corso, il cambio password da Nova impedisce
+  di ottenerne uno nuovo
+
+**Creazione del client SUS (da Nova, non da comandi):**
+
+1. Nova → Users → Create User
+2. Nome: `SUS Client`. Email: un indirizzo su dominio **non instradabile**
+   (es. `sus@catasto.invalid`) — Nova espone il reset password pubblico e un
+   reset innescato per errore cambierebbe la password del client
+3. Password: generata lunga e casuale
+4. Roles: selezionare **solo** `Sus`. Mai `Administrator`: porterebbe il
+   permesso `access-nova` e quindi l'accesso al backoffice a un fornitore
+   esterno
+5. Consegnare a Engineering su canali separati: l'URL della documentazione
+   (`/docs/api/sus`) e le credenziali. Mai nello stesso messaggio
+6. Ripetere su ogni ambiente (UAT per il collaudo, produzione al go-live) con
+   credenziali distinte
+
+I campi Password e Roles del resource utente sono in sola lettura per chi non
+passa `RolesAndPermissionsService::allowsUser()` (allowlist di email).
+
+**Cosa puo' fare il client SUS:** solo `POST /api/auth/login`,
+`POST /api/auth/refresh` e `/api/v1/sus/*`. Ogni altra route dell'app risponde
+403 (`app/Http/Middleware/RestrictSusClient.php`, appeso al gruppo `api`).
 
 ### Fix identifier TaxonomyWhere (oc:8469)
 - L'identifier di `TaxonomyWhere` deriva da `properties['source']` + id della
