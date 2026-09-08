@@ -42,6 +42,8 @@ jobs:
         run: php artisan migrate
         env:
           PGPASSWORD: ${DB_PASSWORD}
+      - name: Check wm-package stub vs schema DB
+        run: php artisan wm-package:publish-missing-migrations --with=trail_registry --dry-run
       - name: Clear the config cache
         run: php artisan config:clear
       - name: Optimize
