@@ -251,9 +251,45 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
 | Feature | Ticket | Moduli toccati | Note |
 |---|---|---|---|
 | Branch API SUS | oc:8333 | `routes/sus.php`, `app/Http/Controllers/Api/Sus/`, `app/Http/Middleware/`, `config/logging.php`, `config/scramble.php`, `wm-package/routes/api.php` | Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo scaffolding: nessuna logica di business |
+| Adozione gate stub wm-package + dominio trail_registry | oc:8492 | `.github/workflows/run-tests.yml`, `.env-deploy`, `.env-example`, `phpunit.xml`, `database/migrations/` | Forestas e' il secondo repo (dopo maphub) con `publish-missing-migrations --dry-run` in CI. Dichiara l'adesione al dominio opzionale del Catasto Sentieri |
 | Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
 
 ## Decisioni architetturali
+
+### Adozione gate stub wm-package (oc:8492)
+- Il gate `publish-missing-migrations --dry-run` era attivo in **1 repo su 16**
+  (solo maphub, da oc:8218). Forestas e' il secondo: non e' la coda del ticket
+  del package ma il primo passo per farne uno standard
+- Accenderlo ha richiesto di sanare due disallineamenti pregressi, **estranei al
+  catasto**: `create_users_table` (colonne `balance`, `fiscal_code`, `app_id`) e
+  `zz_2026_07_27_000001_add_surname_to_users_table`. Erano un bug latente, non
+  solo igiene: `User::$fillable` del package dichiara `surname` e `app_id`, e la
+  rotta `POST /wallet/buy` (`wm-package/routes/api.php`) legge `users.balance` —
+  colonne che nel database non esistevano
+- Lo stub `create_users_table` fa `Schema::table`, non `Schema::create`: il nome
+  inganna, pubblicarlo su una tabella esistente e' sicuro
+- `WM_TRAIL_REGISTRY_ENABLED` va tenuta allineata in **sei** posti, di cui uno
+  fuori dal repository: `.env`, `.env-deploy`, `.env-example`, `phpunit.xml`,
+  `.env.testing` (letto dai comandi artisan lanciati con `--env=testing`, dove
+  `phpunit.xml` non arriva) e il `.env` del server. Solo i primi cinque si
+  vedono in un diff
+- **Se un giorno il dominio va spento**, va tolto anche `--with=trail_registry`
+  dallo step di CI: `--with` e' indipendente dall'interruttore e continuerebbe a
+  pretendere gli stub di un dominio deliberatamente disattivato, lasciando la
+  pipeline rossa senza una via d'uscita evidente
+- **Se il Catasto Sentieri smette di rispondere senza motivo apparente, la causa
+  va cercata qui per prima.** `scripts/deploy_prod.sh` esegue `php artisan
+  optimize`, che congela la configurazione: se il `.env` del server perde quella
+  chiave, route e Nova resource del catasto spariscono mentre la tabella resta
+  piena di dati, e il SUS riceve 404. Una verifica automatica al deploy e' stata
+  valutata e scartata: rischio accettato consapevolmente
+- Lo step di CI e' copiato verbatim da maphub tranne `--with=trail_registry`,
+  che non e' necessario (il flag in `.env-deploy` basta) ma rende leggibile cosa
+  quello step controlla. `--with` puo' solo aggiungere domini alla verifica, mai
+  toglierne
+- Gli stub di un dominio opzionale **non** si pubblicano con `vendor:publish`
+  (la scoperta delle migration di Spatie non e' ricorsiva): serve
+  `publish-migration trail_registry/<stub>`. Riguardera' oc:8489
 
 ### Gestione del client SUS (oc:8333)
 - **Creazione e rotazione si fanno da Nova**, non da comandi artisan: il
