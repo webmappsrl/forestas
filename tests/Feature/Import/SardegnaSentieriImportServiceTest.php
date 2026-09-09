@@ -81,10 +81,10 @@ function makeService(array $clientMethods = []): SardegnaSentieriImportService
 
 function makeServiceWith(SardegnaSentieriClient $client): SardegnaSentieriImportService
 {
-    return new SardegnaSentieriImportService(
-        $client,
-        Mockery::mock(SardegnaSentieriMediaSyncService::class)->shouldIgnoreMissing()
-    );
+    $mediaSync = Mockery::mock(SardegnaSentieriMediaSyncService::class);
+    $mediaSync->shouldIgnoreMissing();
+
+    return new SardegnaSentieriImportService($client, $mediaSync);
 }
 
 function minimalPoiFeature(int $id, array $overrides = []): ApiPoiResponse
@@ -269,7 +269,7 @@ it('sincronizza le TaxonomyPoiType quando presenti', function () {
     $poi = $service->importPoi(42);
 
     expect($poi->taxonomyPoiTypes()->count())->toBe(1)
-        ->and($poi->taxonomyPoiTypes()->first()->identifier)->toBe('rifugio');
+        ->and($poi->taxonomyPoiTypes()->pluck('identifier')->all())->toBe(['rifugio']);
 });
 
 it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', function () {

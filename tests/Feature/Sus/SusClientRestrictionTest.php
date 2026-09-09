@@ -2,13 +2,14 @@
 
 use App\Models\User;
 use Spatie\Permission\Models\Role;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 beforeEach(function () {
     Role::findOrCreate('Sus', 'web');
 
     $this->client = User::factory()->create(['email' => 'sus@example.invalid']);
     $this->client->assignRole('Sus');
-    $this->token = auth('api')->login($this->client);
+    $this->token = JWTAuth::fromUser($this->client);
 });
 
 it('nega al client SUS la cancellazione del proprio account', function () {
@@ -47,7 +48,7 @@ it('consente al client SUS il refresh sul proprio branch', function () {
 
 it('non limita gli utenti senza ruolo Sus', function () {
     $altro = User::factory()->create();
-    $token = auth('api')->login($altro);
+    $token = JWTAuth::fromUser($altro);
 
     // Si usa auth/me e non auth/user: quest'ultima crasha con TypeError se
     // manca l'header app-id (bug preesistente in wm-package,

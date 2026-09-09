@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('ec_tracks', function (Blueprint $table) {
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('SET NULL');
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
         });
     }
 

@@ -111,15 +111,22 @@ class ResetSardegnaSentieriCommand extends Command
         // 5. Flush Horizon Redis data (pending/recent/failed jobs and all job hashes)
         $prefix = config('database.redis.options.prefix', '');
         $horizonPrefix = $prefix ? "{$prefix}horizon:*" : 'horizon:*';
-        $cursor = null;
+        // La connessione va risolta esplicitamente: l'alias `Redis` collide con
+        // la classe dell'estensione phpredis, la cui scan() ha un'altra firma.
+        // Il tipo concreto dipende da REDIS_CLIENT (predis in locale, phpredis
+        // in deploy): con predis scan() passa da __call e il cursore torna come
+        // stringa, da cui il cast a int nella condizione del ciclo.
+        /** @var \Illuminate\Redis\Connections\PhpRedisConnection|\Illuminate\Redis\Connections\PredisConnection $redis */
+        $redis = Redis::connection();
+        $cursor = 0;
         $deleted = 0;
         do {
-            [$cursor, $keys] = Redis::scan($cursor ?? 0, ['match' => $horizonPrefix, 'count' => 500]);
-            if (! empty($keys)) {
-                Redis::del($keys);
+            [$cursor, $keys] = $redis->scan($cursor, ['match' => $horizonPrefix, 'count' => 500]);
+            if (is_array($keys) && $keys !== []) {
+                $redis->del($keys);
                 $deleted += count($keys);
             }
-        } while ($cursor != 0);
+        } while ((int) $cursor !== 0);
         $this->info("Horizon Redis svuotato ({$deleted} chiavi rimosse).");
 
         // 6. Reset sequences

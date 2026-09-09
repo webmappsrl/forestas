@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->float('balance', 0, 0)->default(0);
+            $table->float('balance')->default(0);
             $table->string('fiscal_code', 16)->nullable()->unique();
             $table->integer('app_id')->nullable();
 

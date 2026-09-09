@@ -27,7 +27,7 @@ class SardegnaSentieriSeeder extends Seeder
         );
         $forestasUser->syncRoles([Role::findByName('Editor', 'web')]);
 
-        $adminPassword = env('APP_ADMIN_PASSWORD');
+        $adminPassword = config('forestas.admin_password');
         if (is_string($adminPassword) && $adminPassword !== '') {
             $admin = User::updateOrCreate(
                 ['email' => 'team@webmapp.it'],

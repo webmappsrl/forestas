@@ -11,7 +11,7 @@ beforeEach(function () {
     Role::findOrCreate('Administrator', 'web');
 });
 
-function eseguiAzione(array $campi): Laravel\Nova\Actions\ActionResponse|array
+function eseguiAzione(array $campi): Laravel\Nova\Actions\ActionResponse
 {
     $action = new CreateSusClient;
 

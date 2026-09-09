@@ -40,6 +40,8 @@ class TaxonomyPoiType extends WmTaxonomyPoiType
             return [];
         }
 
+        /** @var \Wm\WmPackage\Models\TaxonomyPoiType $model */
+
         $model = $request->findModelOrFail();
         $sourceId = data_get($model->properties, 'source_id');
         $vocabulary = data_get($model->properties, 'vocabulary');

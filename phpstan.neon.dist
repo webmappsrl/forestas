@@ -10,4 +10,16 @@ parameters:
         - routes
         - tests
     tmpDir: build/phpstan
-
+    ignoreErrors:
+        # Nelle closure Pest `$this` e' legato a Tests\TestCase da tests/Pest.php,
+        # ma PHPStan non interpreta quel binding e vede PHPUnit\Framework\TestCase:
+        # ogni helper Laravel (get, postJson, artisan, instance...) risulta assente.
+        # Il resto dell'analisi sui test resta attivo.
+        -
+            identifier: method.notFound
+            path: tests/*
+            message: '#Call to an undefined method PHPUnit\\Framework\\TestCase::#'
+        -
+            identifier: property.notFound
+            path: tests/*
+            message: '#Access to an undefined property PHPUnit\\Framework\\TestCase::#'

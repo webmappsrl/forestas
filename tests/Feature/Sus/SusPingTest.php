@@ -1,7 +1,8 @@
 <?php
 
-use Spatie\Permission\Models\Role;
 use App\Models\User;
+use Spatie\Permission\Models\Role;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('rifiuta il ping senza token', function () {
     $this->getJson('/api/v1/sus/ping')->assertUnauthorized();
@@ -16,7 +17,7 @@ it('risponde al ping con l identita del client autenticato', function () {
     ]);
     $client->assignRole('Sus');
 
-    $token = auth('api')->login($client);
+    $token = JWTAuth::fromUser($client);
 
     $this->withHeader('Authorization', "Bearer {$token}")
         ->getJson('/api/v1/sus/ping')

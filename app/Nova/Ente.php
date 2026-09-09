@@ -42,6 +42,8 @@ class Ente extends Resource
             return [];
         }
 
+        /** @var \App\Models\Ente $ente */
+
         $ente = $request->findModelOrFail();
         $card = new ApiLinksCard([]);
         $card->addLink('Sardegna Sentieri (JSON)', 'https://www.sardegnasentieri.it/node/'.$ente->sardegnasentieri_id.'?_format=json');

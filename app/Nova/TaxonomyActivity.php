@@ -40,6 +40,8 @@ class TaxonomyActivity extends WmTaxonomyActivity
             return [];
         }
 
+        /** @var \Wm\WmPackage\Models\TaxonomyActivity $model */
+
         $model = $request->findModelOrFail();
         $sourceId = data_get($model->properties, 'source_id');
         $vocabulary = data_get($model->properties, 'vocabulary');

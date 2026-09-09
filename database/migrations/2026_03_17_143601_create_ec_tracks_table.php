@@ -25,7 +25,8 @@ return new class extends Migration
 
             $table->index('osmid');
             $table->index('app_id');
-            $table->spatialIndex('geometry')->comment('for geography queries');
+            // Indice spaziale per le query geografiche.
+            $table->spatialIndex('geometry');
         });
 
         // Used on pbf generations

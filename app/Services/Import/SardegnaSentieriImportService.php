@@ -101,8 +101,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -132,8 +134,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -163,8 +167,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -617,8 +623,8 @@ class SardegnaSentieriImportService
         if (! $activity->exists) {
             $activity->setTranslation('name', 'it', ucfirst($response->type));
         }
-        if (empty($activity->icon)) {
-            $activity->icon = $this->resolveIconNameByIdentifier($identifier);
+        if (empty($activity->getAttribute('icon'))) {
+            $activity->setAttribute('icon', $this->resolveIconNameByIdentifier($identifier));
         }
         $activity->saveQuietly();
 
@@ -857,7 +863,11 @@ class SardegnaSentieriImportService
 
             $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
             $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
-            $ente->contatti = $contatti;
+            if ($contatti !== null) {
+                // Campo translatable come name e description: assegnarlo come
+                // stringa nuda popolerebbe solo la locale corrente.
+                $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
+            }
             $ente->pagina_web = $paginaWeb;
             if ($description !== null && $description !== '') {
                 $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
@@ -876,7 +886,7 @@ class SardegnaSentieriImportService
             $ente->properties = null;
             $ente->saveQuietly();
 
-            if ($featureImageUrl !== null && $this->mediaSync !== null) {
+            if ($featureImageUrl !== null) {
                 $this->mediaSync->syncImportedImages($ente, [
                     ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
                 ]);
