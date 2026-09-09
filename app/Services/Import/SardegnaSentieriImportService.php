@@ -376,10 +376,15 @@ class SardegnaSentieriImportService
 
     public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
     {
-        $geometry = $this->getGeometryFromGpx($response->gpx);
+        $gpxFailures = [];
+        $geometry = $this->getGeometryFromGpx($response->gpx, $gpxFailures);
 
         if ($geometry === null && $response->geometryFallback !== null) {
             $geometry = $this->convertGeoJsonGeometryToWkt($response->geometryFallback);
+
+            if ($geometry === null) {
+                $gpxFailures[] = 'the GeoJSON fallback geometry could not be converted';
+            }
         }
 
         $data = [
@@ -406,7 +411,11 @@ class SardegnaSentieriImportService
         if ($geometry !== null) {
             $data['geometry'] = $geometry;
         } elseif ($isNew) {
-            throw new \RuntimeException("No GPX geometry available for new track {$externalId}. Import skipped.");
+            throw new \RuntimeException(sprintf(
+                'No usable geometry for new track %d. Import skipped. Reasons: %s',
+                $externalId,
+                $gpxFailures === [] ? 'unknown' : implode('; ', $gpxFailures)
+            ));
         }
 
         $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
@@ -429,25 +438,44 @@ class SardegnaSentieriImportService
     /**
      * @param  list<string>  $gpxUrls
      */
-    private function getGeometryFromGpx(array $gpxUrls): ?string
+    /**
+     * @param  array<int, string>  $gpxUrls
+     * @param  array<int, string>  $failures  Collects why each URL was unusable, for error reporting.
+     */
+    private function getGeometryFromGpx(array $gpxUrls, array &$failures = []): ?string
     {
+        if ($gpxUrls === []) {
+            $failures[] = 'the source published no GPX url';
+
+            return null;
+        }
+
         foreach ($gpxUrls as $gpxUrl) {
             try {
                 $gpxContent = $this->client->getGpxContent($gpxUrl);
-                $geometry = $this->parseGpxToWkt($gpxContent);
+            } catch (\Exception $e) {
+                $failures[] = "{$gpxUrl}: download failed ({$e->getMessage()})";
 
-                if ($geometry !== null) {
-                    return $geometry;
-                }
-            } catch (\Exception) {
                 continue;
             }
+
+            $reason = null;
+            $geometry = $this->parseGpxToWkt($gpxContent, $reason);
+
+            if ($geometry !== null) {
+                return $geometry;
+            }
+
+            $failures[] = "{$gpxUrl}: {$reason}";
         }
 
         return null;
     }
 
-    private function parseGpxToWkt(string $gpxContent): ?string
+    /**
+     * @param  string|null  $reason  Set to a human readable explanation when the GPX yields no geometry.
+     */
+    private function parseGpxToWkt(string $gpxContent, ?string &$reason = null): ?string
     {
         // Strip default namespace so SimpleXML can traverse elements without namespace prefix
         $gpxContent = preg_replace('/xmlns\s*=\s*"[^"]*"/', '', $gpxContent, 1) ?? $gpxContent;
@@ -455,6 +483,8 @@ class SardegnaSentieriImportService
         $xml = simplexml_load_string($gpxContent);
 
         if ($xml === false) {
+            $reason = 'the file is not valid XML';
+
             return null;
         }
 
@@ -462,26 +492,48 @@ class SardegnaSentieriImportService
 
         foreach ($xml->trk as $trk) {
             foreach ($trk->trkseg as $seg) {
-                $points = [];
+                $points = $this->gpxPointsToCoordinates($seg->trkpt);
 
-                foreach ($seg->trkpt as $pt) {
-                    $lon = (float) $pt['lon'];
-                    $lat = (float) $pt['lat'];
-                    $ele = isset($pt->ele) ? (float) $pt->ele : 0.0;
-                    $points[] = "{$lon} {$lat} {$ele}";
-                }
-
-                if (! empty($points)) {
+                if (count($points) >= 2) {
                     $segments[] = '('.implode(', ', $points).')';
                 }
             }
         }
 
+        // Some sources publish the itinerary as a route (<rte>/<rtept>) instead of
+        // a track (<trk>/<trkseg>/<trkpt>) — typically GPX converted from KML.
+        foreach ($xml->rte as $rte) {
+            $points = $this->gpxPointsToCoordinates($rte->rtept);
+
+            if (count($points) >= 2) {
+                $segments[] = '('.implode(', ', $points).')';
+            }
+        }
+
         if (empty($segments)) {
+            $reason = 'the GPX contains no <trk> or <rte> with at least two points';
+
             return null;
         }
 
         return 'MULTILINESTRING Z ('.implode(', ', $segments).')';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function gpxPointsToCoordinates(\SimpleXMLElement $gpxPoints): array
+    {
+        $points = [];
+
+        foreach ($gpxPoints as $pt) {
+            $lon = (float) $pt['lon'];
+            $lat = (float) $pt['lat'];
+            $ele = isset($pt->ele) ? (float) $pt->ele : 0.0;
+            $points[] = "{$lon} {$lat} {$ele}";
+        }
+
+        return $points;
     }
 
     private function syncFromTo(EcTrack $ecTrack, ApiTrackResponse $response): void
