@@ -54,8 +54,13 @@ docker exec -it php-${APP_NAME} php artisan optimize
 docker exec -it php-${APP_NAME} php artisan vendor:publish --tag=wm-package-migrations
 docker exec -it php-${APP_NAME} php artisan migrate
 
-# 3-bis. Database di test (una volta per ambiente). Il file .env.testing e'
-# versionato, quindi non va creato: serve solo il database.
+# 3-bis. Ambiente di test. Il file .env.testing NON e' versionato (contiene
+# chiavi): lo crea install.sh, oppure a mano dal modello .env.testing-example.
+cp .env.testing-example .env.testing
+docker exec -it php-${APP_NAME} php artisan key:generate --env=testing --quiet
+docker exec -it php-${APP_NAME} php artisan jwt:secret --env=testing --force --quiet
+
+# Database di test (una volta per ambiente).
 docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d postgres -c "CREATE DATABASE forestas_testing;"
 docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d forestas_testing -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 
@@ -207,12 +212,16 @@ Variabili d'ambiente di testing definite in `phpunit.xml`.
 ### Regole obbligatorie per i test
 
 **L'isolamento e' ora garantito** (oc:8333): `phpunit.xml` imposta
-`DB_DATABASE=forestas_testing` e `.env.testing` (versionato) punta allo stesso
-database. `RefreshDatabase` e' attivo sui test in `tests/Feature`.
+`DB_DATABASE=forestas_testing` e `.env.testing` (non versionato, generato dal
+modello `.env.testing-example`) punta allo stesso database. `RefreshDatabase`
+e' attivo sui test in `tests/Feature`.
 
 Resta comunque obbligatorio, prima di lanciare la suite:
 
 1. Verificare che `phpunit.xml` e `.env.testing` puntino a `forestas_testing`.
+   Se `.env.testing` manca, crearlo dal modello (vedi Setup progetto, passo
+   3-bis): senza di esso i test girano comunque, ma senza `JWT_SECRET`, e i
+   test che firmano un token falliscono in modo poco leggibile.
 2. Verificare che il database `forestas_testing` esista sulla macchina (vedi
    Setup progetto, passo 3-bis): se non esiste i test falliscono con
    "database does not exist", non ricadono sul DB reale.
@@ -270,9 +279,9 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
   inganna, pubblicarlo su una tabella esistente e' sicuro
 - `WM_TRAIL_REGISTRY_ENABLED` va tenuta allineata in **sei** posti, di cui uno
   fuori dal repository: `.env`, `.env-deploy`, `.env-example`, `phpunit.xml`,
-  `.env.testing` (letto dai comandi artisan lanciati con `--env=testing`, dove
-  `phpunit.xml` non arriva) e il `.env` del server. Solo i primi cinque si
-  vedono in un diff
+  `.env.testing-example` (da cui nasce `.env.testing`, letto dai comandi artisan
+  lanciati con `--env=testing`, dove `phpunit.xml` non arriva) e il `.env` del
+  server. Solo i primi cinque si vedono in un diff
 - **Se un giorno il dominio va spento**, va tolto anche `--with=trail_registry`
   dallo step di CI: `--with` e' indipendente dall'interruttore e continuerebbe a
   pretendere gli stub di un dominio deliberatamente disattivato, lasciando la
