@@ -44,6 +44,32 @@ con una scheda del sentiero, anche cartografica — e, in quella fase, l'assegna
 di un **numero di sentiero provvisorio** che diventa definitivo solo a istruttoria
 conclusa.
 
+### Come si corregge un'istanza sbagliata
+
+**Un'istanza presentata non si modifica: si respinge con una motivazione e se ne presenta una
+nuova.** Vale per entrambi i canali — la domanda arrivata dal SUS e quella aperta in backoffice —
+perché sono la stessa cosa con provenienza diversa. Decisione nostra, presa il 10/09/2026, non
+una domanda aperta con il cliente.
+
+Il motivo non è la comodità di realizzazione: è che ogni versione presentata **resta distinta e
+leggibile** invece di essere sovrascritta dalla successiva. Su una pratica amministrativa poter
+ricostruire cosa è stato chiesto, cosa è stato risposto e perché vale più della comodità di
+correggere sul posto — e il rigetto motivato è un atto che resta agli atti, la modifica in corsa
+no.
+
+Ne segue, per l'API del SUS:
+
+- **non esiste un endpoint di aggiornamento** di un'istanza già presentata. Una correzione è una
+  nuova presentazione, con un proprio identificativo;
+- il rigetto **libera il numero riservato**, che torna disponibile per chiunque — compresa la
+  nuova domanda dello stesso richiedente, che però non ha diritto di prelazione su quel numero;
+- la motivazione del rigetto è un dato dell'istanza, e va restituita al SUS perché il richiedente
+  sappia cosa correggere.
+
+Questo evita alla radice il problema più spinoso della modifica in corsa: se cambiasse la traccia,
+potrebbe cambiare il settore in cui il sentiero ricade, e il settore sono i primi caratteri di un
+codice **già riservato e già comunicato**.
+
 A Engineering è stato promesso un branch API REST con un client e una chiave di
 accesso propri, con il modo di esporlo delegato a noi: *«i dati sono i vostri,
 quindi esponete voi l'API nella maniera che riterrete più opportuna»* (Ivan). La

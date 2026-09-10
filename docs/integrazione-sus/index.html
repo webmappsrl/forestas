@@ -3928,6 +3928,7 @@
         <path data-edge-from="chiude" data-edge-to="approva" data-edge-label="interroga esito" data-edge-key="7" data-edge-id="e8" data-composition-points="625,269;625,290;500,290;500,333" d="M 625 269 L 625 290 L 500 290 L 500 333" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="chiude" data-edge-to="esito_istante" data-edge-key="8" data-edge-id="e9" data-composition-points="625,217;625,145" d="M 625 217 L 625 145" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <path data-edge-from="ufficio" data-edge-to="approva" data-edge-key="9" data-edge-id="e10" data-composition-points="500,713;500,538;500,538;500,401" d="M 500 713 L 500 538 L 500 538 L 500 401" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="chiude" data-edge-to="rigetto" data-edge-label="interroga esito" data-edge-key="11" data-edge-id="e12" data-composition-points="671,243;693,243;693,623;671,623" d="M 671 243 L 693 243 L 693 623 L 671 623" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="preistruttoria" data-edge-to="errore" data-edge-label="non passa" data-edge-key="10" data-edge-id="e11" data-composition-points="300,401;300,476;300,476;300,589" d="M 300 401 L 300 476 L 300 476 L 300 589" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
 
         <!-- Nodes -->
@@ -4047,10 +4048,10 @@
         <text data-detail="fine" x="430" y="513" class="t-security" font-size="7" text-anchor="middle">oc:8491</text>
         </g>
 
-        <g id="node-rigetto" data-node-id="rigetto" data-node-label="Respinta" tabindex="0" role="button" aria-label="Focus Respinta, REI liberato, Esito negativo › Istruttoria ed esito" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="REI liberato" data-node-context="Esito negativo › Istruttoria ed esito">
-          <title>Respinta · REI liberato · Esito negativo › Istruttoria ed esito</title>
-          <rect x="579" y="589" width="92" height="52" rx="6" class="c-mask"/>
-          <rect x="579" y="589" width="92" height="52" rx="6" class="c-messagebus" stroke-width="1.5"/>
+        <g id="node-rigetto" data-node-id="rigetto" data-node-label="Respinta" tabindex="0" role="button" aria-label="Focus Respinta, con motivazione: REI liberato, si ripresenta, Esito negativo › Istruttoria ed esito" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="con motivazione" data-node-context="Esito negativo › Istruttoria ed esito">
+          <title>Respinta · con motivazione: REI liberato, si ripresenta · Esito negativo › Istruttoria ed esito</title>
+          <rect x="579" y="589" width="92" height="68" rx="6" class="c-mask"/>
+          <rect x="579" y="589" width="92" height="68" rx="6" class="c-messagebus" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(585 595) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
@@ -4058,7 +4059,8 @@
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
           <text data-detail-anchor x="625" y="610" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Respinta</text>
-          <text data-detail="context" x="625" y="627" class="t-muted" font-size="8" text-anchor="middle">REI liberato</text>
+          <text data-detail="context" x="625" y="627" class="t-muted" font-size="8" text-anchor="middle">con motivazione</text>
+        <text data-detail="fine" x="625" y="645" class="t-security" font-size="7" text-anchor="middle">REI liberato · si ripresenta</text>
         </g>
 
         <g id="node-manutenzione" data-node-id="manutenzione" data-node-label="Proc. 05" tabindex="0" role="button" aria-label="Focus Proc. 05, manutenzioni, Fuori scope — tag successivo › Presentazione" aria-pressed="false" data-node-kind="external" data-node-sublabel="manutenzioni" data-node-context="Fuori scope — tag successivo › Presentazione">
@@ -4324,6 +4326,21 @@
 
     <!-- Info Cards -->
     <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Un&#39;istanza non si modifica</h3>
+        </div>
+        <ul>
+          <li>&bull; Si respinge con una motivazione e se ne presenta una nuova</li>
+          <li>&bull; Vale per entrambi i canali: dal SUS e aperta in backoffice</li>
+          <li>&bull; L&#39;esito negativo e la motivazione tornano al SUS, come quello positivo</li>
+          <li>&bull; Nessun endpoint di aggiornamento: una correzione e&#39; una nuova domanda</li>
+          <li>&bull; Ogni versione resta distinta e leggibile, invece di essere sovrascritta</li>
+          <li>&bull; Il rigetto libera il numero riservato, senza prelazione per il richiedente</li>
+        </ul>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
