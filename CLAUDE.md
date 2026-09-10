@@ -259,11 +259,73 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
 
 | Feature | Ticket | Moduli toccati | Note |
 |---|---|---|---|
+| Catasto Sentieri: codice REI | oc:8489 | `app/Services/Import/SardegnaSentieriImportService.php`, `app/Providers/NovaServiceProvider.php`, `routes/console.php`, `database/migrations/`, `.env*` | Accende il dominio `trail_registry` del package: l'import registra il codice del sentiero appena importato, la sincronizzazione notturna riallinea a Drupal e ricostruisce le anomalie, il menu ha la sezione `Catasto`. Dettaglio in `docs/features/8489-identificazione-automatica-sentiero-codice-rei/` e, per il dominio, in `wm-package/docs/resources/TrailRegistry.md` |
 | Branch API SUS | oc:8333 | `routes/sus.php`, `app/Http/Controllers/Api/Sus/`, `app/Http/Middleware/`, `config/logging.php`, `config/scramble.php`, `wm-package/routes/api.php` | Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo scaffolding: nessuna logica di business |
 | Adozione gate stub wm-package + dominio trail_registry | oc:8492 | `.github/workflows/run-tests.yml`, `.env-deploy`, `.env-example`, `phpunit.xml`, `database/migrations/` | Forestas e' il secondo repo (dopo maphub) con `publish-missing-migrations --dry-run` in CI. Dichiara l'adesione al dominio opzionale del Catasto Sentieri |
 | Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
 
 ## Decisioni architetturali
+
+### Catasto Sentieri: codice REI (oc:8489)
+
+**Fonte di verita':** `wm-package/docs/resources/TrailRegistry.md` per il dominio,
+`docs/features/8489-identificazione-automatica-sentiero-codice-rei/notes.md` per
+le decisioni prese durante la lavorazione.
+
+- **Nel registro dei codici entrano solo i codici su cui non pende alcun
+  dubbio.** Un sentiero che ha un'anomalia non ha una riga: il registro e'
+  l'elenco di cio' che e' deciso, `trail_registry_anomalies` e' cio' che resta
+  da decidere. Verifica: una join fra le due tabelle su `ec_track_id` deve
+  tornare zero
+- **Le anomalie raccolgono solo chi e' rimasto SENZA numero** e dovrebbe
+  averlo. Non e' un registro di imperfezioni: un codice scritto nel nome invece
+  che nel campo dedicato non e' un'anomalia — si legge, si registra, e la
+  colonna `origin` dice da dove viene. Cio' che si puo' risolvere si risolve,
+  cosi' la lista resta corta abbastanza da essere letta davvero
+- **La condizione di go-live** non e' piu' «zero righe in conflitto nel
+  registro» (stato che non esiste piu'), ma
+  `select count(*) from trail_registry_anomalies where type='codice_gia_assegnato'`
+- **`SardegnaSentieriImportService` non e' stato parametrizzato** sul nome del
+  campo che porta il codice, ed e' una scelta: e' custom di questo progetto, in
+  un altro shard non esiste, ed e' proprio lui a DECIDERE come si chiama quella
+  chiave scrivendo `properties['ref']`. La parametrizzazione serve a chi la
+  legge senza saperla in anticipo — il comando del package, dove infatti c'e'.
+  **Se un domani quella chiave cambiasse nome, va aggiornata di conseguenza
+  `WM_TRAIL_LEGACY_CODE_PROPERTY`**, altrimenti il comando cerca la chiave
+  vecchia e non trova piu' nulla
+- **La sincronizzazione notturna e' un troncamento**, e per vincolo a cascata
+  porta via anche cio' che non viene da Drupal: la storia dei cambi di stato dei
+  codici e le istanze. Oggi non morde — le istanze sono zero e il loro flusso
+  arriva con oc:8490 e oc:8491 — ma **dal giorno in cui su collaudo si provera'
+  a presentare un'istanza, ogni notte la si ritrovera' cancellata**. A quel
+  punto la sincronizzazione va cambiata: non piu' troncamento totale, ma
+  rimozione dei soli tracciati spariti alla fonte
+- **`SARDEGNASENTIERI_DAILY_RESET` decide chi fa il troncamento notturno, non
+  `APP_ENV`.** Il nome dell'ambiente non discrimina: i server si chiamano
+  `develop` e `production`, con il collaudo che gira come `production` perche'
+  una produzione vera non esiste ancora. Legare il troncamento a quei nomi
+  significherebbe che la produzione, il giorno che nascera', eredita la regola e
+  si cancella i dati ogni notte. (La condizione precedente cercava `staging`,
+  che non e' il nome di nessuno dei due: **il ramo con `--reset` non e' mai
+  scattato**)
+- **L'import orario non cancella**: marca i record spariti alla fonte con
+  `properties->forestas->deleted_from_source = true`. E' il motivo per cui
+  serviva comunque un troncamento per avere lo specchio esatto di Drupal — e
+  anche la strada per farne a meno, se un giorno si volesse escludere dal
+  catasto i marcati invece di distruggere tutto
+- **Il `--reset` di `sardegnasentieri:import` fa `TRUNCATE ... CASCADE` globale**
+  su `ec_tracks`, `ec_pois` e le tassonomie, non una cancellazione selettiva per
+  `app_id`. Il piano che lo ha introdotto
+  (`.claude/plans/sardegnasentieri-reset-and-reimport.md`) prescriveva l'opposto,
+  con un anti-pattern esplicito. Su forestas e' innocuo — l'app e' una sola —
+  ma diventerebbe un problema se il database ospitasse piu' app
+- **Nessuna Resource `Sentiero`**: sarebbe un doppione del Registro dei codici,
+  che mostra gia' codice, denominazione e collegamento al sentiero. Ne e' stata
+  scritta anche una versione astratta, che selezionava i tracciati con un codice
+  assegnato invece di filtrare per tassonomia, e rimossa per la stessa ragione
+- **Le sei tracce senza tipo non si toccano**: hanno tutte un `ref` e cinque
+  hanno gia' il codice. Da quando il catasto guarda il codice e non il tipo, il
+  tipo mancante non nasconde piu' niente
 
 ### Adozione gate stub wm-package (oc:8492)
 - Il gate `publish-missing-migrations --dry-run` era attivo in **1 repo su 16**
