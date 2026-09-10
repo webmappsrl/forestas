@@ -24,6 +24,33 @@ class SardegnaSentieriClient
      *
      * @throws ConnectionException
      */
+    /**
+     * La fonte risponde? Una sola chiamata leggera, prima di toccare
+     * qualunque cosa.
+     *
+     * Serve a chi sta per cancellare per poi riscaricare: `--reset` fa il
+     * troncamento e SOLO DOPO scarica, quindi una fonte irraggiungibile
+     * lascia la piattaforma vuota. È successo il 10/09/2026 sul collaudo —
+     * Drupal ha risposto «Temporarily Unavailable» subito dopo il
+     * troncamento, e i dati sono stati recuperati copiandoli da un altro
+     * ambiente.
+     *
+     * Si interroga l'elenco dei tracciati e non la home: la home è servita
+     * da una pagina statica che risponde 200 anche mentre l'applicazione
+     * dietro è ferma — verificato quel giorno, con la home a 200 e ogni
+     * endpoint a 503.
+     */
+    public function isReachable(int $timeoutSeconds = 15): bool
+    {
+        try {
+            return Http::timeout($timeoutSeconds)
+                ->get(self::BASE_URL.'/list-tracks/', ['_format' => 'json'])
+                ->successful();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function getPoiList(): array
     {
         $response = Http::timeout(self::TIMEOUT)

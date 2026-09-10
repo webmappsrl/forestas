@@ -54,6 +54,17 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         if ($this->option('reset')) {
+            // Due controlli PRIMA del troncamento, non dopo: `--reset`
+            // cancella e solo allora scarica, quindi ogni imprevisto dopo la
+            // cancellazione lascia la piattaforma vuota.
+            if (! $this->sourceIsReachable($client, $runId)) {
+                return self::FAILURE;
+            }
+
+            if (! $this->backupBeforeReset($runId)) {
+                return self::FAILURE;
+            }
+
             $this->info('Resetting all imported data...');
             $this->resetData();
             $this->info('Reset completed.');
@@ -391,6 +402,65 @@ class ImportSardegnaSentieriCommand extends Command
     /**
      * Ensure minimum entities needed by import exist.
      */
+    /**
+     * La fonte risponde prima di cancellare.
+     *
+     * Il 10/09/2026 sul collaudo Drupal ha risposto «Temporarily
+     * Unavailable» subito dopo il troncamento: 763 tracciati e 970 punti
+     * cancellati e non riscaricabili, recuperati copiandoli da un altro
+     * ambiente. Questo controllo costa una chiamata e lo impedisce.
+     */
+    private function sourceIsReachable(SardegnaSentieriClient $client, string $runId): bool
+    {
+        $this->info('Checking source availability...');
+
+        if ($client->isReachable()) {
+            $this->info('Source is reachable.');
+
+            return true;
+        }
+
+        $this->error('La sorgente non risponde: import annullato, nessun dato e\' stato cancellato.');
+        $this->line('Riprovare quando sardegnasentieri.it torna disponibile.');
+
+        Log::channel('import')->error(
+            "[sardegnasentieri:{$runId}] Source unreachable, --reset aborted before truncate."
+        );
+
+        return false;
+    }
+
+    /**
+     * Un backup del database prima di cancellare.
+     *
+     * Il controllo sulla sorgente copre il caso previsto — la fonte giu' —
+     * ma non quello imprevisto: un troncamento andato a buon fine e un
+     * import che fallisce a meta'. Il backup e' la rete sotto entrambi.
+     *
+     * Un fallimento del backup ferma tutto: procedere senza sarebbe
+     * esattamente la situazione da cui questo codice nasce.
+     */
+    private function backupBeforeReset(string $runId): bool
+    {
+        $this->info('Backing up the database before reset...');
+
+        $exit = $this->call('wm:backup-run', ['--only-db' => true, '--disable-notifications' => true]);
+
+        if ($exit === self::SUCCESS) {
+            $this->info('Backup completed.');
+
+            return true;
+        }
+
+        $this->error('Backup fallito: import annullato, nessun dato e\' stato cancellato.');
+
+        Log::channel('import')->error(
+            "[sardegnasentieri:{$runId}] Backup failed with exit code {$exit}, --reset aborted before truncate."
+        );
+
+        return false;
+    }
+
     private function resetData(): void
     {
         // Truncate in order: tables with FKs first, then referenced tables.
