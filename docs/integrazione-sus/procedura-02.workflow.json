@@ -183,7 +183,8 @@
       "col": 5,
       "type": "messagebus",
       "label": "Respinta",
-      "sublabel": "REI liberato"
+      "sublabel": "con motivazione",
+      "fine": "REI liberato · si ripresenta"
     },
     {
       "id": "manutenzione",
@@ -317,9 +318,31 @@
       "fromSide": "bottom",
       "toSide": "top",
       "route": "drop"
+    },
+    {
+      "id": "e12",
+      "from": "chiude",
+      "to": "rigetto",
+      "label": "interroga esito",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "around"
     }
   ],
   "cards": [
+    {
+      "dot": "amber",
+      "title": "Un'istanza non si modifica",
+      "items": [
+        "Si respinge con una motivazione e se ne presenta una nuova",
+        "Vale per entrambi i canali: dal SUS e aperta in backoffice",
+        "L'esito negativo e la motivazione tornano al SUS, come quello positivo",
+        "Nessun endpoint di aggiornamento: una correzione e' una nuova domanda",
+        "Ogni versione resta distinta e leggibile, invece di essere sovrascritta",
+        "Il rigetto libera il numero riservato, senza prelazione per il richiedente"
+      ]
+    },
     {
       "dot": "cyan",
       "title": "La prevalida e' un controllo formale",
