@@ -47,6 +47,15 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
             return [
                 MenuSection::dashboard(Main::class)->icon('chart-bar'),
 
+                // Catasto Sentieri (oc:8489). Dichiarata qui, e vuota, solo
+                // per fissarne la POSIZIONE: le voci le aggiunge il package
+                // (WmPackageServiceProvider::injectMenuSectionItems()) e solo
+                // a dominio acceso. Senza questa riga la sezione esisterebbe
+                // lo stesso, ma in fondo al menu.
+                MenuSection::make(__('Catasto'), [])
+                    ->icon('map')
+                    ->collapsedByDefault(),
+
                 MenuSection::make(__('Admin'), [
                     MenuItem::resource(NovaApp::class)
                         ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
@@ -58,13 +67,13 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                         ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
                 ])->icon('user')
                     ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
-                    ->collapsable()
                     ->collapsedByDefault(),
 
                 MenuSection::make('UGC', [
                     MenuItem::resource(UgcPoi::class),
                     MenuItem::resource(UgcTrack::class),
-                ])->icon('document'),
+                ])->icon('document')
+                    ->collapsedByDefault(),
 
                 MenuSection::make('EC', [
                     MenuItem::resource(EcPoi::class),
@@ -72,7 +81,8 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     MenuItem::resource(Ente::class),
                     MenuItem::resource(Layer::class),
                     MenuItem::resource(FeatureCollection::class),
-                ])->icon('document'),
+                ])->icon('document')
+                    ->collapsedByDefault(),
 
                 MenuSection::make('Taxonomies', [
                     MenuItem::resource(TaxonomyPoiType::class),
@@ -80,13 +90,13 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     MenuItem::resource(NovaTaxonomyTheme::class),
                     MenuItem::resource(TaxonomyWhere::class),
                     MenuItem::resource(TaxonomyWarning::class),
-                ])->icon('document'),
+                ])->icon('document')
+                    ->collapsedByDefault(),
 
                 MenuSection::make(__('Files'), [
                     MenuItem::externalLink(__('Icons'), route('icons.upload.show'))->openInNewTab(),
                 ])->icon('folder')
                     ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
-                    ->collapsable()
                     ->collapsedByDefault(),
 
                 // Sezione Tools: wm-package cerca una MenuSection con questo nome
@@ -95,10 +105,11 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // con icona 'briefcase' — dichiararla qui permette di aggiungere
                 // voci di progetto, mantenendo lo stesso aspetto.
                 //
-                // Attenzione: il package ricostruisce la sezione conservando solo
-                // icon e collapsable, quindi canSee() e collapsedByDefault()
-                // verrebbero scartati. La visibilita' della singola voce va
-                // impostata sul MenuItem, non sulla sezione.
+                // Attenzione: il package ricostruisce la sezione per
+                // accodarvi le proprie voci, e nel farlo conserva icona,
+                // richiudibilita' e stato iniziale ma NON canSee(): la
+                // visibilita' va impostata sul singolo MenuItem, non sulla
+                // sezione.
                 MenuSection::make(__('Tools'), [
                     // Documentazione delle API SUS generata da Scribe (oc:8333),
                     // consegnata a Engineering per l'integrazione con il SUS.
@@ -106,7 +117,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                         ->openInNewTab()
                         ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                 ])->icon('briefcase')
-                    ->collapsable(),
+                    ->collapsedByDefault(),
             ];
         });
     }

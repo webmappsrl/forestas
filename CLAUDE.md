@@ -277,6 +277,13 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
   colonne che nel database non esistevano
 - Lo stub `create_users_table` fa `Schema::table`, non `Schema::create`: il nome
   inganna, pubblicarlo su una tabella esistente e' sicuro
+- Il catasto ha altre due chiavi proprie di questo shard, accanto all'interruttore:
+  `WM_TRAIL_SOURCE_URL_PROPERTY=forestas.url` (dove l'import scrive l'indirizzo della
+  scheda su Drupal) e `WM_TRAIL_SOURCE_LABEL=Drupal` (il nome che compare nel
+  collegamento). **Nel package sono vuote di default** — non presume ne' il nome dello
+  shard ne' che una piattaforma di origine esista: senza di esse la lista delle anomalie
+  perde i collegamenti alla fonte, cioe' il modo con cui il gestore raggiunge la scheda
+  da correggere. Vivono in `.env`, `.env-example`, `.env-deploy` e nel `.env` del server
 - `WM_TRAIL_REGISTRY_ENABLED` va tenuta allineata in **sei** posti, di cui uno
   fuori dal repository: `.env`, `.env-deploy`, `.env-example`, `phpunit.xml`,
   `.env.testing-example` (da cui nasce `.env.testing`, letto dai comandi artisan
