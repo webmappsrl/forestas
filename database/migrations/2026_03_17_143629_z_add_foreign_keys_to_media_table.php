@@ -14,8 +14,8 @@ return new class extends Migration
     public function up()
     {
         Schema::table('media', function (Blueprint $table) {
-            $table->foreign(['app_id'])->references(['id'])->on('apps')->onDelete('CASCADE');
-            $table->foreign(['user_id'])->references(['id'])->on('users')->onDelete('CASCADE');
+            $table->foreign(['app_id'])->references(['id'])->on('apps')->onDelete('cascade');
+            $table->foreign(['user_id'])->references(['id'])->on('users')->onDelete('cascade');
         });
     }
 

@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Spatie\Permission\Models\Role;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 beforeEach(function () {
     Role::findOrCreate('Sus', 'web');
@@ -58,7 +59,7 @@ it('ignora il referrer: non fa parte del contratto SUS', function () {
 });
 
 it('rinnova il token del client SUS', function () {
-    $token = auth('api')->login($this->client);
+    $token = JWTAuth::fromUser($this->client);
 
     $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/sus/auth/refresh')

@@ -42,9 +42,9 @@ class Ente extends Model implements HasMedia
 
     public function getFeatureCollectionMap(): array
     {
-        $name = is_array($this->name)
-            ? ($this->name[app()->getLocale()] ?? $this->name['it'] ?? $this->name['en'] ?? reset($this->name) ?: 'Ente')
-            : ($this->name ?: 'Ente');
+        // HasTranslations risolve `name` nella locale corrente: qui e' una stringa,
+        // mai la mappa di traduzioni grezza.
+        $name = $this->name ?: 'Ente';
 
         return $this->getFeatureCollectionMapFromTrait([
             'tooltip' => $name,

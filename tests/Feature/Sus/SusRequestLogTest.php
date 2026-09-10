@@ -3,13 +3,14 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 it('registra la chiamata al branch SUS senza mai loggare il token', function () {
     Role::findOrCreate('Sus', 'web');
 
     $client = User::factory()->create(['email' => 'sus@example.invalid']);
     $client->assignRole('Sus');
-    $token = auth('api')->login($client);
+    $token = JWTAuth::fromUser($client);
 
     Log::shouldReceive('channel')->with('sus')->andReturnSelf();
     Log::shouldReceive('info')->once()->withArgs(function (string $message, array $context) use ($client, $token) {

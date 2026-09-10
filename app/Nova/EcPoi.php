@@ -28,6 +28,8 @@ class EcPoi extends WmNovaEcPoi
             return [];
         }
 
+        /** @var \App\Models\EcPoi $poi */
+
         $poi = $request->findModelOrFail();
         $sourceId = data_get($poi->properties, 'out_source_feature_id');
         $htmlUrl = data_get($poi->properties, 'forestas.url');

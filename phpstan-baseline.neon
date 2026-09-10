@@ -1,17 +1,107 @@
 parameters:
 	ignoreErrors:
+		# ---------------------------------------------------------------------
+		# NON rimuovere questi is_array(): PHPStan si fida del phpdoc, ma a
+		# runtime il cast `array` di Eloquent fa json_decode e restituisce
+		# quello che la colonna contiene — un JSON scalare produce string, int
+		# o bool, non un array (verificato: '"testo"' -> string 'testo').
+		# Lo stesso vale per gli elementi delle tassonomie, che arrivano
+		# grezzi dall'API di Sardegna Sentieri.
+		# ---------------------------------------------------------------------
 		-
-			message: '#^Undefined variable\: \$this$#'
-			identifier: variable.undefined
-			count: 1
-			path: routes/console.php
+			message: '#^Call to function is_array\(\) with array#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Console/Commands/ImportSardegnaSentieriCommand.php
 
 		-
-			message: '#^Call to an undefined method PHPUnit\\Framework\\TestCase\:\:get\(\)\.$#'
+			message: '#^Call to function is_array\(\) with array#'
+			identifier: function.alreadyNarrowedType
+			count: 4
+			path: app/Services/Import/SardegnaSentieriImportService.php
+
+		# ---------------------------------------------------------------------
+		# Il controllo `instanceof TabsGroup` e' necessario, non morto: il
+		# parent nel wm-package (src/Nova/EcPoi.php) usa Tab::group(), e
+		# TabsGroup estende Panel -> FieldMergeValue, non Field. E' il phpdoc
+		# del package a dichiarare array<Field> in modo impreciso. Rimuovere il
+		# controllo introdurrebbe un bug.
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Instanceof between Laravel\\Nova\\Fields\\Field and Laravel\\Nova\\Tabs\\TabsGroup will always evaluate to false\.$#'
+			identifier: instanceof.alwaysFalse
+			count: 1
+			path: app/Nova/EcPoi.php
+
+		-
+			message: '#^Instanceof between Laravel\\Nova\\Fields\\Field and Laravel\\Nova\\Tabs\\TabsGroup will always evaluate to false\.$#'
+			identifier: instanceof.alwaysFalse
+			count: 1
+			path: app/Nova/EcTrack.php
+
+		# ---------------------------------------------------------------------
+		# NovaTabTranslatable::make() accetta un array di campi, ma eredita da
+		# Field::make(string $name) senza ridichiarare la firma: e' l'API della
+		# libreria Kongulov, non un errore d'uso.
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Parameter \#1 \$name of static method Laravel\\Nova\\Fields\\Field\:\:make\(\) expects string\|Stringable, array#'
+			identifier: argument.type
+			count: 1
+			path: app/Nova/EcPoi.php
+
+		-
+			message: '#^Parameter \#1 \$name of static method Laravel\\Nova\\Fields\\Field\:\:make\(\) expects string\|Stringable, array#'
+			identifier: argument.type
+			count: 1
+			path: app/Nova/EcTrack.php
+
+		-
+			message: '#^Parameter \#1 \$name of static method Laravel\\Nova\\Fields\\Field\:\:make\(\) expects string\|Stringable, array#'
+			identifier: argument.type
+			count: 2
+			path: app/Nova/Ente.php
+
+		# ---------------------------------------------------------------------
+		# Trait di utilita' deliberatamente non ancora usati: sono documentati
+		# in CLAUDE.md come disponibili per le risorse Nova.
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Trait App\\Nova\\Traits\\FiltersUsersByRoleTrait is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Nova/Traits/FiltersUsersByRoleTrait.php
+
+		-
+			message: '#^Trait App\\Nova\\Traits\\HidesAppFromIndexTrait is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Nova/Traits/HidesAppFromIndexTrait.php
+
+		# ---------------------------------------------------------------------
+		# POI_ACTIVITY_VOCABULARIES e' vuota per scelta: il metodo che la itera
+		# resta come predisposizione per un futuro vocabolario di attivita' POI.
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: app/Services/Import/SardegnaSentieriImportService.php
+
+		# ---------------------------------------------------------------------
+		# addMediaFromUrl() vive nel trait InteractsWithMedia, non nell'interfaccia
+		# HasMedia, e un'intersection type non puo' nominare un trait: limite noto
+		# di spatie/laravel-medialibrary.
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model&Spatie\\MediaLibrary\\HasMedia\:\:addMediaFromUrl\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: tests/Feature/ExampleTest.php
+			path: app/Services/Import/SardegnaSentieriMediaSyncService.php
 
+		# ---------------------------------------------------------------------
+		# In expect()->extend() la closure e' legata da Pest a runtime.
+		# ---------------------------------------------------------------------
 		-
 			message: '#^Undefined variable\: \$this$#'
 			identifier: variable.undefined

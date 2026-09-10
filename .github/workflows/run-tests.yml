@@ -38,10 +38,19 @@ jobs:
         uses: ramsey/composer-install@v2
       - name: Generate key
         run: php artisan key:generate
+      # .env.testing non e' versionato (contiene chiavi): la CI se lo genera,
+      # come fa scripts/install.sh sulle macchine dei dev.
+      - name: Prepare testing env
+        run: |
+          cp .env.testing-example .env.testing
+          php artisan key:generate --env=testing --quiet
+          php artisan jwt:secret --env=testing --force --quiet
       - name: Migrate
         run: php artisan migrate
         env:
           PGPASSWORD: ${DB_PASSWORD}
+      - name: Check wm-package stub vs schema DB
+        run: php artisan wm-package:publish-missing-migrations --with=trail_registry --dry-run
       - name: Clear the config cache
         run: php artisan config:clear
       - name: Optimize

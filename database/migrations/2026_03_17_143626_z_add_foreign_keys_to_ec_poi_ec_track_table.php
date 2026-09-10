@@ -14,8 +14,8 @@ return new class extends Migration
     public function up()
     {
         Schema::table('ec_poi_ec_track', function (Blueprint $table) {
-            $table->foreign(['ec_poi_id'])->references(['id'])->on('ec_pois')->onDelete('CASCADE');
-            $table->foreign(['ec_track_id'])->references(['id'])->on('ec_tracks')->onDelete('CASCADE');
+            $table->foreign(['ec_poi_id'])->references(['id'])->on('ec_pois')->onDelete('cascade');
+            $table->foreign(['ec_track_id'])->references(['id'])->on('ec_tracks')->onDelete('cascade');
         });
     }
 

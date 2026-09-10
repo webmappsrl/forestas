@@ -24,7 +24,10 @@ use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
+use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
+use Wm\WmPackage\TrailRegistry\TrailCodeRegistrationOutcome;
+use Wm\WmPackage\TrailRegistry\TrailRegistryService;
 
 class SardegnaSentieriImportService
 {
@@ -101,8 +104,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -132,8 +137,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -163,8 +170,10 @@ class SardegnaSentieriImportService
                     'vocabulary' => $vocabulary,
                 ]);
 
-                if (empty($taxonomy->icon)) {
-                    $taxonomy->icon = $this->resolveIconNameByIdentifier((string) $data['name']);
+                // `icon` esiste in tabella ma non e' dichiarata sui modelli del
+                // package: si passa da get/setAttribute per restare type-safe.
+                if (empty($taxonomy->getAttribute('icon'))) {
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -376,10 +385,15 @@ class SardegnaSentieriImportService
 
     public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
     {
-        $geometry = $this->getGeometryFromGpx($response->gpx);
+        $gpxFailures = [];
+        $geometry = $this->getGeometryFromGpx($response->gpx, $gpxFailures);
 
         if ($geometry === null && $response->geometryFallback !== null) {
             $geometry = $this->convertGeoJsonGeometryToWkt($response->geometryFallback);
+
+            if ($geometry === null) {
+                $gpxFailures[] = 'the GeoJSON fallback geometry could not be converted';
+            }
         }
 
         $data = [
@@ -406,7 +420,11 @@ class SardegnaSentieriImportService
         if ($geometry !== null) {
             $data['geometry'] = $geometry;
         } elseif ($isNew) {
-            throw new \RuntimeException("No GPX geometry available for new track {$externalId}. Import skipped.");
+            throw new \RuntimeException(sprintf(
+                'No usable geometry for new track %d. Import skipped. Reasons: %s',
+                $externalId,
+                $gpxFailures === [] ? 'unknown' : implode('; ', $gpxFailures)
+            ));
         }
 
         $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
@@ -423,31 +441,134 @@ class SardegnaSentieriImportService
         $this->syncTrackWarnings($ecTrack, $response);
         $this->syncTrackType($ecTrack, $response);
 
+        $this->registerTrailRegistryCode($ecTrack);
+
         return $ecTrack;
+    }
+
+    /**
+     * Registra nel catasto il codice del sentiero appena importato.
+     *
+     * E' la stessa regola del comando di normalizzazione, perche' chiama lo
+     * stesso metodo del service: leggere il `ref`, ricavare il settore dalla
+     * geometria, scrivere come assegnato o come conflitto se la posizione e'
+     * gia' presa.
+     *
+     * Non solleva mai: un problema sul codice non deve far perdere
+     * l'aggiornamento di una traccia.
+     */
+    private function registerTrailRegistryCode(EcTrack $ecTrack): void
+    {
+        if (! FeaturesService::isEnabled('trail_registry')) {
+            return;
+        }
+
+        $ref = $ecTrack->properties['ref'] ?? '';
+
+        // Nessun ref, nessun codice. E' anche cio' che taglia fuori gli
+        // itinerari: nessuno dei 147 sui dati reali ne ha uno. Non serve un
+        // controllo separato sul tipo del tracciato.
+        if (trim((string) $ref) === '') {
+            return;
+        }
+
+        try {
+            // La geometria si rilegge dal database: la variabile locale del
+            // metodo puo' essere null quando la traccia esisteva gia' e il GPX
+            // non era disponibile, mentre la riga conserva quella di prima.
+            $row = DB::selectOne(
+                'SELECT ST_AsText(geometry) AS wkt FROM ec_tracks WHERE id = ? AND geometry IS NOT NULL',
+                [$ecTrack->id],
+            );
+
+            if ($row === null) {
+                return;
+            }
+
+            $outcome = app(TrailRegistryService::class)
+                ->registerExistingCode($ecTrack->id, (string) $ref, $row->wkt);
+
+            $this->logTrailRegistryOutcome($ecTrack, (string) $ref, $outcome);
+        } catch (\Throwable $e) {
+            Log::error('Catasto: registrazione del codice fallita', [
+                'ec_track_id' => $ecTrack->id,
+                'ref' => $ref,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Logga solo le anomalie: `alreadyRegistered` e' il caso normale di ogni
+     * re-import (767 tracce a ogni giro) e riempirebbe il log di righe che
+     * nessuno legge.
+     */
+    private function logTrailRegistryOutcome(EcTrack $ecTrack, string $ref, TrailCodeRegistrationOutcome $outcome): void
+    {
+        if (in_array($outcome->status, ['alreadyAssigned', 'sectorMismatch', 'unparsableRef', 'noSector'], true)) {
+            Log::warning('Catasto: anomalia nella registrazione del codice', [
+                'ec_track_id' => $ecTrack->id,
+                'ref' => $ref,
+                'status' => $outcome->status,
+                'full_code' => $outcome->fullCode,
+                // Solo su `alreadyAssigned`: e' il sentiero che quel codice
+                // lo porta gia', l'unico dato che rende il log azionabile
+                // senza dover andare a cercare chi sia.
+                'holder_ec_track_id' => $outcome->holder?->ec_track_id,
+            ]);
+        }
+
+        if ($outcome->sectorMismatch) {
+            Log::warning('Catasto: il settore dedotto dalla geometria non coincide con quello nel codice', [
+                'ec_track_id' => $ecTrack->id,
+                'ref' => $ref,
+                'status' => $outcome->status,
+                'full_code' => $outcome->fullCode,
+            ]);
+        }
     }
 
     /**
      * @param  list<string>  $gpxUrls
      */
-    private function getGeometryFromGpx(array $gpxUrls): ?string
+    /**
+     * @param  array<int, string>  $gpxUrls
+     * @param  array<int, string>  $failures  Collects why each URL was unusable, for error reporting.
+     */
+    private function getGeometryFromGpx(array $gpxUrls, array &$failures = []): ?string
     {
+        if ($gpxUrls === []) {
+            $failures[] = 'the source published no GPX url';
+
+            return null;
+        }
+
         foreach ($gpxUrls as $gpxUrl) {
             try {
                 $gpxContent = $this->client->getGpxContent($gpxUrl);
-                $geometry = $this->parseGpxToWkt($gpxContent);
+            } catch (\Exception $e) {
+                $failures[] = "{$gpxUrl}: download failed ({$e->getMessage()})";
 
-                if ($geometry !== null) {
-                    return $geometry;
-                }
-            } catch (\Exception) {
                 continue;
             }
+
+            $reason = null;
+            $geometry = $this->parseGpxToWkt($gpxContent, $reason);
+
+            if ($geometry !== null) {
+                return $geometry;
+            }
+
+            $failures[] = "{$gpxUrl}: {$reason}";
         }
 
         return null;
     }
 
-    private function parseGpxToWkt(string $gpxContent): ?string
+    /**
+     * @param  string|null  $reason  Set to a human readable explanation when the GPX yields no geometry.
+     */
+    private function parseGpxToWkt(string $gpxContent, ?string &$reason = null): ?string
     {
         // Strip default namespace so SimpleXML can traverse elements without namespace prefix
         $gpxContent = preg_replace('/xmlns\s*=\s*"[^"]*"/', '', $gpxContent, 1) ?? $gpxContent;
@@ -455,6 +576,8 @@ class SardegnaSentieriImportService
         $xml = simplexml_load_string($gpxContent);
 
         if ($xml === false) {
+            $reason = 'the file is not valid XML';
+
             return null;
         }
 
@@ -462,26 +585,48 @@ class SardegnaSentieriImportService
 
         foreach ($xml->trk as $trk) {
             foreach ($trk->trkseg as $seg) {
-                $points = [];
+                $points = $this->gpxPointsToCoordinates($seg->trkpt);
 
-                foreach ($seg->trkpt as $pt) {
-                    $lon = (float) $pt['lon'];
-                    $lat = (float) $pt['lat'];
-                    $ele = isset($pt->ele) ? (float) $pt->ele : 0.0;
-                    $points[] = "{$lon} {$lat} {$ele}";
-                }
-
-                if (! empty($points)) {
+                if (count($points) >= 2) {
                     $segments[] = '('.implode(', ', $points).')';
                 }
             }
         }
 
+        // Some sources publish the itinerary as a route (<rte>/<rtept>) instead of
+        // a track (<trk>/<trkseg>/<trkpt>) — typically GPX converted from KML.
+        foreach ($xml->rte as $rte) {
+            $points = $this->gpxPointsToCoordinates($rte->rtept);
+
+            if (count($points) >= 2) {
+                $segments[] = '('.implode(', ', $points).')';
+            }
+        }
+
         if (empty($segments)) {
+            $reason = 'the GPX contains no <trk> or <rte> with at least two points';
+
             return null;
         }
 
         return 'MULTILINESTRING Z ('.implode(', ', $segments).')';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function gpxPointsToCoordinates(\SimpleXMLElement $gpxPoints): array
+    {
+        $points = [];
+
+        foreach ($gpxPoints as $pt) {
+            $lon = (float) $pt['lon'];
+            $lat = (float) $pt['lat'];
+            $ele = isset($pt->ele) ? (float) $pt->ele : 0.0;
+            $points[] = "{$lon} {$lat} {$ele}";
+        }
+
+        return $points;
     }
 
     private function syncFromTo(EcTrack $ecTrack, ApiTrackResponse $response): void
@@ -565,8 +710,8 @@ class SardegnaSentieriImportService
         if (! $activity->exists) {
             $activity->setTranslation('name', 'it', ucfirst($response->type));
         }
-        if (empty($activity->icon)) {
-            $activity->icon = $this->resolveIconNameByIdentifier($identifier);
+        if (empty($activity->getAttribute('icon'))) {
+            $activity->setAttribute('icon', $this->resolveIconNameByIdentifier($identifier));
         }
         $activity->saveQuietly();
 
@@ -805,7 +950,11 @@ class SardegnaSentieriImportService
 
             $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
             $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
-            $ente->contatti = $contatti;
+            if ($contatti !== null) {
+                // Campo translatable come name e description: assegnarlo come
+                // stringa nuda popolerebbe solo la locale corrente.
+                $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
+            }
             $ente->pagina_web = $paginaWeb;
             if ($description !== null && $description !== '') {
                 $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
@@ -824,7 +973,7 @@ class SardegnaSentieriImportService
             $ente->properties = null;
             $ente->saveQuietly();
 
-            if ($featureImageUrl !== null && $this->mediaSync !== null) {
+            if ($featureImageUrl !== null) {
                 $this->mediaSync->syncImportedImages($ente, [
                     ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
                 ]);
@@ -983,26 +1132,26 @@ class SardegnaSentieriImportService
     }
 
     private const ICON_FALLBACK_MAP = [
-        'crossroads'                   => 'txn-guidepost',
-        'places-of-transhumance'       => 'txn-horse',
-        'monumental-tree'              => 'txn-olive-tree',
-        'natural-sprin'                => 'txn-spring',
-        'natural-spring'               => 'txn-spring',
-        'foresteria'                   => 'txn-lodging',
-        'natural-cave-entrance'        => 'txn-cave-entrance',
-        'rifugio'                      => 'refuge',
-        'natural-wood'                 => 'txn-natural',
-        'coast-seaside'                => 'txn-beach',
-        'nature'                       => 'txn-park',
-        'natural-park'                 => 'txn-park-alt',
-        'archaeological-site'          => 'txn-ruins',
-        'public-transport'             => 'txn-bus',
-        'tlc'                          => 'communications-tower',
-        'disabled-access'              => 'txn-wheelchair',
-        'sardegnasentieri:type:sentiero'    => 'txn-hiking',
-        'sardegnasentieri:type:itinerario'  => 'txn-trail',
-        'accessible-trails'            => 'txn-mobility-disability',
-        'educational-trails'           => 'txn-environmental-education',
+        'crossroads' => 'txn-guidepost',
+        'places-of-transhumance' => 'txn-horse',
+        'monumental-tree' => 'txn-olive-tree',
+        'natural-sprin' => 'txn-spring',
+        'natural-spring' => 'txn-spring',
+        'foresteria' => 'txn-lodging',
+        'natural-cave-entrance' => 'txn-cave-entrance',
+        'rifugio' => 'refuge',
+        'natural-wood' => 'txn-natural',
+        'coast-seaside' => 'txn-beach',
+        'nature' => 'txn-park',
+        'natural-park' => 'txn-park-alt',
+        'archaeological-site' => 'txn-ruins',
+        'public-transport' => 'txn-bus',
+        'tlc' => 'communications-tower',
+        'disabled-access' => 'txn-wheelchair',
+        'sardegnasentieri:type:sentiero' => 'txn-hiking',
+        'sardegnasentieri:type:itinerario' => 'txn-trail',
+        'accessible-trails' => 'txn-mobility-disability',
+        'educational-trails' => 'txn-environmental-education',
     ];
 
     private function resolveIconNameByIdentifier(string $identifier): ?string

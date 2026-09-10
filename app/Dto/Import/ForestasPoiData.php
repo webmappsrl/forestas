@@ -64,7 +64,7 @@ readonly class ForestasPoiData
         }
 
         $result = [];
-        foreach (array_values($list) as $i => $value) {
+        foreach ($list as $i => $value) {
             $result[(string) $i] = $value;
         }
 

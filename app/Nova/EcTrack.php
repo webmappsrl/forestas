@@ -68,6 +68,8 @@ class EcTrack extends WmNovaEcTrack
             return [];
         }
 
+        /** @var \App\Models\EcTrack $track */
+
         $track = $request->findModelOrFail();
         $card = new EcTrackApiLinksCard($track);
 

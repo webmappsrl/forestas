@@ -113,6 +113,25 @@ docker run --rm \
     php artisan key:generate
 ok "APP_KEY generata."
 
+# ─── ambiente di test ────────────────────────────────────────────────────────
+# .env.testing non e' versionato: contiene chiavi, e un segreto in un file
+# tracciato finisce su un repo pubblico (oc:8333). Il modello lo e'.
+step ".env.testing"
+
+if [ -f .env.testing ]; then
+    warn ".env.testing già presente, skip."
+else
+    cp .env.testing-example .env.testing
+    docker run --rm \
+        --network "$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')_default" \
+        -v "$PWD:/var/www/html/${DIR_NAME}" \
+        -v "$(dirname "$PWD")/wm-package:/var/www/html/wm-package" \
+        -w "/var/www/html/${DIR_NAME}" \
+        wm-phpfpm:8.4 \
+        sh -c "php artisan key:generate --env=testing --quiet && php artisan jwt:secret --env=testing --force --quiet"
+    ok ".env.testing creato con chiavi locali."
+fi
+
 step "Publish migrations (wm-package)"
 docker run --rm \
     --network "$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')_default" \

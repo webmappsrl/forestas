@@ -44,6 +44,8 @@ class TaxonomyWarning extends AbstractTaxonomyResource
             return [];
         }
 
+        /** @var \App\Models\TaxonomyWarning $model */
+
         $model = $request->findModelOrFail();
         $sourceId = data_get($model->properties, 'source_id');
 

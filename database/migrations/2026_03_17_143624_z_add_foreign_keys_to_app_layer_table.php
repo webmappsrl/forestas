@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('layer_associated_app', function (Blueprint $table) {
-            $table->foreign(['layer_id'])->references(['id'])->on('layers')->onDelete('CASCADE');
+            $table->foreign(['layer_id'])->references(['id'])->on('layers')->onDelete('cascade');
         });
     }
 

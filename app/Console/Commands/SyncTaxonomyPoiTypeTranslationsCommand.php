@@ -143,7 +143,7 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
             return $path;
         }
 
-        $fromEnv = env('TAXONOMY_POI_TYPES_DICTIONARY');
+        $fromEnv = config('forestas.taxonomy_poi_types_dictionary');
         if (is_string($fromEnv) && $fromEnv !== '' && is_readable($fromEnv)) {
             return $fromEnv;
         }

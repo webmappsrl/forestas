@@ -54,8 +54,13 @@ docker exec -it php-${APP_NAME} php artisan optimize
 docker exec -it php-${APP_NAME} php artisan vendor:publish --tag=wm-package-migrations
 docker exec -it php-${APP_NAME} php artisan migrate
 
-# 3-bis. Database di test (una volta per ambiente). Il file .env.testing e'
-# versionato, quindi non va creato: serve solo il database.
+# 3-bis. Ambiente di test. Il file .env.testing NON e' versionato (contiene
+# chiavi): lo crea install.sh, oppure a mano dal modello .env.testing-example.
+cp .env.testing-example .env.testing
+docker exec -it php-${APP_NAME} php artisan key:generate --env=testing --quiet
+docker exec -it php-${APP_NAME} php artisan jwt:secret --env=testing --force --quiet
+
+# Database di test (una volta per ambiente).
 docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d postgres -c "CREATE DATABASE forestas_testing;"
 docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d forestas_testing -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 
@@ -207,12 +212,16 @@ Variabili d'ambiente di testing definite in `phpunit.xml`.
 ### Regole obbligatorie per i test
 
 **L'isolamento e' ora garantito** (oc:8333): `phpunit.xml` imposta
-`DB_DATABASE=forestas_testing` e `.env.testing` (versionato) punta allo stesso
-database. `RefreshDatabase` e' attivo sui test in `tests/Feature`.
+`DB_DATABASE=forestas_testing` e `.env.testing` (non versionato, generato dal
+modello `.env.testing-example`) punta allo stesso database. `RefreshDatabase`
+e' attivo sui test in `tests/Feature`.
 
 Resta comunque obbligatorio, prima di lanciare la suite:
 
 1. Verificare che `phpunit.xml` e `.env.testing` puntino a `forestas_testing`.
+   Se `.env.testing` manca, crearlo dal modello (vedi Setup progetto, passo
+   3-bis): senza di esso i test girano comunque, ma senza `JWT_SECRET`, e i
+   test che firmano un token falliscono in modo poco leggibile.
 2. Verificare che il database `forestas_testing` esista sulla macchina (vedi
    Setup progetto, passo 3-bis): se non esiste i test falliscono con
    "database does not exist", non ricadono sul DB reale.
@@ -250,10 +259,115 @@ Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
 
 | Feature | Ticket | Moduli toccati | Note |
 |---|---|---|---|
+| Catasto Sentieri: codice REI | oc:8489 | `app/Services/Import/SardegnaSentieriImportService.php`, `app/Providers/NovaServiceProvider.php`, `routes/console.php`, `database/migrations/`, `.env*` | Accende il dominio `trail_registry` del package: l'import registra il codice del sentiero appena importato, la sincronizzazione notturna riallinea a Drupal e ricostruisce le anomalie, il menu ha la sezione `Catasto`. Dettaglio in `docs/features/8489-identificazione-automatica-sentiero-codice-rei/` e, per il dominio, in `wm-package/docs/resources/TrailRegistry.md` |
 | Branch API SUS | oc:8333 | `routes/sus.php`, `app/Http/Controllers/Api/Sus/`, `app/Http/Middleware/`, `config/logging.php`, `config/scramble.php`, `wm-package/routes/api.php` | Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo scaffolding: nessuna logica di business |
+| Adozione gate stub wm-package + dominio trail_registry | oc:8492 | `.github/workflows/run-tests.yml`, `.env-deploy`, `.env-example`, `phpunit.xml`, `database/migrations/` | Forestas e' il secondo repo (dopo maphub) con `publish-missing-migrations --dry-run` in CI. Dichiara l'adesione al dominio opzionale del Catasto Sentieri |
 | Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
 
 ## Decisioni architetturali
+
+### Catasto Sentieri: codice REI (oc:8489)
+
+**Fonte di verita':** `wm-package/docs/resources/TrailRegistry.md` per il dominio,
+`docs/features/8489-identificazione-automatica-sentiero-codice-rei/notes.md` per
+le decisioni prese durante la lavorazione.
+
+- **Nel registro dei codici entrano solo i codici su cui non pende alcun
+  dubbio.** Un sentiero che ha un'anomalia non ha una riga: il registro e'
+  l'elenco di cio' che e' deciso, `trail_registry_anomalies` e' cio' che resta
+  da decidere. Verifica: una join fra le due tabelle su `ec_track_id` deve
+  tornare zero
+- **Le anomalie raccolgono solo chi e' rimasto SENZA numero** e dovrebbe
+  averlo. Non e' un registro di imperfezioni: un codice scritto nel nome invece
+  che nel campo dedicato non e' un'anomalia — si legge, si registra, e la
+  colonna `origin` dice da dove viene. Cio' che si puo' risolvere si risolve,
+  cosi' la lista resta corta abbastanza da essere letta davvero
+- **La condizione di go-live** non e' piu' «zero righe in conflitto nel
+  registro» (stato che non esiste piu'), ma
+  `select count(*) from trail_registry_anomalies where type='codice_gia_assegnato'`
+- **`SardegnaSentieriImportService` non e' stato parametrizzato** sul nome del
+  campo che porta il codice, ed e' una scelta: e' custom di questo progetto, in
+  un altro shard non esiste, ed e' proprio lui a DECIDERE come si chiama quella
+  chiave scrivendo `properties['ref']`. La parametrizzazione serve a chi la
+  legge senza saperla in anticipo — il comando del package, dove infatti c'e'.
+  **Se un domani quella chiave cambiasse nome, va aggiornata di conseguenza
+  `WM_TRAIL_LEGACY_CODE_PROPERTY`**, altrimenti il comando cerca la chiave
+  vecchia e non trova piu' nulla
+- **La sincronizzazione notturna e' un troncamento**, e per vincolo a cascata
+  porta via anche cio' che non viene da Drupal: la storia dei cambi di stato dei
+  codici e le istanze. Oggi non morde — le istanze sono zero e il loro flusso
+  arriva con oc:8490 e oc:8491 — ma **dal giorno in cui su collaudo si provera'
+  a presentare un'istanza, ogni notte la si ritrovera' cancellata**. A quel
+  punto la sincronizzazione va cambiata: non piu' troncamento totale, ma
+  rimozione dei soli tracciati spariti alla fonte
+- **`SARDEGNASENTIERI_DAILY_RESET` decide chi fa il troncamento notturno, non
+  `APP_ENV`.** Il nome dell'ambiente non discrimina: i server si chiamano
+  `develop` e `production`, con il collaudo che gira come `production` perche'
+  una produzione vera non esiste ancora. Legare il troncamento a quei nomi
+  significherebbe che la produzione, il giorno che nascera', eredita la regola e
+  si cancella i dati ogni notte. (La condizione precedente cercava `staging`,
+  che non e' il nome di nessuno dei due: **il ramo con `--reset` non e' mai
+  scattato**)
+- **L'import orario non cancella**: marca i record spariti alla fonte con
+  `properties->forestas->deleted_from_source = true`. E' il motivo per cui
+  serviva comunque un troncamento per avere lo specchio esatto di Drupal — e
+  anche la strada per farne a meno, se un giorno si volesse escludere dal
+  catasto i marcati invece di distruggere tutto
+- **Il `--reset` di `sardegnasentieri:import` fa `TRUNCATE ... CASCADE` globale**
+  su `ec_tracks`, `ec_pois` e le tassonomie, non una cancellazione selettiva per
+  `app_id`. Il piano che lo ha introdotto
+  (`.claude/plans/sardegnasentieri-reset-and-reimport.md`) prescriveva l'opposto,
+  con un anti-pattern esplicito. Su forestas e' innocuo — l'app e' una sola —
+  ma diventerebbe un problema se il database ospitasse piu' app
+- **Nessuna Resource `Sentiero`**: sarebbe un doppione del Registro dei codici,
+  che mostra gia' codice, denominazione e collegamento al sentiero. Ne e' stata
+  scritta anche una versione astratta, che selezionava i tracciati con un codice
+  assegnato invece di filtrare per tassonomia, e rimossa per la stessa ragione
+- **Le sei tracce senza tipo non si toccano**: hanno tutte un `ref` e cinque
+  hanno gia' il codice. Da quando il catasto guarda il codice e non il tipo, il
+  tipo mancante non nasconde piu' niente
+
+### Adozione gate stub wm-package (oc:8492)
+- Il gate `publish-missing-migrations --dry-run` era attivo in **1 repo su 16**
+  (solo maphub, da oc:8218). Forestas e' il secondo: non e' la coda del ticket
+  del package ma il primo passo per farne uno standard
+- Accenderlo ha richiesto di sanare due disallineamenti pregressi, **estranei al
+  catasto**: `create_users_table` (colonne `balance`, `fiscal_code`, `app_id`) e
+  `zz_2026_07_27_000001_add_surname_to_users_table`. Erano un bug latente, non
+  solo igiene: `User::$fillable` del package dichiara `surname` e `app_id`, e la
+  rotta `POST /wallet/buy` (`wm-package/routes/api.php`) legge `users.balance` —
+  colonne che nel database non esistevano
+- Lo stub `create_users_table` fa `Schema::table`, non `Schema::create`: il nome
+  inganna, pubblicarlo su una tabella esistente e' sicuro
+- Il catasto ha altre due chiavi proprie di questo shard, accanto all'interruttore:
+  `WM_TRAIL_SOURCE_URL_PROPERTY=forestas.url` (dove l'import scrive l'indirizzo della
+  scheda su Drupal) e `WM_TRAIL_SOURCE_LABEL=Drupal` (il nome che compare nel
+  collegamento). **Nel package sono vuote di default** — non presume ne' il nome dello
+  shard ne' che una piattaforma di origine esista: senza di esse la lista delle anomalie
+  perde i collegamenti alla fonte, cioe' il modo con cui il gestore raggiunge la scheda
+  da correggere. Vivono in `.env`, `.env-example`, `.env-deploy` e nel `.env` del server
+- `WM_TRAIL_REGISTRY_ENABLED` va tenuta allineata in **sei** posti, di cui uno
+  fuori dal repository: `.env`, `.env-deploy`, `.env-example`, `phpunit.xml`,
+  `.env.testing-example` (da cui nasce `.env.testing`, letto dai comandi artisan
+  lanciati con `--env=testing`, dove `phpunit.xml` non arriva) e il `.env` del
+  server. Solo i primi cinque si vedono in un diff
+- **Se un giorno il dominio va spento**, va tolto anche `--with=trail_registry`
+  dallo step di CI: `--with` e' indipendente dall'interruttore e continuerebbe a
+  pretendere gli stub di un dominio deliberatamente disattivato, lasciando la
+  pipeline rossa senza una via d'uscita evidente
+- **Se il Catasto Sentieri smette di rispondere senza motivo apparente, la causa
+  va cercata qui per prima.** `scripts/deploy_prod.sh` esegue `php artisan
+  optimize`, che congela la configurazione: se il `.env` del server perde quella
+  chiave, route e Nova resource del catasto spariscono mentre la tabella resta
+  piena di dati, e il SUS riceve 404. Una verifica automatica al deploy e' stata
+  valutata e scartata: rischio accettato consapevolmente
+- Lo step di CI e' copiato verbatim da maphub tranne `--with=trail_registry`,
+  che non e' necessario (il flag in `.env-deploy` basta) ma rende leggibile cosa
+  quello step controlla. `--with` puo' solo aggiungere domini alla verifica, mai
+  toglierne
+- Gli stub di un dominio opzionale **non** si pubblicano con `vendor:publish`
+  (la scoperta delle migration di Spatie non e' ricorsiva): serve
+  `publish-migration trail_registry/<stub>`. Riguardera' oc:8489
 
 ### Gestione del client SUS (oc:8333)
 - **Creazione e rotazione si fanno da Nova**, non da comandi artisan: il

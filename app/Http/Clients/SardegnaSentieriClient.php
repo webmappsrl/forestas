@@ -84,7 +84,10 @@ class SardegnaSentieriClient
     /**
      * Get taxonomy vocabulary
      *
-     * @return array<int, array<string, mixed>>
+     * Le chiavi sono gli id dei termini: numerici nel JSON, quindi PHP li
+     * converte in int, ma il chiamante li tratta come stringhe.
+     *
+     * @return array<int|string, array<string, mixed>>
      *
      * @throws ConnectionException
      */
@@ -151,7 +154,7 @@ class SardegnaSentieriClient
     /**
      * Get warning type taxonomy: {id: {vid, name: {it, en}, parent}, ...}
      *
-     * @return array<string, array<string, mixed>>
+     * @return array<int|string, array<string, mixed>>
      *
      * @throws ConnectionException
      */
