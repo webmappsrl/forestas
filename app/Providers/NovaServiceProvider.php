@@ -52,7 +52,15 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // (WmPackageServiceProvider::injectMenuSectionItems()) e solo
                 // a dominio acceso. Senza questa riga la sezione esisterebbe
                 // lo stesso, ma in fondo al menu.
-                MenuSection::make(__('Catasto'), [])
+                MenuSection::make(__('Catasto'), [
+                    // Documentazione delle API SUS generata da Scribe (oc:8333),
+                    // consegnata a Engineering per l'integrazione con il SUS.
+                    // Sta qui e non piu' fra gli strumenti: e' la stessa
+                    // materia del catasto — le istanze arrivano da quelle API.
+                    MenuItem::externalLink(__('Documentazione API SUS'), url('/docs/api/sus'))
+                        ->openInNewTab()
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
+                ])
                     ->icon('map')
                     ->collapsedByDefault(),
 
@@ -110,13 +118,8 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // richiudibilita' e stato iniziale ma NON canSee(): la
                 // visibilita' va impostata sul singolo MenuItem, non sulla
                 // sezione.
-                MenuSection::make(__('Tools'), [
-                    // Documentazione delle API SUS generata da Scribe (oc:8333),
-                    // consegnata a Engineering per l'integrazione con il SUS.
-                    MenuItem::externalLink(__('SUS API documentation'), url('/docs/api/sus'))
-                        ->openInNewTab()
-                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
-                ])->icon('briefcase')
+                MenuSection::make(__('Tools'), [])
+                    ->icon('briefcase')
                     ->collapsedByDefault(),
             ];
         });
