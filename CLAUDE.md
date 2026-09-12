@@ -1,429 +1,91 @@
-# Laravel PostGIS Boilerplate — CLAUDE.md
+# Forestas — CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Backend Laravel per FoReSTAS (Sardegna). Stack: Laravel 12, PHP 8.4 nel container (`composer.json`
+richiede `^8.2`), PostgreSQL + PostGIS, Nova 5.7.6, Elasticsearch 8, Redis, Horizon.
 
-Stack: Laravel 12, PHP 8.4, PostgreSQL + PostGIS, Nova 5, Elasticsearch 8, Redis, Horizon.
+## Regole che precedono tutte le altre
 
-## Comandi utili
+**Non eseguire mai `git commit` senza istruzione esplicita dell'utente.** Implementa, testa, poi
+fermati: è l'utente che controlla il codice e committa. Vale anche per i subagent, che vanno
+istruiti esplicitamente a non committare.
+
+**Il DB reale contiene dati importati da processi lunghi: distruggerli è inaccettabile.** Prima di
+lanciare la suite va verificato l'isolamento; se non è verificabile, non si lancia e si chiede
+consenso. Le condizioni da controllare sono in [.claude/rules/test.md](.claude/rules/test.md), e
+valgono anche per i subagent.
+
+**Non ruotare mai `JWT_SECRET` per revocare un token.** Sembra la soluzione ovvia, ma invalida i
+token di *tutti* gli utenti della piattaforma, non solo del client SUS. Un singolo token si revoca
+con `JWTAuth::invalidate()` (snippet qui sotto).
+
+## Comandi
 
 ```bash
-# Formattazione codice
-composer format
+composer format                                  # formattazione codice
+composer dev                                     # ambiente locale (serve + horizon + pail + vite)
+vendor/bin/pest                                  # test — leggi prima .claude/rules/test.md
+vendor/bin/pest --filter=<nome-test>
+vendor/bin/phpstan analyse                       # livello 5, baseline in phpstan-baseline.neon
 
-# Revocare il token del client SUS (oc:8333) — NON ruotare JWT_SECRET
-docker exec -it php-${APP_NAME} php artisan tinker --execute="
+# i container sono <servizio>-forestas: il suffisso viene da APP_NAME nel .env
+docker exec -it php-forestas bash
+docker exec -it php-forestas php artisan <comando>
+
+php artisan vendor:publish --tag=wm-package-migrations   # migrazioni del package
+
+# Revocare il token del client SUS — NON ruotare JWT_SECRET
+docker exec -it php-forestas php artisan tinker --execute="
 \Tymon\JWTAuth\Facades\JWTAuth::setToken('<token-da-revocare>')->invalidate(true);
 "
-
-# Avvio ambiente locale completo (serve + horizon + pail + vite)
-composer dev
-
-# Entrare nel container PHP
-docker exec -it php-${APP_NAME} bash
-
-# Eseguire un comando artisan senza entrare nel container
-docker exec -it php-${APP_NAME} php artisan <comando>
-
-# Test (Pest)
-vendor/bin/pest
-vendor/bin/pest --filter=<nome-test>
-
-# PHPStan
-vendor/bin/phpstan analyse
-
-# Pubblicare migrazioni dal wm-package
-php artisan vendor:publish --tag=wm-package-migrations
 ```
 
-## Setup progetto
-
-Usare lo script `scripts/install.sh` per l'installazione guidata completa, oppure manualmente:
-
-```bash
-# 1. Configurare .env (copiare da .env-example)
-cp .env-example .env
-# Modificare: APP_NAME, DOCKER_PHP_PORT, DOCKER_PROJECT_DIR_NAME
-
-# 2. Avviare Docker
-bash docker/init-docker.sh
-
-# 3. Installare dipendenze e configurare Laravel
-docker exec -it php-${APP_NAME} composer install
-docker exec -it php-${APP_NAME} php artisan key:generate
-docker exec -it php-${APP_NAME} php artisan optimize
-docker exec -it php-${APP_NAME} php artisan vendor:publish --tag=wm-package-migrations
-docker exec -it php-${APP_NAME} php artisan migrate
-
-# 3-bis. Ambiente di test. Il file .env.testing NON e' versionato (contiene
-# chiavi): lo crea install.sh, oppure a mano dal modello .env.testing-example.
-cp .env.testing-example .env.testing
-docker exec -it php-${APP_NAME} php artisan key:generate --env=testing --quiet
-docker exec -it php-${APP_NAME} php artisan jwt:secret --env=testing --force --quiet
-
-# Database di test (una volta per ambiente).
-docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d postgres -c "CREATE DATABASE forestas_testing;"
-docker exec -i postgres-${APP_NAME} psql -U ${DB_USERNAME} -d forestas_testing -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-
-# 4. Creare ruoli base
-docker exec -it php-${APP_NAME} php artisan tinker --execute="
-foreach (['Administrator', 'Editor', 'Validator', 'Guest', 'Contributor', 'Sus'] as \$name) {
-    \Spatie\Permission\Models\Role::firstOrCreate(['name' => \$name, 'guard_name' => 'web']);
-}
-"
-
-# 5. Creare utente Administrator
-docker exec -it php-${APP_NAME} php artisan nova:user
-```
-
-## Ambienti Docker
-
-Il progetto ha tre file compose con scopi distinti:
-
-| File | Scopo |
-|------|-------|
-| `compose.yml` | Base condivisa (prod). Non si usa direttamente. |
-| `develop.compose.yml` | Sviluppo locale con nginx/proxy. Aggiunge minio, mailpit. |
-| `local.compose.yml` | Sviluppo locale standalone con `php artisan serve`. Aggiunge scout-init, kibana, laravel server. |
-
-```bash
-# Produzione
-docker compose up -d
-
-# Sviluppo (con nginx)
-docker compose -f develop.compose.yml up -d
-
-# Sviluppo standalone (senza nginx)
-docker compose -f local.compose.yml up -d
-```
-
-### Convenzioni container name
-
-I container usano trattino come separatore: `php-${APP_NAME}`, `postgres-${APP_NAME}`, `horizon-${APP_NAME}`, `minio-${APP_NAME}`.
-
-## Stack Elasticsearch
-
-La sequenza di avvio è: `elasticsearch` → `elasticsearch-init` → `kibana`.
-
-`elasticsearch-init` è un container curl one-shot che imposta la password di `kibana_system` via API (Elasticsearch non supporta variabili d'ambiente per questo utente). Si rimuove automaticamente dopo l'esecuzione.
-
-`scout-init` (solo `local.compose.yml`) esegue `scout:import` sui modelli di wm-package dopo che Elasticsearch e il database sono pronti.
-
-Variabili `.env` rilevanti:
-```
-ELASTICSEARCH_HOST=elasticsearch:9200
-ELASTICSEARCH_USER=elastic
-ELASTICSEARCH_PASSWORD=changeme
-ELASTICSEARCH_SSL_VERIFICATION=false
-DOCKER_KIBANA_PORT=5601
-```
-
-## Nova
-
-### Gate
-
-`NovaServiceProvider::gate()` blocca i Guest da Nova:
-```php
-return !$user->hasRole('Guest');
-```
-
-### Menu
-
-Il menu è strutturato per sezioni in `NovaServiceProvider::boot()`. Le sezioni Admin e Media sono visibili solo agli Administrator. Aggiungere nuove sezioni dopo quella Media.
-
-### Traits disponibili (`app/Nova/Traits/`)
-
-- `FiltersUsersByRoleTrait` — filtra gli utenti relatibili per ruolo (Administrator/Validator)
-- `HidesAppFromIndexTrait` — nasconde il campo `app` dalla lista index
-
-### Footer
-
-Il footer Nova viene renderizzato da `resources/views/nova/footer.blade.php` e mostra: nome app, versione, environment, versioni di Nova/Laravel/PHP.
-
-### Estensione risorse wm-package
-
-Le risorse Nova nel progetto estendono quelle del wm-package. Pattern:
-```php
-namespace App\Nova;
-
-use Wm\WmPackage\Nova\App as WmNovaApp;
-
-class App extends WmNovaApp {}
-```
-
-Questo permette di personalizzare label, campi, o aggiungere funzionalità mantenendo la logica base nel package.
-
-## Ruoli e Permessi
-
-Il sistema usa spatie/laravel-permission tramite wm-package. Ruoli predefiniti:
-- **Administrator** — accesso completo a Nova, gestione utenti e app
-- **Editor** — creazione e modifica contenuti
-- **Validator** — validazione UGC
-- **Guest** — solo lettura, NO accesso a Nova (bloccato dal gate)
-
-Le policy di Role e Permission sono registrate in `AppServiceProvider::boot()`. Per aggiungere policy progetto-specifiche:
-```php
-Gate::policy(MyModel::class, MyModelPolicy::class);
-```
-
-## PHPStan
-
-```bash
-vendor/bin/phpstan analyse
-```
-
-Configurazione in `phpstan.neon.dist`. La baseline è `phpstan-baseline.neon`. Livello 5.
-
-## MinIO e Storage
-
-MinIO è disponibile negli ambienti di sviluppo per simulare S3. Endpoint: `http://localhost:${FORWARD_MINIO_PORT}` (default 9000). Console: port 8900.
-
-Credenziali default: `laravel` / `laravelminio`. Bucket: `wmfe`.
-
-Il sistema di icone globale è gestito tramite `GlobalFileHelper` (wm-package) che carica e mantiene aggiornato `icons.json` in MinIO.
-
-## Import dati
-
-**Forestas usa un import custom da Sardegna Sentieri (piattaforma Drupal), non l'import standard da GeoHub.**
-
-- Comando: `sardegnasentieri:import` (`app/Console/Commands/ImportSardegnaSentieriCommand.php`)
-- Service: `app/Services/Import/SardegnaSentieriImportService.php` — importa tassonomie (poi types, activities), POI e Track direttamente dalle API di `sardegnasentieri.it`
-- Client HTTP: `app/Http/Clients/SardegnaSentieriClient.php`
-- Job asincroni: `app/Jobs/Import/ImportSardegnaSentieriPoiJob.php`, `ImportSardegnaSentieriTrackJob.php`
-- Forestas ha una sola app (id 1, costante `SardegnaSentieriImportService::IMPORT_APP_ID`)
-
-**Il flusso di import da GeoHub presente in wm-package (`ImportTaxonomyActivityJob`, `ImportTaxonomyJob`, `wm-geohub-import.php`, ecc.) non è usato in questo progetto — va ignorato quando si indaga su bug di import in Forestas.** Se un bug riguarda tassonomie/POI/track importati, la causa va cercata in `SardegnaSentieriImportService`, non nei job GeoHub del package.
-
-## Testing
-
-Il progetto usa Pest. Configurazione in `phpunit.xml`:
-```bash
-# Eseguire tutti i test
-vendor/bin/pest
-
-# Eseguire un file specifico
-vendor/bin/pest tests/Feature/EsempioTest.php
-
-# Con filtro
-vendor/bin/pest --filter=nome_test
-```
-
-Variabili d'ambiente di testing definite in `phpunit.xml`.
-
-### Regole obbligatorie per i test
-
-**L'isolamento e' ora garantito** (oc:8333): `phpunit.xml` imposta
-`DB_DATABASE=forestas_testing` e `.env.testing` (non versionato, generato dal
-modello `.env.testing-example`) punta allo stesso database. `RefreshDatabase`
-e' attivo sui test in `tests/Feature`.
-
-Resta comunque obbligatorio, prima di lanciare la suite:
-
-1. Verificare che `phpunit.xml` e `.env.testing` puntino a `forestas_testing`.
-   Se `.env.testing` manca, crearlo dal modello (vedi Setup progetto, passo
-   3-bis): senza di esso i test girano comunque, ma senza `JWT_SECRET`, e i
-   test che firmano un token falliscono in modo poco leggibile.
-2. Verificare che il database `forestas_testing` esista sulla macchina (vedi
-   Setup progetto, passo 3-bis): se non esiste i test falliscono con
-   "database does not exist", non ricadono sul DB reale.
-3. Se l'isolamento non e' verificabile, NON lanciare i test — chiedere consenso
-   esplicito all'utente.
-4. Questa regola vale anche per i subagent: istruirli esplicitamente a non
-   lanciare test senza verifica isolamento.
-
-**Il DB reale contiene dati importati da processi lunghi — distruggerli è inaccettabile.**
-
-## Regole operative
-
-### Commit
-
-**Non eseguire mai `git commit` senza istruzione esplicita dell'utente.** Implementa, testa, poi fermati. È l'utente che controlla il codice e committa. Questa regola vale anche per i subagent: istruirli sempre a non committare.
-
-### wm-package CLAUDE.md
-
-Leggere sempre `wm-package/CLAUDE.md` quando si lavora su codice che tocca il package.
-
-## wm-package (submodule)
-
-Il progetto dipende da `wm/wm-package` come path repository (submodule Git in `../wm-package` o `vendor/wm/wm-package`).
-
-Il package fornisce:
-- Modelli base (User, EcTrack, EcPoi, UgcTrack, UgcPoi, Layer, App)
-- Risorse Nova base
-- Policy Role/Permission
-- Comandi artisan personalizzati
-- Migrazioni (da pubblicare con `--tag=wm-package-migrations`)
-
-Quando si modifica il wm-package, ricordare che è condiviso tra progetti.
-
-## Feature disponibili
-
-| Feature | Ticket | Moduli toccati | Note |
-|---|---|---|---|
-| Catasto Sentieri: codice REI | oc:8489 | `app/Services/Import/SardegnaSentieriImportService.php`, `app/Providers/NovaServiceProvider.php`, `routes/console.php`, `database/migrations/`, `.env*` | Accende il dominio `trail_registry` del package: l'import registra il codice del sentiero appena importato, la sincronizzazione notturna riallinea a Drupal e ricostruisce le anomalie, il menu ha la sezione `Catasto`. Dettaglio in `docs/features/8489-identificazione-automatica-sentiero-codice-rei/` e, per il dominio, in `wm-package/docs/resources/TrailRegistry.md` |
-| Branch API SUS | oc:8333 | `routes/sus.php`, `app/Http/Controllers/Api/Sus/`, `app/Http/Middleware/`, `config/logging.php`, `config/scramble.php`, `wm-package/routes/api.php` | Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo scaffolding: nessuna logica di business |
-| Adozione gate stub wm-package + dominio trail_registry | oc:8492 | `.github/workflows/run-tests.yml`, `.env-deploy`, `.env-example`, `phpunit.xml`, `database/migrations/` | Forestas e' il secondo repo (dopo maphub) con `publish-missing-migrations --dry-run` in CI. Dichiara l'adesione al dominio opzionale del Catasto Sentieri |
-| Fix identifier TaxonomyWhere | oc:8469 | tutto in `wm-package` (vedi `wm-package/docs/features/8469-fix-identifier-taxonomy-where/`) | Sblocca l'azione Nova `Import TaxonomyWhere`, che falliva con `SQLSTATE[42703]` su ogni sorgente |
-
-## Decisioni architetturali
-
-### Catasto Sentieri: codice REI (oc:8489)
-
-**Fonte di verita':** `wm-package/docs/resources/TrailRegistry.md` per il dominio,
-`docs/features/8489-identificazione-automatica-sentiero-codice-rei/notes.md` per
-le decisioni prese durante la lavorazione.
-
-- **Nel registro dei codici entrano solo i codici su cui non pende alcun
-  dubbio.** Un sentiero che ha un'anomalia non ha una riga: il registro e'
-  l'elenco di cio' che e' deciso, `trail_registry_anomalies` e' cio' che resta
-  da decidere. Verifica: una join fra le due tabelle su `ec_track_id` deve
-  tornare zero
-- **Le anomalie raccolgono solo chi e' rimasto SENZA numero** e dovrebbe
-  averlo. Non e' un registro di imperfezioni: un codice scritto nel nome invece
-  che nel campo dedicato non e' un'anomalia — si legge, si registra, e la
-  colonna `origin` dice da dove viene. Cio' che si puo' risolvere si risolve,
-  cosi' la lista resta corta abbastanza da essere letta davvero
-- **La condizione di go-live** non e' piu' «zero righe in conflitto nel
-  registro» (stato che non esiste piu'), ma
-  `select count(*) from trail_registry_anomalies where type='codice_gia_assegnato'`
-- **`SardegnaSentieriImportService` non e' stato parametrizzato** sul nome del
-  campo che porta il codice, ed e' una scelta: e' custom di questo progetto, in
-  un altro shard non esiste, ed e' proprio lui a DECIDERE come si chiama quella
-  chiave scrivendo `properties['ref']`. La parametrizzazione serve a chi la
-  legge senza saperla in anticipo — il comando del package, dove infatti c'e'.
-  **Se un domani quella chiave cambiasse nome, va aggiornata di conseguenza
-  `WM_TRAIL_LEGACY_CODE_PROPERTY`**, altrimenti il comando cerca la chiave
-  vecchia e non trova piu' nulla
-- **La sincronizzazione notturna e' un troncamento**, e per vincolo a cascata
-  porta via anche cio' che non viene da Drupal: la storia dei cambi di stato dei
-  codici e le istanze. Oggi non morde — le istanze sono zero e il loro flusso
-  arriva con oc:8490 e oc:8491 — ma **dal giorno in cui su collaudo si provera'
-  a presentare un'istanza, ogni notte la si ritrovera' cancellata**. A quel
-  punto la sincronizzazione va cambiata: non piu' troncamento totale, ma
-  rimozione dei soli tracciati spariti alla fonte
-- **`SARDEGNASENTIERI_DAILY_RESET` decide chi fa il troncamento notturno, non
-  `APP_ENV`.** Il nome dell'ambiente non discrimina: i server si chiamano
-  `develop` e `production`, con il collaudo che gira come `production` perche'
-  una produzione vera non esiste ancora. Legare il troncamento a quei nomi
-  significherebbe che la produzione, il giorno che nascera', eredita la regola e
-  si cancella i dati ogni notte. (La condizione precedente cercava `staging`,
-  che non e' il nome di nessuno dei due: **il ramo con `--reset` non e' mai
-  scattato**)
-- **L'import orario non cancella**: marca i record spariti alla fonte con
-  `properties->forestas->deleted_from_source = true`. E' il motivo per cui
-  serviva comunque un troncamento per avere lo specchio esatto di Drupal — e
-  anche la strada per farne a meno, se un giorno si volesse escludere dal
-  catasto i marcati invece di distruggere tutto
-- **Il `--reset` di `sardegnasentieri:import` fa `TRUNCATE ... CASCADE` globale**
-  su `ec_tracks`, `ec_pois` e le tassonomie, non una cancellazione selettiva per
-  `app_id`. Il piano che lo ha introdotto
-  (`.claude/plans/sardegnasentieri-reset-and-reimport.md`) prescriveva l'opposto,
-  con un anti-pattern esplicito. Su forestas e' innocuo — l'app e' una sola —
-  ma diventerebbe un problema se il database ospitasse piu' app
-- **Nessuna Resource `Sentiero`**: sarebbe un doppione del Registro dei codici,
-  che mostra gia' codice, denominazione e collegamento al sentiero. Ne e' stata
-  scritta anche una versione astratta, che selezionava i tracciati con un codice
-  assegnato invece di filtrare per tassonomia, e rimossa per la stessa ragione
-- **Le sei tracce senza tipo non si toccano**: hanno tutte un `ref` e cinque
-  hanno gia' il codice. Da quando il catasto guarda il codice e non il tipo, il
-  tipo mancante non nasconde piu' niente
-
-### Adozione gate stub wm-package (oc:8492)
-- Il gate `publish-missing-migrations --dry-run` era attivo in **1 repo su 16**
-  (solo maphub, da oc:8218). Forestas e' il secondo: non e' la coda del ticket
-  del package ma il primo passo per farne uno standard
-- Accenderlo ha richiesto di sanare due disallineamenti pregressi, **estranei al
-  catasto**: `create_users_table` (colonne `balance`, `fiscal_code`, `app_id`) e
-  `zz_2026_07_27_000001_add_surname_to_users_table`. Erano un bug latente, non
-  solo igiene: `User::$fillable` del package dichiara `surname` e `app_id`, e la
-  rotta `POST /wallet/buy` (`wm-package/routes/api.php`) legge `users.balance` —
-  colonne che nel database non esistevano
-- Lo stub `create_users_table` fa `Schema::table`, non `Schema::create`: il nome
-  inganna, pubblicarlo su una tabella esistente e' sicuro
-- Il catasto ha altre due chiavi proprie di questo shard, accanto all'interruttore:
-  `WM_TRAIL_SOURCE_URL_PROPERTY=forestas.url` (dove l'import scrive l'indirizzo della
-  scheda su Drupal) e `WM_TRAIL_SOURCE_LABEL=Drupal` (il nome che compare nel
-  collegamento). **Nel package sono vuote di default** — non presume ne' il nome dello
-  shard ne' che una piattaforma di origine esista: senza di esse la lista delle anomalie
-  perde i collegamenti alla fonte, cioe' il modo con cui il gestore raggiunge la scheda
-  da correggere. Vivono in `.env`, `.env-example`, `.env-deploy` e nel `.env` del server
-- `WM_TRAIL_REGISTRY_ENABLED` va tenuta allineata in **sei** posti, di cui uno
-  fuori dal repository: `.env`, `.env-deploy`, `.env-example`, `phpunit.xml`,
-  `.env.testing-example` (da cui nasce `.env.testing`, letto dai comandi artisan
-  lanciati con `--env=testing`, dove `phpunit.xml` non arriva) e il `.env` del
-  server. Solo i primi cinque si vedono in un diff
-- **Se un giorno il dominio va spento**, va tolto anche `--with=trail_registry`
-  dallo step di CI: `--with` e' indipendente dall'interruttore e continuerebbe a
-  pretendere gli stub di un dominio deliberatamente disattivato, lasciando la
-  pipeline rossa senza una via d'uscita evidente
-- **Se il Catasto Sentieri smette di rispondere senza motivo apparente, la causa
-  va cercata qui per prima.** `scripts/deploy_prod.sh` esegue `php artisan
-  optimize`, che congela la configurazione: se il `.env` del server perde quella
-  chiave, route e Nova resource del catasto spariscono mentre la tabella resta
-  piena di dati, e il SUS riceve 404. Una verifica automatica al deploy e' stata
-  valutata e scartata: rischio accettato consapevolmente
-- Lo step di CI e' copiato verbatim da maphub tranne `--with=trail_registry`,
-  che non e' necessario (il flag in `.env-deploy` basta) ma rende leggibile cosa
-  quello step controlla. `--with` puo' solo aggiungere domini alla verifica, mai
-  toglierne
-- Gli stub di un dominio opzionale **non** si pubblicano con `vendor:publish`
-  (la scoperta delle migration di Spatie non e' ricorsiva): serve
-  `publish-migration trail_registry/<stub>`. Riguardera' oc:8489
-
-### Gestione del client SUS (oc:8333)
-- **Creazione e rotazione si fanno da Nova**, non da comandi artisan: il
-  resource utente espone `Password::make()` e `RoleBooleanGroup` per i ruoli
-  (`wm-package/src/Nova/AbstractUserResource.php:66,71`), riservati a chi passa
-  `RolesAndPermissionsService::allowsUser()`. Nessun `sus:create-client` /
-  `sus:rotate-client`: aggiungerebbero un secondo modo di fare la stessa cosa,
-  con la password esposta nello scrollback del terminale
-- La blacklist JWT e' attiva (`config/jwt.php:220` → `blacklist_enabled`
-  default `true`), quindi un singolo token si invalida con
-  `JWTAuth::invalidate()` — unica operazione senza interfaccia Nova, vedi
-  snippet in "Comandi utili"
-- **Non ruotare mai `JWT_SECRET` per revocare un token**: sembra la soluzione
-  ovvia ma invalida i token di *tutti* gli utenti della piattaforma, non solo
-  del client SUS. Nessun utente mobile ha token con `exp` (`JWT_TTL` non e'
-  impostato), quindi sarebbe un logout di massa senza possibilita' di rientro
-  automatico
-- Cambiare la password del client **non** invalida il token gia' emesso: sono
-  due azioni distinte e in caso di compromissione servono entrambe — la revoca
-  via blacklist taglia l'accesso in corso, il cambio password da Nova impedisce
-  di ottenerne uno nuovo
-
-**Creazione del client SUS (da Nova, non da comandi):**
-
-1. Nova → Users → Create User
-2. Nome: `SUS Client`. Email: un indirizzo su dominio **non instradabile**
-   (es. `sus@catasto.invalid`) — Nova espone il reset password pubblico e un
-   reset innescato per errore cambierebbe la password del client
-3. Password: generata lunga e casuale
-4. Roles: selezionare **solo** `Sus`. Mai `Administrator`: porterebbe il
-   permesso `access-nova` e quindi l'accesso al backoffice a un fornitore
-   esterno
-5. Consegnare a Engineering su canali separati: l'URL della documentazione
-   (`/docs/api/sus`) e le credenziali. Mai nello stesso messaggio
-6. Ripetere su ogni ambiente (UAT per il collaudo, produzione al go-live) con
-   credenziali distinte
-
-I campi Password e Roles del resource utente sono in sola lettura per chi non
-passa `RolesAndPermissionsService::allowsUser()` (allowlist di email).
-
-**Cosa puo' fare il client SUS:** solo `POST /api/auth/login`,
-`POST /api/auth/refresh` e `/api/v1/sus/*`. Ogni altra route dell'app risponde
-403 (`app/Http/Middleware/RestrictSusClient.php`, appeso al gruppo `api`).
-
-### Fix identifier TaxonomyWhere (oc:8469)
-- L'identifier di `TaxonomyWhere` deriva da `properties['source']` + id della
-  sorgente (`osmfeatures-r276369`, `osm2cai-142`), **mai dal nome**: i nomi da
-  OSMFeatures sono instabili e, su alfabeti non latini, `Str::slug()` restituisce
-  stringa vuota. I record creati a mano da Nova prendono come sorgente il nome
-  della piattaforma (`Str::slug(config('app.name'))` → `forestas`)
-- I test della feature vivono nella suite di `wm-package`, che usa il DB
-  **`wm_package`** (vedi `wm-package/phpunit.xml.dist`), distinto da `forestas`.
-  Il DB va creato una volta con PostGIS abilitato
-- Il `phpunit.xml` di **forestas** non ha isolamento DB (`DB_CONNECTION` e
-  `DB_DATABASE` sono commentati): lanciare la suite del progetto girerebbe sul DB
-  reale. Da sistemare prima di scrivere test lato progetto
-- La licenza Nova e' scaduta: le versioni dalla 5.8.0 in poi rispondono HTTP 402.
-  Sia forestas sia wm-package vanno tenuti su `laravel/nova 5.7.6`. Il rinnovo
-  diventa obbligatorio prima di passare a Laravel 13
+## Regole del repo
+
+- **Documentazione, commenti e messaggi di commit in italiano.** I termini tecnici restano in
+  inglese.
+- **Le Resource Nova del progetto estendono quelle del package**, non le duplicano.
+- **Quando modifichi il `wm-package`, ricorda che è condiviso fra progetti**: è un submodule
+  (`wm-package/`), ha un repo e un `CLAUDE.md` propri. Un fatto che vale per chiunque monti il
+  package si documenta lì, non qui.
+- **Forestas importa da Sardegna Sentieri, non da GeoHub**: il flusso GeoHub del package non è
+  usato qui — vedi le trappole sull'import.
+
+## Trappole
+
+Regole path-scoped, si caricano quando tocchi i file corrispondenti:
+
+| Soggetto | Dove |
+|---|---|
+| Import da Sardegna Sentieri, `--reset`, troncamento notturno | [.claude/rules/import-sardegna-sentieri.md](.claude/rules/import-sardegna-sentieri.md) |
+| Nova: gate, menu, trait, policy | [.claude/rules/nova.md](.claude/rules/nova.md) |
+| Test e isolamento del database | [.claude/rules/test.md](.claude/rules/test.md) |
+| Deploy, configurazione congelata, CI, licenza Nova | [.claude/rules/deploy-e-configurazione.md](.claude/rules/deploy-e-configurazione.md) |
+
+Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole» di
+`wm-package/docs/resources/TrailRegistry.md`.
+
+## Conoscenza
+
+| Argomento | Cosa copre | Pagina |
+|---|---|---|
+| Catasto Sentieri su Forestas | import come sorgente del codice, valori di configurazione di questo shard, cifre di go-live | [docs/knowledge/catasto-sentieri.md](docs/knowledge/catasto-sentieri.md) |
+| Gate di pubblicazione migrazioni | `publish-missing-migrations` in CI, stub dei domini opzionali | [docs/knowledge/gate-pubblicazione-migrazioni.md](docs/knowledge/gate-pubblicazione-migrazioni.md) |
+| Il client SUS | cosa può raggiungere, creazione e rotazione, revoca dei token | [docs/knowledge/client-sus.md](docs/knowledge/client-sus.md) |
+| Identifier di `TaxonomyWhere` | da dove deriva, dove vivono i suoi test | [docs/knowledge/import-taxonomy-where.md](docs/knowledge/import-taxonomy-where.md) |
+
+Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
+package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la
+customizzazione di Forestas.
+
+## Procedure
+
+| Cosa devi fare | Procedura |
+|---|---|
+| Installare il progetto da zero | [docs/howto/setup-progetto.md](docs/howto/setup-progetto.md) |
+| Creare o ruotare il client SUS | [docs/howto/creazione-client-sus.md](docs/howto/creazione-client-sus.md) |
+
+## Ruoli
+
+`Administrator` (accesso completo a Nova, gestione utenti e app), `Editor` (contenuti), `Validator`
+(validazione UGC), `Contributor`, `Guest` (sola lettura, niente Nova), `Sus` (client programmatico,
+niente Nova). Il sistema usa `spatie/laravel-permission` tramite il package.

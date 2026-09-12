@@ -1185,3 +1185,11 @@ La chiave della risposta di login (`access_token` o `token`) va verificata su `A
 git add CLAUDE.md docs/features/8333-branch-api-sus-con-autenticazione-dedicata/
 git commit -m "docs(oc:8333): documenta la procedura operativa del client SUS"
 ```
+
+> **Errata (2026-09-12)** — questo documento propone per `RestrictSusClient::ALLOWED` i prefissi
+> `'api/v1/sus/*'`, `'api/auth/login'`, `'api/auth/refresh'`.
+> Verificato: `app/Http/Middleware/RestrictSusClient.php:28-30` — la whitelist contiene il solo
+> `'api/v1/sus/*'`. Login e refresh del branch vivono dentro quel prefisso
+> (`api/v1/sus/auth/login`, `api/v1/sus/auth/refresh`, da `php artisan route:list --path=sus`), e
+> gli endpoint di autenticazione di wm-package rispondono 403 al client SUS.
+> Lo stato attuale è in [docs/knowledge/client-sus.md](../../knowledge/client-sus.md).
