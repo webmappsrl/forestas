@@ -16,6 +16,7 @@ use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Models\TaxonomyWarning;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -1057,14 +1058,28 @@ class SardegnaSentieriImportService
             return $this->taxonomyTermsCache[$vocabulary];
         }
 
-        $terms = $this->client->getTaxonomy($vocabulary);
+        // La cache d'istanza qui sopra dura quanto il job che ci sta dentro, e
+        // i job sono migliaia: senza quella condivisa, ognuno richiedeva di
+        // nuovo alla sorgente gli stessi tre o quattro vocabolari, ed erano
+        // quelle richieste — non i singoli POI — a far cadere l'import in
+        // timeout. I vocabolari cambiano una volta al giorno, un'ora di
+        // validita' e' abbondante (oc:8607).
+        $normalized = Cache::remember(
+            "sardegnasentieri:taxonomy:{$vocabulary}",
+            now()->addHour(),
+            function () use ($vocabulary) {
+                $terms = $this->client->getTaxonomy($vocabulary);
 
-        $normalized = [];
-        foreach ($terms as $apiId => $term) {
-            if (is_array($term)) {
-                $normalized[(string) $apiId] = $term;
+                $normalized = [];
+                foreach ($terms as $apiId => $term) {
+                    if (is_array($term)) {
+                        $normalized[(string) $apiId] = $term;
+                    }
+                }
+
+                return $normalized;
             }
-        }
+        );
 
         $this->taxonomyTermsCache[$vocabulary] = $normalized;
 
