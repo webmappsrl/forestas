@@ -9,7 +9,10 @@ use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
+use Illuminate\Bus\Batch;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -18,9 +21,34 @@ use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
+use Throwable;
 
 class ImportSardegnaSentieriCommand extends Command
 {
+    /**
+     * Quota di job falliti oltre la quale le anomalie non si ricalcolano.
+     */
+    private const NORMALIZE_FAILURE_THRESHOLD = 0.02;
+
+    /**
+     * Se le anomalie vadano ricalcolate dato l'esito del batch di import.
+     *
+     * Sopra la soglia il ricalcolo non parte: le anomalie sono relazioni fra
+     * tracciati, e su un archivio gravemente incompleto non ne escono di meno,
+     * ne escono di sbagliate. Sotto, parte comunque: qualche timeout della
+     * sorgente e' la norma sotto il carico di un reset, e rinunciare per
+     * quello lascerebbe la lista vuota — cioe' il difetto che oc:8607
+     * corregge (oc:8607).
+     */
+    public static function shouldNormalize(int $failedJobs, int $totalJobs): bool
+    {
+        if ($failedJobs <= 0) {
+            return true;
+        }
+
+        return $failedJobs / max($totalJobs, 1) <= self::NORMALIZE_FAILURE_THRESHOLD;
+    }
+
     /**
      * The name and signature of the console command.
      *
@@ -79,15 +107,35 @@ class ImportSardegnaSentieriCommand extends Command
         $tracksDispatched = [];
         $poisRemoved = 0;
         $tracksRemoved = 0;
+        $jobs = [];
 
         // Import POIs
         if (! $only || $only === 'pois') {
-            [$poisDispatched, $poisRemoved] = $this->importPois($client);
+            [$poisDispatched, $poisRemoved, $poiJobs] = $this->importPois($client);
+            $jobs = [...$jobs, ...$poiJobs];
         }
 
         // Import Tracks
         if (! $only || $only === 'tracks') {
-            [$tracksDispatched, $tracksRemoved] = $this->importTracks($client);
+            [$tracksDispatched, $tracksRemoved, $trackJobs] = $this->importTracks($client);
+            $jobs = [...$jobs, ...$trackJobs];
+        }
+
+        if ($jobs === []) {
+            $this->info('Nessun job da importare.');
+        } elseif (! $this->option('reset')) {
+            // Import incrementale: nulla e' stato troncato, non c'e' niente da
+            // ricalcolare. I job partono sciolti, come prima.
+            foreach ($jobs as $job) {
+                dispatch($job);
+            }
+            $this->info('Dispatched '.count($jobs).' import jobs.');
+        } else {
+            // Con `--only=pois` i tracciati sono stati troncati e non
+            // reimportati: l'archivio e' vuoto per volonta' di chi ha lanciato
+            // il comando, non per un guasto, e ricalcolare le anomalie li'
+            // dentro scriverebbe «catasto vuoto» come stato legittimo.
+            $this->dispatchImportBatch($jobs, $runId, $only !== 'pois');
         }
 
         $this->info('Import completed.');
@@ -105,9 +153,60 @@ class ImportSardegnaSentieriCommand extends Command
     }
 
     /**
+     * Dopo un `--reset` le anomalie del Catasto sono state portate via dal
+     * troncamento, e a ricalcolarle e' `trail-registry-normalize`. Il momento
+     * giusto per chiamarlo e' quando i job hanno finito di scrivere: il
+     * comando ritorna molto prima di loro, e un normalize lanciato allora
+     * leggerebbe un archivio ancora vuoto — che e' il difetto corretto da
+     * oc:8607.
+     *
+     * Qualche job che cade e' la norma — la sorgente va in timeout sotto il
+     * carico di un reset — quindi il ricalcolo tollera una quota di
+     * fallimenti e si ferma solo oltre quella.
+     *
+     * @param  list<ImportSardegnaSentieriPoiJob|ImportSardegnaSentieriTrackJob>  $jobs
+     */
+    private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize): void
+    {
+        Bus::batch($jobs)
+            ->name('sardegnasentieri import')
+            ->allowFailures()
+            ->finally(function (Batch $batch) use ($runId, $withNormalize) {
+                if (! $withNormalize) {
+                    Log::channel('import')->info("[sardegnasentieri:{$runId}] Tracciati non reimportati (--only): anomalie non ricalcolate.");
+
+                    return;
+                }
+
+                $failed = $batch->failedJobs;
+                $total = max($batch->totalJobs, 1);
+
+                if (! self::shouldNormalize($failed, $total)) {
+                    Log::channel('import')->error(
+                        "[sardegnasentieri:{$runId}] Job falliti {$failed}/{$total}: oltre la soglia, anomalie NON ricalcolate."
+                    );
+
+                    return;
+                }
+
+                Artisan::call('wm-package:trail-registry-normalize', ['--force' => true]);
+
+                Log::channel('import')->info(
+                    "[sardegnasentieri:{$runId}] Anomalie ricalcolate (job falliti: {$failed}/{$total})."
+                );
+            })
+            ->dispatch();
+
+        $this->info('Dispatched '.count($jobs).' import jobs in un batch.');
+    }
+
+    /**
      * Import POIs from API
      *
-     * @return array{0: list<int>, 1: int}
+     * I job non partono qui: li raccoglie `handle()`, che dopo un `--reset`
+     * deve poterli raggruppare in un batch (oc:8607).
+     *
+     * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriPoiJob>}
      */
     private function importPois(SardegnaSentieriClient $client): array
     {
@@ -140,16 +239,17 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         $dispatched = [];
+        $jobs = [];
         foreach ($this->sortPoiDispatchOrder($candidateIds, $poiList) as $id) {
-            ImportSardegnaSentieriPoiJob::dispatch($id);
+            $jobs[] = new ImportSardegnaSentieriPoiJob($id);
             $dispatched[] = $id;
         }
 
-        $this->info('Dispatched '.count($dispatched).' POI import jobs.');
+        $this->info('Prepared '.count($dispatched).' POI import jobs.');
 
         $removed = $this->markRemovedPois($apiIds);
 
-        return [$dispatched, $removed];
+        return [$dispatched, $removed, $jobs];
     }
 
     /**
@@ -192,7 +292,10 @@ class ImportSardegnaSentieriCommand extends Command
     /**
      * Import Tracks from API
      *
-     * @return array{0: list<int>, 1: int}
+     * I job non partono qui: li raccoglie `handle()`, che dopo un `--reset`
+     * deve poterli raggruppare in un batch (oc:8607).
+     *
+     * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriTrackJob>}
      */
     private function importTracks(SardegnaSentieriClient $client): array
     {
@@ -222,16 +325,17 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         $dispatched = [];
+        $jobs = [];
         foreach ($this->sortTrackDispatchOrder($candidateIds, $trackList) as $id) {
-            ImportSardegnaSentieriTrackJob::dispatch($id);
+            $jobs[] = new ImportSardegnaSentieriTrackJob($id);
             $dispatched[] = $id;
         }
 
-        $this->info('Dispatched '.count($dispatched).' Track import jobs.');
+        $this->info('Prepared '.count($dispatched).' Track import jobs.');
 
         $removed = $this->markRemovedTracks($apiIds);
 
-        return [$dispatched, $removed];
+        return [$dispatched, $removed, $jobs];
     }
 
     /**
@@ -465,6 +569,14 @@ class ImportSardegnaSentieriCommand extends Command
     {
         // Truncate in order: tables with FKs first, then referenced tables.
         // CASCADE handles junction tables automatically.
+
+        // Le domande di iscrizione non referenziano ec_tracks, quindi il
+        // CASCADE qui sotto non le tocca: senza questa riga resterebbero in
+        // piedi mentre i codici che avevano riservato spariscono insieme a
+        // trail_registry_codes (oc:8607).
+        DB::statement('TRUNCATE TABLE trail_applications RESTART IDENTITY CASCADE');
+        $this->info('Truncated trail_applications.');
+
         DB::statement('TRUNCATE TABLE ec_tracks RESTART IDENTITY CASCADE');
         $this->info('Truncated ec_tracks.');
 

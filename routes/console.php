@@ -32,13 +32,13 @@ Artisan::command('inspire', function () {
  * incrementale, che aggiorna senza distruggere.
  */
 if (env('SARDEGNASENTIERI_DAILY_RESET', false)) {
-    Schedule::command('sardegnasentieri:import --reset')
-        ->dailyAt('06:00')
-        // In coda, non in parallelo: la lista delle anomalie si ricostruisce
-        // guardando l'intero archivio, e leggerlo a importazione in corso
-        // significherebbe fotografare un catasto a metà. I codici invece si
-        // scrivono già durante l'importazione, tracciato per tracciato.
-        ->then(fn () => Artisan::call('wm-package:trail-registry-normalize', ['--force' => true]));
+    // Il ricalcolo delle anomalie non sta più qui. Stava in un `->then()`
+    // che partiva alla fine del comando, ma il comando accoda i job e ritorna:
+    // il normalize leggeva un archivio ancora vuoto e scriveva zero anomalie
+    // senza segnalare nulla. Ora è agganciata al batch dei job, dentro il
+    // comando, che è l'unico punto a sapere quando l'archivio è completo
+    // (oc:8607).
+    Schedule::command('sardegnasentieri:import --reset')->dailyAt('06:00');
 } else {
     Schedule::command('sardegnasentieri:import')->hourly();
 }
