@@ -707,18 +707,64 @@ class SardegnaSentieriImportService
 
         $identifier = 'sardegnasentieri:type:'.$response->type;
 
-        $activity = TaxonomyActivity::firstOrNew(['identifier' => $identifier]);
-        if (! $activity->exists) {
-            $activity->setTranslation('name', 'it', ucfirst($response->type));
-        }
-        if (empty($activity->getAttribute('icon'))) {
-            $activity->setAttribute('icon', $this->resolveIconNameByIdentifier($identifier));
-        }
-        $activity->saveQuietly();
+        $activity = $this->resolveActivityByIdentifier(
+            $identifier,
+            ucfirst($response->type)
+        );
 
         $currentIds = $ecTrack->taxonomyActivities()->pluck('taxonomy_activities.id')->toArray();
         $allIds = array_unique(array_merge($currentIds, [$activity->id]));
         $ecTrack->taxonomyActivities()->sync($allIds);
+    }
+
+    /**
+     * L'attivita' con questo identifier, creandola se manca.
+     *
+     * I job di import girano a decine in parallelo e i tipi si ripetono:
+     * `sentiero` arriva da centinaia di tracciati. Un `firstOrNew` seguito da
+     * un `save` sono due passi distinti, quindi due job che leggono insieme
+     * non trovano nulla e inseriscono entrambi: il perdente riceve una
+     * violazione di unicita' su `identifier`, muore, e rientra in coda in
+     * fondo — dietro il post-processing accodato nel frattempo. Un solo job
+     * caduto cosi' tiene il batch aperto per ore, e il ricalcolo delle
+     * anomalie agganciato alla sua fine non parte (oc:8607).
+     *
+     * La corsa non si assorbe catturando l'eccezione: sotto una transazione
+     * Postgres la aborta, e ogni query successiva — la rilettura compresa —
+     * fallisce. Si evita a monte, con un inserimento che sul conflitto non
+     * fa nulla: chi arriva secondo rilegge la riga del primo, che e'
+     * esattamente quella che voleva scrivere.
+     */
+    private function resolveActivityByIdentifier(string $identifier, string $fallbackName): TaxonomyActivity
+    {
+        $existing = TaxonomyActivity::query()->where('identifier', $identifier)->first();
+
+        if ($existing !== null) {
+            if (empty($existing->getAttribute('icon'))) {
+                $existing->setAttribute('icon', $this->resolveIconNameByIdentifier($identifier));
+                $existing->saveQuietly();
+            }
+
+            return $existing;
+        }
+
+        $now = now();
+
+        TaxonomyActivity::query()->insertOrIgnore([
+            'identifier' => $identifier,
+            'name' => json_encode(['it' => $fallbackName], JSON_UNESCAPED_UNICODE),
+            'icon' => $this->resolveIconNameByIdentifier($identifier),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $activity = TaxonomyActivity::query()->where('identifier', $identifier)->first();
+
+        if ($activity === null) {
+            throw new \RuntimeException("Impossibile risolvere l'attivita' {$identifier} dopo l'inserimento.");
+        }
+
+        return $activity;
     }
 
     private function syncTrackWarnings(EcTrack $ecTrack, ApiTrackResponse $response): void

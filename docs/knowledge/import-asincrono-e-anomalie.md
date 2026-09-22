@@ -22,6 +22,16 @@ no. Sotto soglia si accetta un archivio quasi completo; sopra ci si ferma, perch
 sono relazioni fra tracciati e su un archivio gravemente incompleto non ne escono di meno, ne
 escono di sbagliate. In entrambi i casi il canale di log `import` registra quanti sono.
 
+**I job di import hanno una coda tutta loro, `sardegnasentieri-import`.** Ogni job che completa ne
+accoda altri — conversione delle immagini, aggiornamento delle relazioni — e su una coda condivisa
+quei job si accumulano davanti a chi deve ancora girare. Il supervisor Horizon che la lavora è
+dichiarato in `config/horizon.php`, per tutti gli ambienti compreso `production`.
+
+**La creazione delle tassonomie regge la concorrenza.** L'attività derivata dal `type` del
+tracciato si crea con `insertOrIgnore` seguito da una rilettura: decine di job importano insieme
+tracciati dello stesso tipo, e chi arriva secondo si prende la riga scritta dal primo invece di
+fallire.
+
 **Le tassonomie si leggono una volta per tutti i job.** `getTaxonomyTerms()` usa
 `Cache::remember()` con validità un'ora: la cache d'istanza del service dura quanto il job che la
 contiene, e con migliaia di job significava altrettante richieste agli stessi tre o quattro
@@ -42,6 +52,16 @@ vocabolari.
 - **I ritentativi distanziati** (oc:8607): i job avevano già `$tries = 3` ma nessun `backoff`, e i
   tre tentativi cadevano tutti nella stessa finestra di pochi secondi. Ora sono cinque, a
   30/120/300/600 secondi.
+- **La coda dedicata** (oc:8607): con i job di import sulla `default`, un solo job ritentato
+  rientrava dietro il post-processing accumulato nel frattempo. Su collaudo il 22/09/2026 il job
+  del tracciato 5496 era in posizione 1679 su 5125 — davanti a lui 4346 conversioni immagine e 768
+  aggiornamenti di relazioni — e il batch delle 06:00 era ancora aperto tre ore dopo, con le
+  anomalie a zero per tutta la mattina. Su collaudo `supervisor-default` ha due soli processi, il
+  che allunga ulteriormente la fila.
+- **`insertOrIgnore` invece del `catch`** (oc:8607): assorbire la violazione di unicità e rileggere
+  sembra la via breve, ma sotto una transazione Postgres la aborta e la rilettura fallisce con
+  essa — il test lo mostra, perché `RefreshDatabase` avvolge ogni test in una transazione. Evitare
+  il conflitto a monte funziona in entrambi i casi.
 - **La soglia invece della tolleranza zero** (oc:8607): con 1736 chiamate a ogni reset qualche
   timeout è la norma, e rinunciare al ricalcolo per quello avrebbe lasciato la lista vuota — cioè
   il difetto stesso che si stava correggendo.
@@ -65,3 +85,7 @@ Il riscontro giusto è la riga nel canale `import`:
   comando finisse insieme all'importazione.
 - **Rifiuto di ricalcolare su qualunque job fallito** (oc:8607, superata): prima versione della
   regola, abbandonata perché in esercizio non sarebbe quasi mai partita.
+- **Job di import sulla coda `default`** (oc:8607, superata): finché l'import girava senza
+  ritentativi non si notava nulla. Bastava un job caduto per rimandare di ore la chiusura del
+  batch, e con essa il ricalcolo — il sintomo era identico a quello che oc:8607 aveva appena
+  corretto, tanto che sembrava una regressione del fix.

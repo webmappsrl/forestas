@@ -23,6 +23,20 @@ class ImportSardegnaSentieriPoiJob implements ShouldQueue
     use SerializesModels;
 
     /**
+     * La coda dell'import da Sardegna Sentieri.
+     *
+     * Non `default`: li' i job di import finiscono dietro il post-processing
+     * che loro stessi accodano, e un ritentativo rientra in fondo a migliaia
+     * di conversioni immagine. Il batch resta aperto fino a quando quel job
+     * gira, e con lui il ricalcolo delle anomalie (oc:8607).
+     *
+     * La coda si assegna nel costruttore e non come proprieta': `Queueable`
+     * dichiara gia' `$queue`, e ridefinirla nella classe rompe la
+     * composizione del trait.
+     */
+    public const QUEUE = 'sardegnasentieri-import';
+
+    /**
      * The number of times the job may be attempted.
      */
     public int $tries = 5;
@@ -52,7 +66,9 @@ class ImportSardegnaSentieriPoiJob implements ShouldQueue
      */
     public function __construct(
         public readonly int $externalId
-    ) {}
+    ) {
+        $this->onQueue(self::QUEUE);
+    }
 
     /**
      * Execute the job.

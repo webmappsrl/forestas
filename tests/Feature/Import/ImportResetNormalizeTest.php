@@ -130,3 +130,48 @@ it('distanzia i ritentativi dei job di import', function () {
             ->and($job->backoff())->toBe([30, 120, 300, 600]);
     }
 });
+
+it('tiene i job di import fuori dalla coda default (oc:8607)', function () {
+    // Sulla `default` un job ritentato rientra dietro le migliaia di
+    // conversioni immagine che l'import stesso ha accodato: il batch resta
+    // aperto per ore e il ricalcolo delle anomalie non parte.
+    foreach ([new ImportSardegnaSentieriTrackJob(1), new ImportSardegnaSentieriPoiJob(1)] as $job) {
+        expect($job->queue)->toBe('sardegnasentieri-import');
+    }
+});
+
+it('dichiara un supervisor Horizon per la coda di import in ogni ambiente (oc:8607)', function () {
+    // Una coda senza supervisor non e' una coda isolata: e' una coda che
+    // nessuno lavora, e i job ci restano fermi per sempre.
+    expect(config('horizon.defaults.supervisor-sardegnasentieri-import.queue'))
+        ->toBe(['sardegnasentieri-import']);
+
+    foreach (['local', 'develop', 'staging', 'production'] as $env) {
+        expect(config("horizon.environments.{$env}.supervisor-sardegnasentieri-import"))
+            ->not->toBeNull("ambiente {$env} senza supervisor per la coda di import");
+    }
+});
+
+it('non toglie a production i supervisor che arrivano dal package (oc:8607)', function () {
+    // Il progetto non dichiarava `production`: dichiararlo ora e' sicuro solo
+    // perche' il merge del package e' per-supervisor e non sovrascrive.
+    foreach (['supervisor-default', 'supervisor-pbf', 'supervisor-layers', 'supervisor-dem'] as $supervisor) {
+        expect(config("horizon.environments.production.{$supervisor}"))
+            ->not->toBeNull("production ha perso {$supervisor}");
+    }
+});
+
+it('non lascia che il batch riporti i job di import sulla coda default (oc:8607)', function () {
+    // `Bus::batch()` riassegna la coda a ogni job che raggruppa: senza
+    // `onQueue()` esplicito, la coda dichiarata nel costruttore viene
+    // sovrascritta con `default` — proprio nel caso, il reset, per cui la
+    // coda dedicata serve. Osservato in locale: 1739 job del batch tutti su
+    // `default` malgrado la dichiarazione nei job.
+    Bus::fake();
+
+    Artisan::call('sardegnasentieri:import', ['--reset' => true]);
+
+    Bus::assertBatched(function ($batch) {
+        return $batch->queue() === ImportSardegnaSentieriTrackJob::QUEUE;
+    });
+});

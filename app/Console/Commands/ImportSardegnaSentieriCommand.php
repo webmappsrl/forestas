@@ -168,8 +168,13 @@ class ImportSardegnaSentieriCommand extends Command
      */
     private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize): void
     {
+        // `Bus::batch()` riassegna la coda a ogni job che raggruppa: quella
+        // dichiarata nel loro costruttore viene sovrascritta con `null`, cioe'
+        // `default`, e l'isolamento della coda di import sparirebbe proprio
+        // nel caso — il reset — per cui serve (oc:8607).
         Bus::batch($jobs)
             ->name('sardegnasentieri import')
+            ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
             ->allowFailures()
             ->finally(function (Batch $batch) use ($runId, $withNormalize) {
                 if (! $withNormalize) {

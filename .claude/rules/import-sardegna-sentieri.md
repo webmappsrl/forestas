@@ -39,6 +39,17 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   dai dati importati va agganciato alla sua fine — va agganciato alla fine dei job. È il difetto
   che lasciava il Catasto senza anomalie dopo ogni reset:
   [docs/knowledge/import-asincrono-e-anomalie.md](../../docs/knowledge/import-asincrono-e-anomalie.md) (oc:8607)
+- **I job di import stanno sulla coda `sardegnasentieri-import`, non su `default`.** Sulla `default`
+  finivano dietro il post-processing che l'import stesso accoda — migliaia di conversioni immagine
+  per ogni run — quindi un job ritentato rientrava in fondo e girava ore dopo, tenendo il batch
+  aperto e il ricalcolo delle anomalie fermo con lui. La coda ha un supervisor suo in
+  `config/horizon.php`: aggiungerne uno senza dichiarare il supervisor significa accodare job che
+  nessuno lavora (oc:8607)
+- **Due job che importano tracciati dello stesso tipo creano la stessa tassonomia insieme.**
+  `sentiero` arriva da centinaia di tracciati, e un `firstOrNew` seguito da un `save` sono due
+  passi: il secondo job viola l'unicità su `identifier` e muore. Le tassonomie si creano con
+  `insertOrIgnore` più rilettura, non catturando l'eccezione — sotto transazione Postgres la
+  aborta, e la rilettura fallirebbe con essa (oc:8607)
 - **Dopo aver modificato un job, riavvia Horizon** (`docker restart horizon-<progetto>`): i worker
   tengono in memoria le classi vecchie, e una modifica appena scritta non ha effetto finché non
   ripartono (oc:8607)
