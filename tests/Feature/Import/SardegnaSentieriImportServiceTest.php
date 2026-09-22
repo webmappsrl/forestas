@@ -731,3 +731,47 @@ it('segnala nel messaggio quando la sorgente non pubblica alcun GPX', function (
     expect(fn () => makeServiceWith($client)->importTrack(76))
         ->toThrow(RuntimeException::class, 'the source published no GPX url');
 });
+
+it('assorbe la corsa di due job che creano insieme la stessa activity di tipo (oc:8607)', function () {
+    // Riproduce la corsa vera: fra il SELECT di firstOrNew e l'INSERT, un
+    // altro job scrive la stessa riga. Senza il fix l'INSERT viola l'unicita'
+    // e il job muore, rientrando in coda dietro il post-processing.
+    $raced = false;
+    DB::listen(function ($query) use (&$raced) {
+        if ($raced) {
+            return;
+        }
+        if (! str_contains($query->sql, 'taxonomy_activities')
+            || ! str_starts_with(strtolower(trim($query->sql)), 'select')) {
+            return;
+        }
+        if (! in_array('sardegnasentieri:type:sentiero', $query->bindings, true)) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('taxonomy_activities')->insert([
+            'identifier' => 'sardegnasentieri:type:sentiero',
+            'name' => json_encode(['it' => 'Sentiero']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(81, ['properties' => ['gpx' => ['http://example.com/track.gpx']]])
+    );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+
+    makeServiceWith($client)->importTrack(81);
+
+    expect($raced)->toBeTrue();
+
+    // Una sola riga, e il tracciato ci e' agganciato: il job ha assorbito il
+    // conflitto invece di morirci sopra.
+    expect(TaxonomyActivity::query()->where('identifier', 'sardegnasentieri:type:sentiero')->count())->toBe(1);
+    expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
+        ->toBe(['sardegnasentieri:type:sentiero']);
+});
