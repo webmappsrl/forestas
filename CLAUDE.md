@@ -73,6 +73,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | Il client SUS | cosa può raggiungere, creazione e rotazione, revoca dei token | [docs/knowledge/client-sus.md](docs/knowledge/client-sus.md) |
 | Identifier di `TaxonomyWhere` | da dove deriva, dove vivono i suoi test | [docs/knowledge/import-taxonomy-where.md](docs/knowledge/import-taxonomy-where.md) |
 | L'import è asincrono | il comando accoda e ritorna, quando parte il ricalcolo delle anomalie, cosa succede con i job falliti | [docs/knowledge/import-asincrono-e-anomalie.md](docs/knowledge/import-asincrono-e-anomalie.md) |
+| Valori tecnici dei sentieri | l'import non scrive `manual_data` né calcola il DEM, e perché | [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
 package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la
