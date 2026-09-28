@@ -11,33 +11,14 @@ parameters:
 		-
 			message: '#^Call to function is_array\(\) with array#'
 			identifier: function.alreadyNarrowedType
-			count: 2
+			count: 1
 			path: app/Console/Commands/ImportSardegnaSentieriCommand.php
 
 		-
 			message: '#^Call to function is_array\(\) with array#'
 			identifier: function.alreadyNarrowedType
-			count: 4
+			count: 3
 			path: app/Services/Import/SardegnaSentieriImportService.php
-
-		# ---------------------------------------------------------------------
-		# Il controllo `instanceof TabsGroup` e' necessario, non morto: il
-		# parent nel wm-package (src/Nova/EcPoi.php) usa Tab::group(), e
-		# TabsGroup estende Panel -> FieldMergeValue, non Field. E' il phpdoc
-		# del package a dichiarare array<Field> in modo impreciso. Rimuovere il
-		# controllo introdurrebbe un bug.
-		# ---------------------------------------------------------------------
-		-
-			message: '#^Instanceof between Laravel\\Nova\\Fields\\Field and Laravel\\Nova\\Tabs\\TabsGroup will always evaluate to false\.$#'
-			identifier: instanceof.alwaysFalse
-			count: 1
-			path: app/Nova/EcPoi.php
-
-		-
-			message: '#^Instanceof between Laravel\\Nova\\Fields\\Field and Laravel\\Nova\\Tabs\\TabsGroup will always evaluate to false\.$#'
-			identifier: instanceof.alwaysFalse
-			count: 1
-			path: app/Nova/EcTrack.php
 
 		# ---------------------------------------------------------------------
 		# NovaTabTranslatable::make() accetta un array di campi, ma eredita da
@@ -107,3 +88,16 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: tests/Pest.php
+
+		# ---------------------------------------------------------------------
+		# NON e' un falso positivo, e' un debito accettato per ora (oc:8641).
+		# scripts/deploy_prod.sh esegue `php artisan optimize`: con la config in
+		# cache env() restituisce il default, e SARDEGNASENTIERI_DAILY_RESET vale
+		# false anche se il .env dice true, quindi il reset notturno non viene
+		# schedulato. Il fix e' leggerlo da un file di config/ con config().
+		# ---------------------------------------------------------------------
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: routes/console.php

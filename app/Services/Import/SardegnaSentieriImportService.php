@@ -409,11 +409,12 @@ class SardegnaSentieriImportService
         ) ?? new EcTrack;
 
         $existingProperties = is_array($ecTrack->properties) ? $ecTrack->properties : [];
-        $existingManualData = is_array($existingProperties['manual_data'] ?? null) ? $existingProperties['manual_data'] : [];
 
+        // Il DTO non emette `manual_data`: l'array_merge conserva quello già
+        // presente, che è degli operatori (oc:8641).
         $data['properties'] = array_merge(
             $existingProperties,
-            TrackPropertiesData::fromApiResponse($externalId, $response, $existingManualData)->toArray()
+            TrackPropertiesData::fromApiResponse($externalId, $response)->toArray()
         );
 
         $isNew = ! $ecTrack->exists;

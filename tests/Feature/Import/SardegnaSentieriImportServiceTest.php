@@ -310,7 +310,7 @@ it('crea un nuovo EcTrack dalla API con GPX', function () {
 
     expect(EcTrack::count())->toBe(1)
         ->and($track->properties['sardegnasentieri_id'])->toBe('75')
-        ->and($track->properties['manual_data']['distance'])->toBe('5000');
+        ->and($track->properties)->not->toHaveKey('manual_data');
 });
 
 it('imposta stato_validazione tramite enum', function () {
@@ -347,7 +347,30 @@ it('aggiorna un EcTrack esistente senza duplicati', function () {
     (makeServiceWith($client2))->importTrack(75);
 
     expect(EcTrack::count())->toBe(1)
-        ->and(EcTrack::first()->properties['manual_data']['distance'])->toBe('9999');
+        ->and(EcTrack::first()->properties)->not->toHaveKey('manual_data');
+});
+
+it('conserva il manual_data inserito da un operatore quando reimporta il sentiero (oc:8641)', function () {
+    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client->shouldReceive('getTrackDetail')
+        ->andReturn(minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    (makeServiceWith($client))->importTrack(75);
+
+    $operatorManual = ['distance' => '7.2', 'ascent' => '410', 'descent' => '380', 'duration_forward' => '150'];
+    $track = EcTrack::first();
+    $track->properties = array_merge($track->properties, ['manual_data' => $operatorManual]);
+    $track->saveQuietly();
+
+    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2->shouldReceive('getTrackDetail')
+        ->andReturn(minimalTrackFeature(75, ['properties' => ['lunghezza' => '9999', 'durata' => '60']]));
+
+    (makeServiceWith($client2))->importTrack(75);
+
+    // toEqual: jsonb riordina le chiavi, conta che i valori restino gli stessi.
+    expect(EcTrack::first()->properties['manual_data'])->toEqual($operatorManual);
 });
 
 // ---------------------------------------------------------------------------

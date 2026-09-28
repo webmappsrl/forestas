@@ -115,7 +115,9 @@ class TaxonomyWhereLayersImportService
             }
         }
 
-        $counters['synced_tracks'] = GeometryComputationService::make()->syncTracksTaxonomyWhere(
+        // Chiamata su tutti i sentieri: un sentiero senza intersezioni locali conserva
+        // il taxonomy_where che aveva, invece di vederlo azzerato (wm-package oc:8487).
+        $counters['synced_tracks'] = GeometryComputationService::make()->syncTaxonomyWhere(
             config('wm-package.ec_track_model', EcTrack::class)
         );
 
