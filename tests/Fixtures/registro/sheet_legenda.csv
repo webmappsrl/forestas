@@ -1,0 +1,4 @@
+Campo Shape,Tipo Campo Shape,Nome campo,Tipo,Tipo valori,Es. valori,Obbligatorio,Note e regole
+ID,Intero (max 19 cifre),Id univoco,,,,SI ( id SITEMA),
+CODUNIV,Testo (max 200 caratteri),Codifica univoca,Varchar2(255),,,,
+DESCRIZ,Testo (max 254 caratteri),Descrizione,Varchar2(4000),,,,

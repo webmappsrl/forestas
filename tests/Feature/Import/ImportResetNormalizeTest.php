@@ -7,10 +7,12 @@ use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Bus\Batchable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Testing\Fakes\BatchFake;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 
@@ -75,12 +77,42 @@ it('raggruppa in un batch i job dispatchati da --reset', function () {
     Bus::assertBatchCount(1);
 });
 
-it('non raggruppa nulla senza --reset', function () {
+it('raggruppa in un batch anche l import incrementale, ma senza normalize', function () {
+    // Da oc:8539 anche l'import orario raggruppa i job: e' il punto
+    // d'aggancio per il job del registro catastale, che deve partire a fine
+    // batch pure quando non c'e' stato nessun --reset. Il normalize invece
+    // resta escluso: senza troncamento non c'e' nulla da ricalcolare.
     Bus::fake();
+
+    $normalizeCalled = false;
+    Artisan::command('wm-package:trail-registry-normalize {--force}', function () use (&$normalizeCalled) {
+        $normalizeCalled = true;
+
+        return 0;
+    });
 
     Artisan::call('sardegnasentieri:import');
 
-    Bus::assertNothingBatched();
+    Bus::assertBatchCount(1);
+
+    Bus::assertBatched(function ($batch) {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $callback(new BatchFake(
+                'batch-id',
+                $batch->name,
+                $batch->jobs->count(),
+                0,
+                0,
+                [],
+                [],
+                Carbon::now()->toImmutable(),
+            ));
+        }
+
+        return true;
+    });
+
+    expect($normalizeCalled)->toBeFalse();
 });
 
 it('raggruppa i job anche con --only=pois, senza ricalcolare le anomalie', function () {

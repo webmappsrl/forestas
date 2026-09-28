@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Http\Clients\SardegnaSentieriClient;
+use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
@@ -21,7 +22,6 @@ use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
-use Throwable;
 
 class ImportSardegnaSentieriCommand extends Command
 {
@@ -123,19 +123,32 @@ class ImportSardegnaSentieriCommand extends Command
 
         if ($jobs === []) {
             $this->info('Nessun job da importare.');
-        } elseif (! $this->option('reset')) {
-            // Import incrementale: nulla e' stato troncato, non c'e' niente da
-            // ricalcolare. I job partono sciolti, come prima.
-            foreach ($jobs as $job) {
-                dispatch($job);
+
+            // Nell'import orario (niente `--reset`, niente `--only`) il
+            // registro catastale si riallinea a ogni giro, anche quando da
+            // Sardegna Sentieri non arriva nulla di nuovo: il foglio Google
+            // cambia per conto suo, e senza job non ci sarebbe un batch alla
+            // cui fine agganciarlo (oc:8539). Con `--reset` resta tutto come
+            // prima: un archivio troncato e non ripopolato non va specchiato.
+            if (! $this->option('reset') && $only === null) {
+                ImportRegistroCatastaleJob::dispatch();
+
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Nessun job da importare, registro catastale accodato.");
             }
-            $this->info('Dispatched '.count($jobs).' import jobs.');
+        } elseif (! $this->option('reset')) {
+            // Import incrementale: nulla e' stato troncato, quindi nessun
+            // normalize. Il registro catastale pero' va comunque
+            // riallineato a fine batch (oc:8539), quindi i job restano
+            // raggruppati come nel ramo `--reset`. `withNormalize` qui
+            // significa solo «non e' un `--only` parziale»: il normalize
+            // vero e proprio resta escluso dal ramo `! $reset` piu' sotto.
+            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only === null, reset: false);
         } else {
             // Con `--only=pois` i tracciati sono stati troncati e non
             // reimportati: l'archivio e' vuoto per volonta' di chi ha lanciato
             // il comando, non per un guasto, e ricalcolare le anomalie li'
             // dentro scriverebbe «catasto vuoto» come stato legittimo.
-            $this->dispatchImportBatch($jobs, $runId, $only !== 'pois');
+            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only !== 'pois', reset: true);
         }
 
         $this->info('Import completed.');
@@ -164,9 +177,19 @@ class ImportSardegnaSentieriCommand extends Command
      * carico di un reset — quindi il ricalcolo tollera una quota di
      * fallimenti e si ferma solo oltre quella.
      *
+     * Il registro catastale (oc:8539) si riallinea nello stesso punto e per
+     * lo stesso motivo delle anomalie: legge lo stato dei tracciati, quindi
+     * deve partire a batch concluso, mai alla fine del comando. Con
+     * `--reset` parte solo se il normalize e' andato a buon fine — un
+     * archivio troncato e ancora incompleto produrrebbe anomalie del
+     * registro false; nell'import incrementale (`$reset` false) invece parte
+     * sempre, perche' li' non e' stato troncato nulla da ricalcolare prima.
+     * Con `--only` (catasto parziale, `$withNormalize` false) non parte ne'
+     * l'uno ne' l'altro.
+     *
      * @param  list<ImportSardegnaSentieriPoiJob|ImportSardegnaSentieriTrackJob>  $jobs
      */
-    private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize): void
+    private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize, bool $reset): void
     {
         // `Bus::batch()` riassegna la coda a ogni job che raggruppa: quella
         // dichiarata nel loro costruttore viene sovrascritta con `null`, cioe'
@@ -176,9 +199,20 @@ class ImportSardegnaSentieriCommand extends Command
             ->name('sardegnasentieri import')
             ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
             ->allowFailures()
-            ->finally(function (Batch $batch) use ($runId, $withNormalize) {
+            ->finally(function (Batch $batch) use ($runId, $withNormalize, $reset) {
                 if (! $withNormalize) {
-                    Log::channel('import')->info("[sardegnasentieri:{$runId}] Tracciati non reimportati (--only): anomalie non ricalcolate.");
+                    Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");
+
+                    return;
+                }
+
+                if (! $reset) {
+                    // Incrementale: nulla e' stato troncato, non c'e' niente
+                    // da ricalcolare, ma il registro catastale va comunque
+                    // riallineato.
+                    ImportRegistroCatastaleJob::dispatch();
+
+                    Log::channel('import')->info("[sardegnasentieri:{$runId}] Import incrementale completato, registro catastale accodato.");
 
                     return;
                 }
@@ -188,7 +222,7 @@ class ImportSardegnaSentieriCommand extends Command
 
                 if (! self::shouldNormalize($failed, $total)) {
                     Log::channel('import')->error(
-                        "[sardegnasentieri:{$runId}] Job falliti {$failed}/{$total}: oltre la soglia, anomalie NON ricalcolate."
+                        "[sardegnasentieri:{$runId}] Job falliti {$failed}/{$total}: oltre la soglia, anomalie e registro catastale NON aggiornati."
                     );
 
                     return;
@@ -199,6 +233,8 @@ class ImportSardegnaSentieriCommand extends Command
                 Log::channel('import')->info(
                     "[sardegnasentieri:{$runId}] Anomalie ricalcolate (job falliti: {$failed}/{$total})."
                 );
+
+                ImportRegistroCatastaleJob::dispatch();
             })
             ->dispatch();
 

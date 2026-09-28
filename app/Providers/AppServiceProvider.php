@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
+use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
+use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
+use App\Services\RegistroCatastale\AnomalyTypes\TracciaSenzaCodice;
+use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityRequirement;
@@ -34,6 +39,20 @@ class AppServiceProvider extends ServiceProvider
             ui: 'docs/api/sus',
             document: 'docs/api/sus.json',
         );
+
+        // Tipi di anomalia del registro catastale (oc:8539): il package li
+        // unisce ai suoi nella Resource Anomalie. Il nome porta il prefisso
+        // della provenienza. Si unisce a quanto gia' in config invece di
+        // sovrascrivere, nel caso la chiave abbia gia' altre voci.
+        config(['wm-package.features.trail_registry.anomaly_types' => array_merge(
+            (array) config('wm-package.features.trail_registry.anomaly_types', []),
+            [
+                RegistroAnomalyTypes::LINK_ORFANO => LinkOrfano::class,
+                RegistroAnomalyTypes::NUMERO_DIVERSO => NumeroDiverso::class,
+                RegistroAnomalyTypes::TRACCIA_SENZA_CODICE => TracciaSenzaCodice::class,
+                RegistroAnomalyTypes::RIPIEGO_AMBIGUO => RipiegoAmbiguo::class,
+            ],
+        )]);
     }
 
     /**
