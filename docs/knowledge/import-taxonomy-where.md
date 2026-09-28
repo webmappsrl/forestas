@@ -13,6 +13,11 @@ stare su Forestas. (oc:8469)
 - **I test della feature stanno nella suite di `wm-package`**, che usa il database `wm_package`
   (vedi `wm-package/phpunit.xml.dist`), distinto da `forestas` e da `forestas_testing`. Va creato
   una volta con PostGIS abilitato.
+- **`TaxonomyWhereLayersImportService` collega i sentieri con `syncTaxonomyWhere()`**, chiamato su
+  tutti i sentieri: un sentiero senza intersezioni conserva il `taxonomy_where` che aveva. Il
+  package ha rinominato `syncTracksTaxonomyWhere()` senza alias (wm-package oc:8487), e dal bump del
+  24/09 la Action `ImportTaxonomyWhereFromLayersAction` creava le where e poi falliva: il test
+  `tests/Feature/Import/TaxonomyWhereLayersImportServiceTest.php` copre la chiamata (oc:8641)
 
 ## Come ci siamo arrivati
 

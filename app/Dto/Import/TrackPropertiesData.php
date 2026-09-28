@@ -27,27 +27,17 @@ readonly class TrackPropertiesData extends EcTrackPropertiesData
     }
 
     /**
-     * @param  array<string, mixed>  $existingManualData  Previously stored manual_data to preserve user edits
+     * L'import non scrive `manual_data`: lunghezza, dislivello, durata e quote su
+     * Drupal vengono dal vecchio calcolo di Webmapp, non da misure. `manual_data`
+     * resta degli operatori, e con la chiave assente dal DTO l'array_merge del
+     * service conserva quello già presente sul sentiero (oc:8641).
      */
-    public static function fromApiResponse(int $externalId, ApiTrackResponse $response, array $existingManualData = []): self
+    public static function fromApiResponse(int $externalId, ApiTrackResponse $response): self
     {
-        $apiManual = ManualTrackData::fromArray([
-            'distance' => $response->lunghezza,
-            'ascent' => $response->dislivello_totale,
-            'duration_forward' => $response->durata,
-            'duration_backward' => $response->durata,
-            'ele_min' => $response->ele_min,
-            'ele_max' => $response->ele_max,
-        ]);
-
-        $manual = empty($existingManualData)
-            ? $apiManual
-            : ManualTrackData::merge(ManualTrackData::fromArray($existingManualData), $apiManual);
-
         return new self(
             description: $response->description,
             excerpt: $response->excerpt,
-            manual_data: $manual,
+            manual_data: null,
             ref: $response->codice_cai,
             sardegnasentieri_id: (string) $externalId,
             forestas: ForestasTrackData::fromApiResponse($externalId, $response),

@@ -60,3 +60,7 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **L'import scrive il codice del sentiero in `properties['ref']`** e il catasto lo legge da lì: il
   service non è parametrizzato, cambiare quella chiave richiede di aggiornare
   `WM_TRAIL_LEGACY_CODE_PROPERTY` — vedi [docs/knowledge/catasto-sentieri.md](../../docs/knowledge/catasto-sentieri.md) (oc:8489)
+- **Un sentiero importato non ha lunghezza, dislivello, tempi né quote, ed è voluto**: l'import non
+  scrive `manual_data` e non accoda il DEM. Non rimettere la mappatura dai campi di Drupal né
+  accodare la catena DEM dall'import — con il reset notturno ricalcolerebbe tutto ogni giorno:
+  [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](../../docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) (oc:8641)
