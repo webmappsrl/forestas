@@ -28,4 +28,18 @@ return [
 
     'taxonomy_poi_types_dictionary' => env('TAXONOMY_POI_TYPES_DICTIONARY'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registro catastale dei sentieri (oc:8539)
+    |--------------------------------------------------------------------------
+    |
+    | Il file Google che Forestas mantiene con il CAI, condiviso con chi ha il
+    | link. Solo l'URL: i fogli si ricavano a ogni giro.
+    |
+    */
+
+    'registro_catastale' => [
+        'url' => env('REGISTRO_CATASTALE_URL'),
+    ],
+
 ];

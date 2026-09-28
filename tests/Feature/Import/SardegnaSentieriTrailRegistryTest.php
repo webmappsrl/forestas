@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Dto\Api\ApiTrackResponse;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\EcTrack;
+use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -148,7 +148,7 @@ beforeEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6: registrazione del codice durante l'import
+// Registrazione del codice durante l'import
 // ---------------------------------------------------------------------------
 
 it('registra nel registro il codice di un sentiero appena importato', function () {

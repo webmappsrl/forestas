@@ -1,0 +1,18 @@
+<!--
+Estratto ridotto della pagina reale /htmlview del registro catastale
+(https://docs.google.com/spreadsheets/d/12WYaRr_gtwxdiWTBvmzeUQQcGQjqJ_UsGwI0DylPOtk/htmlview),
+verificato con curl il 2026-09-28. La pagina non contiene elementi statici
+con id "sheet-button-<gid>": l'elenco dei fogli e' costruito da un array JS
+`items.push({name, pageUrl, gid, ...})` dentro uno <script>. Qui sono
+ricopiate solo due voci reali (gid 0 e 1001546814), il resto della pagina
+non serve al reader.
+-->
+<!DOCTYPE html><html><head><title>REGISTRO CATASTALE R.E.S. - Google Drive</title></head>
+<body>
+<script nonce="abc">
+(function(){
+var gid = null;var items = [];items.push({name: "AREA D (Cagliari+OR)", pageUrl: "https:\/\/docs.google.com\/spreadsheets\/d\/12WYaRr_gtwxdiWTBvmzeUQQcGQjqJ_UsGwI0DylPOtk\/htmlview\/sheet?headers\x3dtrue&gid=0", gid: "0",initialSheet: ("0" == gid)});items.push({name: "POI", pageUrl: "https:\/\/docs.google.com\/spreadsheets\/d\/12WYaRr_gtwxdiWTBvmzeUQQcGQjqJ_UsGwI0DylPOtk\/htmlview\/sheet?headers\x3dtrue&gid=1001546814", gid: "1001546814",initialSheet: ("1001546814" == gid)});var sheetsViewport = document.getElementById("sheet-menu");
+})();
+</script>
+</body>
+</html>
