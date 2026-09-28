@@ -27,6 +27,7 @@ altrimenti il comando cerca la chiave vecchia e non trova più nulla. (oc:8489)
 | `WM_TRAIL_REGISTRY_ENABLED` | `true` | adesione al dominio opzionale |
 | `WM_TRAIL_SOURCE_URL_PROPERTY` | `forestas.url` | dove l'import scrive l'indirizzo della scheda su Drupal |
 | `WM_TRAIL_SOURCE_LABEL` | `Drupal` | il nome che compare nel collegamento |
+| `REGISTRO_CATASTALE_URL` | URL del foglio Google (`config('forestas.registro_catastale.url')`) | sorgente del mirror del registro catastale — [docs/knowledge/registro-catastale.md](registro-catastale.md) (oc:8539) |
 
 Nel package le ultime due sono vuote di default. Senza di esse la lista delle anomalie perde i
 collegamenti alla fonte, cioè il modo con cui il gestore raggiunge la scheda da correggere. (oc:8492)

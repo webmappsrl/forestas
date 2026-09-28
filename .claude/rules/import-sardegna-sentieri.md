@@ -60,6 +60,16 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **L'import scrive il codice del sentiero in `properties['ref']`** e il catasto lo legge da lì: il
   service non è parametrizzato, cambiare quella chiave richiede di aggiornare
   `WM_TRAIL_LEGACY_CODE_PROPERTY` — vedi [docs/knowledge/catasto-sentieri.md](../../docs/knowledge/catasto-sentieri.md) (oc:8489)
+- **Il job del registro catastale non aspetta il normalize nel regime orario**: con `--reset`
+  parte solo dopo un normalize riuscito, ma nell'import incrementale (senza `--reset`) parte
+  **sempre**, a ogni giro: a fine batch, o subito dal comando se non c'è nessun job da accodare,
+  perché lì non c'è un troncamento da ricalcolare prima — con un giro all'ora scarica il foglio
+  Google ~24 volte al giorno, voluto dallo spec ma da tenere d'occhio. Con `--only`, e con
+  `--reset` senza job, non parte:
+  [docs/knowledge/registro-catastale.md](../../docs/knowledge/registro-catastale.md) (oc:8539)
+- **`REGISTRO_CATASTALE_URL` va aggiunta a mano anche nel `.env` di ogni server**: non è coperta
+  dal gate di `WM_TRAIL_REGISTRY_ENABLED`, e senza di essa il job del registro fallisce in lettura
+  a ogni giro (oc:8539)
 - **Un sentiero importato non ha lunghezza, dislivello, tempi né quote, ed è voluto**: l'import non
   scrive `manual_data` e non accoda il DEM. Non rimettere la mappatura dai campi di Drupal né
   accodare la catena DEM dall'import — con il reset notturno ricalcolerebbe tutto ogni giorno:
