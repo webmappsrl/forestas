@@ -13,10 +13,11 @@ nel package: `wm-package/docs/knowledge/dati-dem-e-valori-manuali.md`.
   `dislivello_totale`, `durata`, `ele_min`, `ele_max` dell'API restano in `ApiTrackResponse` ma
   nessuno li legge (oc:8641).
 - **L'import non calcola nemmeno il DEM**: salva con `saveQuietly()` e non accoda la catena di
-  `EcTrackService`. Un sentiero appena importato non ha né `manual_data` né `dem_data`, e in Nova il
-  tab DEM è vuoto. È voluto: con il reset notturno ricalcolare il DEM di tutti i sentieri ogni
-  giorno caricherebbe il server per niente; lato client i valori arrivano con la chiamata API del
-  dettaglio del sentiero (oc:8641).
+  `EcTrackService`, quindi un sentiero appena importato non ha né `manual_data` né `dem_data`. È
+  voluto: con il reset notturno ricalcolare il DEM di tutti i sentieri ogni giorno caricherebbe il
+  server per niente; lato client i valori arrivano con la chiamata API del dettaglio del sentiero
+  (oc:8641). Il DEM si calcola la prima volta che qualcuno apre il dettaglio del sentiero in Nova,
+  perché il package lo ricalcola quando manca (oc:8660).
 - **Sui DB con il reset spento i valori di Drupal già importati restano** finché qualcuno non li
   cancella: il codice nuovo smette di scriverli, non li toglie. Su sviluppo e UAT li porta via il
   reset delle 06:00; la produzione partirà con il codice nuovo (oc:8641).
