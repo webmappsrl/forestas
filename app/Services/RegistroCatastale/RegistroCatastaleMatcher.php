@@ -33,6 +33,9 @@ class RegistroCatastaleMatcher
     /** @var array<string, list<array{id: int, code: string, area: string, sector: string, number: int, variant: string, ec_track_id: ?int}>>|null area|settore|numero|variante → codici attivi */
     private ?array $codesByKey = null;
 
+    /** @var array<int, string>|null id del codice → codice completo */
+    private ?array $codeStringById = null;
+
     /** @var array<int, bool>|null ec_track_id → ha almeno un'anomalia del catasto */
     private ?array $tracksWithCatastoAnomaly = null;
 
@@ -64,6 +67,17 @@ class RegistroCatastaleMatcher
     }
 
     /**
+     * Il codice completo (nella forma di TrailRegistryCode::code) di un
+     * codice attivo, dalla mappa gia' caricata: niente query (oc:8540).
+     */
+    public function codeString(int $codeId): ?string
+    {
+        $this->assertPrepared();
+
+        return $this->codeStringById[$codeId] ?? null;
+    }
+
+    /**
      * Regola 2 e 3: traccia trovata, con o senza codice attivo.
      */
     private function matchByTrack(int $trackId, RegistroCatastaleParsedRow $row): RegistroCatastaleMatch
@@ -72,7 +86,7 @@ class RegistroCatastaleMatcher
 
         if ($code !== null) {
             if ($this->numberMatches($code, $row)) {
-                return new RegistroCatastaleMatch($code['id'], null, $trackId);
+                return new RegistroCatastaleMatch($code['id'], null, $trackId, byLink: true);
             }
 
             // `code` e' il codice completo del catasto, nella stessa forma di
@@ -259,6 +273,7 @@ class RegistroCatastaleMatcher
 
         $this->activeCodeByTrack = [];
         $this->codesByKey = [];
+        $this->codeStringById = [];
 
         foreach ($rows as $row) {
             $entry = [
@@ -270,6 +285,8 @@ class RegistroCatastaleMatcher
                 'variant' => (string) $row->variant,
                 'ec_track_id' => $row->ec_track_id !== null ? (int) $row->ec_track_id : null,
             ];
+
+            $this->codeStringById[$entry['id']] = $entry['code'];
 
             if ($entry['ec_track_id'] !== null) {
                 $this->activeCodeByTrack[$entry['ec_track_id']] = $entry;

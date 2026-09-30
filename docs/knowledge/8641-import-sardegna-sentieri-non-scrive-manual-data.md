@@ -9,7 +9,9 @@ nel package: `wm-package/docs/knowledge/dati-dem-e-valori-manuali.md`.
 - **L'import da Sardegna Sentieri non scrive `manual_data`.** `TrackPropertiesData::fromApiResponse()`
   passa `manual_data: null`, la chiave non esce dal DTO e l'`array_merge` di
   `SardegnaSentieriImportService::importTrackFromResponse()` lascia com'è il `manual_data` già
-  presente: il campo è degli operatori, che lo scrivono dal tab DEM di Nova. I valori `lunghezza`,
+  presente: l'import da Sardegna Sentieri non lo scrive: lo scrivono gli operatori dal tab DEM di
+  Nova e, per lunghezza e tempi, il registro catastale fino al go-live
+  ([registro-catastale.md](registro-catastale.md), oc:8540). I valori `lunghezza`,
   `dislivello_totale`, `durata`, `ele_min`, `ele_max` dell'API restano in `ApiTrackResponse` ma
   nessuno li legge (oc:8641).
 - **L'import non calcola nemmeno il DEM**: salva con `saveQuietly()` e non accoda la catena di
@@ -26,8 +28,8 @@ nel package: `wm-package/docs/knowledge/dati-dem-e-valori-manuali.md`.
 
 - **I valori di Drupal non sono misure** (oc:8641): nell'ultima versione del sito erano stati
   popolati con il vecchio calcolo di Webmapp, a volte sbagliato. Call tecnica Sardegna Sentieri del
-  14/09/2026: «ignoriamo i valori presi da Drupal». Sui sentieri restano il calcolo automatico e, in
-  un lavoro successivo, il valore del registro storico (Excel).
+  14/09/2026: «ignoriamo i valori presi da Drupal». Sui sentieri restano il calcolo automatico e il
+  valore del registro storico (Excel), portato da oc:8540 ([registro-catastale.md](registro-catastale.md)).
 - **Nessun comando di pulizia** (oc:8641): il sistema non è in produzione e il reset notturno
   ricrea i sentieri da zero.
 

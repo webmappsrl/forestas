@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
 use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
+use App\Services\RegistroCatastale\AnomalyTypes\RigheMultiple;
 use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
 use App\Services\RegistroCatastale\AnomalyTypes\TracciaSenzaCodice;
+use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -51,6 +53,8 @@ class AppServiceProvider extends ServiceProvider
                 RegistroAnomalyTypes::NUMERO_DIVERSO => NumeroDiverso::class,
                 RegistroAnomalyTypes::TRACCIA_SENZA_CODICE => TracciaSenzaCodice::class,
                 RegistroAnomalyTypes::RIPIEGO_AMBIGUO => RipiegoAmbiguo::class,
+                RegistroAnomalyTypes::RIGHE_MULTIPLE => RigheMultiple::class,
+                RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE => ValoreNonSanitizzabile::class,
             ],
         )]);
     }
