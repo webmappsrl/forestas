@@ -20,6 +20,7 @@ class RegistroCatastaleImportResult
         public readonly int $consistentRows,
         public readonly array $anomaliesByType,
         public readonly array $sheets,
+        public readonly int $tracksUpdated = 0,
     ) {}
 
     /**
@@ -34,6 +35,7 @@ class RegistroCatastaleImportResult
             'rows_by_sheet' => $this->rowsBySheet,
             'consistent_rows' => $this->consistentRows,
             'anomalies_by_type' => $this->anomaliesByType,
+            'tracks_updated' => $this->tracksUpdated,
         ];
     }
 }
