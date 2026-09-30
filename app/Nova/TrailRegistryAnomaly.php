@@ -60,7 +60,7 @@ class TrailRegistryAnomaly extends WmTrailRegistryAnomaly
     protected function noticeBody(): string
     {
         $registro = '<h3 class="text-lg font-bold mb-3 mt-6">'.e(__('Le anomalie del registro')).'</h3>'
-            .'<p class="mb-3">'.e(__('Sono le righe del foglio Google del registro catastale che non si sono agganciate in modo pulito a un codice del Catasto: un numero diverso da quello sul foglio, un link che non porta a nessuna traccia, o una traccia senza codice attivo. Anche queste si correggono alla fonte — il foglio o la scheda del sentiero — non da qui: il prossimo giro dell\'import le fa sparire da sole quando il dato torna coerente.')).'</p>';
+            .'<p class="mb-3">'.e(__('Sono le righe del foglio Google del registro catastale che non si sono agganciate in modo pulito a un codice del Catasto: un numero diverso da quello sul foglio, un link che non porta a nessuna traccia, una traccia senza codice attivo, un numero che il ripiego non sa attribuire a un solo codice, più righe del foglio per lo stesso codice, o valori di lunghezza o tempi che non si riescono a interpretare. Anche queste si correggono alla fonte — il foglio o la scheda del sentiero — non da qui: il prossimo giro dell\'import le fa sparire da sole quando il dato torna coerente.')).'</p>';
 
         return parent::noticeBody().$registro;
     }

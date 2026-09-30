@@ -23,6 +23,7 @@ class RegistroCatastaleImporter
         private readonly RegistroCatastaleSheetReader $reader,
         private readonly RegistroCatastaleRowParser $parser,
         private readonly RegistroCatastaleMatcher $matcher,
+        private readonly RegistroCatastaleTrackWriter $writer,
     ) {}
 
     public function run(): RegistroCatastaleImportResult
@@ -48,16 +49,80 @@ class RegistroCatastaleImporter
         $this->matcher->prepare();
         $now = now();
 
+        $matches = array_map(fn (RegistroCatastaleParsedRow $row) => $this->matcher->match($row), $rows);
+
+        // Una sola riga per codice (oc:8540): fra piu' righe consistenti sullo
+        // stesso codice resta quella del link, se e' una sola; le altre (o
+        // tutte) si sganciano e il sentiero diventa RIGHE_MULTIPLE.
+        $byCode = [];
+        foreach ($matches as $i => $match) {
+            if ($match->codeId !== null) {
+                $byCode[$match->codeId][] = $i;
+            }
+        }
+
+        $multiTrackIds = [];
+        $multiAnomalies = [];
+
+        foreach ($byCode as $codeId => $indexes) {
+            if (count($indexes) < 2) {
+                continue;
+            }
+
+            $linked = array_values(array_filter($indexes, fn (int $i) => $matches[$i]->byLink));
+            $keep = count($linked) === 1 ? $linked[0] : null;
+
+            // Il codice si legge prima dello sgancio: serve nel context, cosi'
+            // la Tab «Registro» trova l'anomalia anche senza sentiero.
+            $code = $this->matcher->codeString($codeId);
+
+            foreach ($indexes as $i) {
+                if ($i !== $keep) {
+                    $matches[$i]->codeId = null;
+                }
+            }
+
+            // Foglio, riga e link sono quelli della riga rimasta agganciata,
+            // se c'e'; altrimenti della prima del gruppo.
+            $main = $rows[$keep ?? $indexes[0]];
+            $trackId = $matches[$keep ?? $indexes[0]]->ecTrackId;
+
+            if ($trackId === null) {
+                foreach ($indexes as $i) {
+                    $trackId ??= $matches[$i]->ecTrackId;
+                }
+            }
+
+            if ($trackId !== null) {
+                $multiTrackIds[$trackId] = true;
+            }
+
+            $multiAnomalies[] = [
+                'ec_track_id' => $trackId,
+                'type' => RegistroAnomalyTypes::RIGHE_MULTIPLE,
+                'source' => RegistroAnomalyTypes::SOURCE,
+                'created_at' => $now,
+                'context' => json_encode([
+                    'sheet' => $main->sheetName,
+                    'gid' => $main->gid,
+                    'row' => $main->rowNumber,
+                    'link' => $main->link,
+                    'code' => $code,
+                    'rows' => array_map(fn (int $i) => ['sheet' => $rows[$i]->sheetName, 'row' => $rows[$i]->rowNumber], $indexes),
+                ]),
+            ];
+        }
+
         $mirror = [];
         $anomalies = [];
         $rowsBySheet = [];
         $anomaliesByType = [];
         $consistentRows = 0;
 
-        foreach ($rows as $row) {
+        foreach ($rows as $i => $row) {
             $rowsBySheet[$row->sheetName] = ($rowsBySheet[$row->sheetName] ?? 0) + 1;
 
-            $match = $this->matcher->match($row);
+            $match = $matches[$i];
 
             if ($match->codeId !== null) {
                 $consistentRows++;
@@ -104,7 +169,46 @@ class RegistroCatastaleImporter
             }
         }
 
-        DB::transaction(function () use ($mirror, $anomalies) {
+        $anomalies = [...$anomalies, ...$multiAnomalies];
+
+        if ($multiAnomalies !== []) {
+            $anomaliesByType[RegistroAnomalyTypes::RIGHE_MULTIPLE] = count($multiAnomalies);
+        }
+
+        // Sentieri con una riga agganciata e non esclusi da RIGHE_MULTIPLE (oc:8540).
+        $writes = [];
+
+        foreach ($rows as $i => $row) {
+            $trackId = $matches[$i]->ecTrackId;
+
+            if ($matches[$i]->codeId === null || $trackId === null || isset($multiTrackIds[$trackId])) {
+                continue;
+            }
+
+            $write = $this->writer->evaluate($row, $trackId);
+            $writes[] = $write;
+
+            foreach ($write->invalid as $cell) {
+                $anomalies[] = [
+                    'ec_track_id' => $trackId,
+                    'type' => RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE,
+                    'source' => RegistroAnomalyTypes::SOURCE,
+                    'created_at' => $now,
+                    'context' => json_encode([
+                        'sheet' => $row->sheetName,
+                        'gid' => $row->gid,
+                        'row' => $row->rowNumber,
+                        'link' => $row->link,
+                        ...$cell,
+                    ]),
+                ];
+                $anomaliesByType[RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE] = ($anomaliesByType[RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE] ?? 0) + 1;
+            }
+        }
+
+        $tracksUpdated = 0;
+
+        DB::transaction(function () use ($mirror, $anomalies, $writes, &$tracksUpdated) {
             RegistroCatastaleRow::query()->delete();
             TrailRegistryClasses::anomaly()::query()->fromSource(RegistroAnomalyTypes::SOURCE)->delete();
 
@@ -115,8 +219,14 @@ class RegistroCatastaleImporter
             foreach (array_chunk($anomalies, 500) as $chunk) {
                 DB::table('trail_registry_anomalies')->insert($chunk);
             }
+
+            foreach ($writes as $write) {
+                if ($this->writer->apply($write)) {
+                    $tracksUpdated++;
+                }
+            }
         });
 
-        return new RegistroCatastaleImportResult($rowsBySheet, $consistentRows, $anomaliesByType, $sheetsLog);
+        return new RegistroCatastaleImportResult($rowsBySheet, $consistentRows, $anomaliesByType, $sheetsLog, tracksUpdated: $tracksUpdated);
     }
 }

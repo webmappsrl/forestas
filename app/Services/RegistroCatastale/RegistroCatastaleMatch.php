@@ -21,5 +21,7 @@ class RegistroCatastaleMatch
         public ?string $anomalyType,
         public ?int $ecTrackId,
         public array $context = [],
+        /** Agganciata dal link (e non dal ripiego sul numero): vince quando piu' righe cadono sullo stesso codice (oc:8540). */
+        public bool $byLink = false,
     ) {}
 }
