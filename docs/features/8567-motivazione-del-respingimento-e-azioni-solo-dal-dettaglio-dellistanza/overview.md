@@ -24,8 +24,9 @@ reviewer, è in
   ALTER TABLE trail_applications ADD COLUMN rejection_reason text NULL;
   ```
   **Non usare `migrate:rollback`**: annulla tutto il batch 9 (10 migration, fra cui
-  `add_identifier_to_taxonomy_wheres`) e distrugge dati importati. Un rollback mirato delle sole 4
-  migration del Catasto funziona, ma svuota codici (579 in locale), anomalie, eventi e istanze.
+  `add_identifier_to_taxonomy_wheres`) e distrugge dati importati. Se offrire un rollback mirato
+  delle sole migration del Catasto come alternativa è una domanda aperta per il reviewer,
+  nell'overview del package (domanda 6).
 
 ## Moduli toccati
 
