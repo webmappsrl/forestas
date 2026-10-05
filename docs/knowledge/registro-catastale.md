@@ -68,6 +68,13 @@ l'intero import, non solo quel foglio. È una scelta voluta — un mirror parzia
 completo — e il costo è che un errore di impaginazione su un foglio blocca l'aggiornamento di
 tutti, finché qualcuno non lo corregge (oc:8539).
 
+**Colonne normalizzate** (oc:8700). Oltre alle `cells`, il mirror salva in colonne vere i valori
+che il parser calcola per l'aggancio: `area`, `sector`, `number`, `variant`. `number` è il numero a
+due cifre del catasto (`162` è settore 1, numero 62) e una variante assente vale `'0'`, come in
+`trail_registry_codes`. Area, settore e numero restano nulli per una riga con solo il link o con
+l'area illeggibile. Il model ricompone il numero come si legge sul foglio in `sheet_number`
+(`100`, `100A`, `162`; `null` se non c'è numero).
+
 **Anomalie prodotte** (provenienza `registro`, distinta da `catasto`):
 
 - `NUMERO_DIVERSO` — traccia agganciata il cui codice ha numero, settore, area o variante diversi
@@ -131,6 +138,16 @@ di Sardegna Sentieri: la cella è testo libero del foglio.
 mostra quella riga e non l'avviso, perché la riga ha la precedenza sull'anomalia; che il sentiero
 non riceva valori si legge solo nella lista anomalie (oc:8540).
 
+Le righe si consultano anche in un elenco, Catasto › Righe del registro
+(`App\Nova\RegistroCatastaleRow`, oc:8700): tutte le righe, anche quelle senza codice, in sola
+lettura, ordinate per nome della tab e poi per riga del foglio (oggi l'ordine alfabetico delle tab
+coincide con quello del file). Colonne Codice · Tab · Area · Settore · Numero, filtri Tab, Area,
+Settore e Agganciato a un codice, ricerca sul numero ricomposto (`101` trova `101` e `101A`). Il
+detail è la stessa tabella della Tab, dallo stesso metodo (`RegistroTabRenderer::renderRowDetail()`),
+con sopra il link al codice; per una riga senza codice, un rimando alla lista delle anomalie. La
+vedono solo Administrator ed Editor, con la regola del Catasto del package
+(`TrailRegistryPolicy::allows()`, vedi `wm-package/docs/resources/TrailRegistry.md`).
+
 ## Perché così
 
 - **Sul numero del sentiero Drupal resta la fonte di verità.** Il foglio è compilato a mano e può
@@ -167,6 +184,15 @@ non riceva valori si legge solo nella lista anomalie (oc:8540).
   la callback del batch non deve allungarsi oltre il timeout della coda
   (`docs/knowledge/import-asincrono-e-anomalie.md`), e un foglio Google irraggiungibile non deve
   bloccare il ricalcolo delle anomalie del catasto (oc:8539).
+- **Colonne normalizzate invece di filtri sul jsonb** (oc:8700): sul foglio il numero ha forme
+  diverse (`101A`, `401 A`, `302/A`, `100 (S.I.)`), e alcune righe hanno la cella dell'area vuota
+  perché l'area è scritta solo sulla prima riga del gruppo (33 sul DB locale al 05/10/2026). Il
+  parser le risolve già; filtrare le `cells` avrebbe dato risultati sbagliati.
+- **Area tenuta insieme a Tab** (oc:8700): oggi ogni tab è un'area e i due filtri danno le stesse
+  righe, ma una tab nuova che non corrisponde a un'area si noterebbe.
+- **Il filtro Agganciato dice solo sì o no** (oc:8700): il motivo di una riga senza codice (numero
+  prenotato, anomalia, righe multiple) sta nella lista delle anomalie; ripeterlo nell'elenco vorrebbe
+  dire tenere due elenchi allineati.
 
 ## Come ci siamo arrivati
 
