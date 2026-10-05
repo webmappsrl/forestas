@@ -4,8 +4,13 @@
 
 ## Deviazioni dal piano
 
-Nessuna deviazione nei Task 1-4: gli script sono quelli del piano, le verifiche hanno dato l'esito
-atteso. Il Task 5 (messa in opera su UAT) si esegue dopo il rilascio su `main`.
+Nessuna deviazione nei Task 1-5: gli script sono quelli del piano, le verifiche hanno dato l'esito
+atteso. Il Task 5 è stato eseguito il 05/10/2026 dopo il rilascio su `main` (`09fbd1b`): voce
+`Host prod.sardegnasentieri` nel `~/.ssh/config` di root (copia in `config.bak-oc8706`), cartella
+`storage/drupal-dump/`, container acceso su `127.0.0.1:3307` e rete `forestas_default`, primo giro
+dalle 13:29 alle 13:41 UTC (download circa 1 minuto, ricarica circa 12, 972 tabelle),
+`php-forestasuat` legge la copia, riga del cron alle 10:00 UTC (crontab precedente in
+`/root/crontab.bak-oc8706`), riga provata con l'ambiente minimo di cron.
 
 ## Bug trovati
 
@@ -27,9 +32,22 @@ atteso. Il Task 5 (messa in opera su UAT) si esegue dopo il rilascio su `main`.
 - **Log dedicato** `storage/logs/drupal-dump-sync.log`: il dev ha corretto l'assunzione che i log di
   UAT non vengano letti; il log è letto da lui e dalle sessioni di lavoro.
 
+- **Righe duplicate tolte dal crontab di UAT**, su richiesta del dev: il backup del database delle
+  19:50 e il download `wm:download-db-backup --latest --s3` delle 20:00 duplicavano lo scheduler del
+  package (`wm-package/src/Providers/ScheduleServiceProvider.php`, ramo `production`: backup alle
+  20:00, download alle 20:10). Su UAT `--s3` non cambia nulla, perché `AWS_DUMPS_ENDPOINT` non è
+  definito e la regione è già `eu-central-1`. Crontab precedente in
+  `/root/crontab.bak-oc8706-duplicati`. Da allora il backup lo fa solo lo scheduler, con le
+  notifiche.
+- **Prova dal locale sulla copia di UAT**: tunnel SSH e script PHP con PDO, le ultime 10 news con
+  titolo, data, tipologia, URL, immagine e testo; scrittura rifiutata (1142). Con PHP 7.4 PDO non
+  segnala gli errori senza `ERRMODE_EXCEPTION`: la prima prova di scrittura sembrava riuscita.
+- **Porta unica 3307**, regola del dev: gli script dall'host usano sempre `127.0.0.1:3307`; per
+  lavorare su UAT dal locale si spegne il container locale e si apre il tunnel sulla 3307 (con
+  `ExitOnForwardFailure`). Tolta dal compose la variabile `DOCKER_DRUPAL_DUMP_PORT`.
+
 ## Follow-up
 
-- **Task 5 del piano**, dopo il rilascio: `~/.ssh/config` di root, cartella dei dump, accensione
-  del container, primo giro, riga del cron, prova con l'ambiente minimo di cron, controllo del log
-  il giorno dopo.
+- **Controllare il log di UAT il 06/10/2026 dopo le 10:00 UTC**: primo giro automatico con il dump
+  del 06/10.
 - **Resto di oc:8706**: scaricamento UAT → locale, verifica del tunnel, password su UAT.

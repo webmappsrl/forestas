@@ -88,15 +88,46 @@ ssh uat.forestas 'tail -n 30 /var/www/html/forestas/storage/logs/drupal-dump-syn
 - **Il container** ha `restart: unless-stopped`: riparte da solo dopo un riavvio, resta spento se
   lo si ferma a mano.
 
-## Raggiungere la copia di UAT dal locale
+## La porta è sempre la 3307
 
-La porta del container è pubblicata solo sul loopback del server, quindi ci si arriva con un
-tunnel SSH:
+Uno script che legge la copia dall'host si collega **sempre** a `127.0.0.1:3307`, utente
+`readonly`, database `sardegnasentieri`, ovunque giri. Così lo script scritto e provato in locale
+gira identico su UAT, senza cambiare configurazione.
+
+| Dove gira lo script | Cosa c'è sulla `127.0.0.1:3307` |
+|---|---|
+| UAT | la copia di UAT |
+| Mac, container locale acceso | la copia locale |
+| Mac, container locale spento e tunnel aperto | la copia di UAT, aggiornata ogni giorno |
+
+Il codice Laravel non passa dall'host: dentro Docker usa `mysql-sardegnasentieri-dump:3306`, in
+locale come su UAT.
+
+## Lavorare dal locale sulla copia di UAT
+
+Si spegne il container locale, che libera la 3307, e si apre il tunnel sulla stessa porta:
 
 ```bash
-ssh -N -L 3308:127.0.0.1:3307 uat.forestas
-# poi: host 127.0.0.1, porta 3308, utente readonly, database sardegnasentieri
+docker stop mysql-sardegnasentieri-dump
+ssh -f -N -o ExitOnForwardFailure=yes -L 3307:127.0.0.1:3307 uat.forestas
 ```
+
+Da qui la 3307 del Mac è la copia di UAT. Il container locale ha `restart: unless-stopped`: spento
+a mano, non riparte da solo occupando la porta. `ExitOnForwardFailure` fa fallire il tunnel con un
+errore se la 3307 è ancora occupata, invece di partire senza inoltrare nulla.
+
+Per tornare alla copia locale:
+
+```bash
+pkill -f "3307:127.0.0.1:3307"
+docker start mysql-sardegnasentieri-dump
+```
+
+Il tunnel passa dall'SSH di UAT: serve la propria chiave autorizzata su `uat.forestas` e il proprio
+IP fra quelli ammessi in entrata dal firewall Hetzner. Da internet la copia resta irraggiungibile.
+
+Con PHP 7.4 PDO non segnala gli errori se non glielo si chiede: negli script va sempre
+`PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION`, altrimenti una query rifiutata sembra riuscita.
 
 ## Scaricare il codice Drupal di riferimento
 
