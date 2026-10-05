@@ -175,3 +175,26 @@ it('il titolo di un anomalia del registro e foglio e riga', function () {
 
     expect($resource->title())->toBe('Z-SU-D · riga 34');
 });
+
+it('il detail di una riga agganciata e uguale alla Tab del codice (oc:8700)', function () {
+    $code = creaCodiceRegistro();
+    $row = RegistroCatastaleRow::create([
+        'sheet_gid' => '0', 'sheet_name' => 'AREA G', 'row_number' => 5,
+        'cells' => [['header' => 'Numero', 'value' => '506C']],
+        'link' => '', 'trail_registry_code_id' => $code->id, 'imported_at' => '2026-10-05 10:00:00',
+    ]);
+
+    expect(RegistroTabRenderer::renderRowDetail($row))->toBe(RegistroTabRenderer::render($code));
+});
+
+it('il detail di una riga non agganciata rimanda alle anomalie (oc:8700)', function () {
+    $row = RegistroCatastaleRow::create([
+        'sheet_gid' => '0', 'sheet_name' => 'AREA G', 'row_number' => 7,
+        'cells' => [['header' => 'Numero', 'value' => '102']],
+        'link' => '', 'trail_registry_code_id' => null, 'imported_at' => '2026-10-05 10:00:00',
+    ]);
+
+    expect(RegistroTabRenderer::renderRowDetail($row))
+        ->toContain('102')
+        ->toContain(e(__('Questa riga non è agganciata a nessun codice.')));
+});

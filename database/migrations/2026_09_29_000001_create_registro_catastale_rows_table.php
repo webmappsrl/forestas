@@ -21,6 +21,15 @@ return new class extends Migration
             // perderebbe un valore.
             $table->jsonb('cells');
             $table->text('link');
+            // Valori calcolati dal parser per l'aggancio al codice, salvati per
+            // filtrare l'elenco delle righe in Nova (oc:8700). Il numero e' quello
+            // a due cifre del catasto: `162` e' settore 1, numero 62. Nullable:
+            // una riga con solo il link non ha numero, e un'area ambigua resta
+            // senza area.
+            $table->char('area', 1)->nullable();
+            $table->char('sector', 1)->nullable();
+            $table->unsignedSmallInteger('number')->nullable();
+            $table->char('variant', 1)->default('0');
             // Solo le righe consistenti hanno il codice. La FK porta la riga via con
             // il reset notturno, insieme ai codici: si ricostruiscono nella stessa
             // catena (oc:8539).
@@ -29,6 +38,8 @@ return new class extends Migration
 
             $table->unique(['sheet_gid', 'row_number']);
             $table->index('trail_registry_code_id');
+            $table->index(['area', 'sector', 'number']);
+            $table->index('sheet_name');
         });
     }
 

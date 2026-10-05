@@ -37,5 +37,15 @@
     "Colonna": "Colonna",
     "Valore": "Valore",
     "Source": "Provenienza",
-    ":sheet · row :row": ":sheet · riga :row"
+    ":sheet · row :row": ":sheet · riga :row",
+    "Questa riga non è agganciata a nessun codice.": "Questa riga non è agganciata a nessun codice.",
+    "Se è finita in anomalia la trovi in Catasto › Anomalie, filtro provenienza Registro.": "Se è finita in anomalia la trovi in Catasto › Anomalie, filtro provenienza Registro.",
+    "Registry rows": "Righe del registro",
+    "Tab": "Tab",
+    "Area": "Area",
+    "Sector": "Settore",
+    "Number": "Numero",
+    "Linked to a code": "Agganciato a un codice",
+    "Yes": "Sì",
+    "No": "No"
 }

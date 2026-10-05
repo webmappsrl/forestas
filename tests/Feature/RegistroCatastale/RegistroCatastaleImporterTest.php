@@ -190,3 +190,25 @@ it('il risultato elenca tutti i fogli letti, anche quelli che non sono registro'
         ->and($result->logContext()['sheets'])->toBe($result->sheets)
         ->and($result->rowsBySheet)->toBe(['Z-SU-D' => 2]);
 });
+
+it('scrive nel mirror area, settore, numero e variante normalizzati (oc:8700)', function () {
+    fakeSingleSheet(registroCsv([
+        ['Z-NU-B', '1', '105', ''],
+        // Area vuota: sul foglio e' scritta solo sulla prima riga del gruppo.
+        ['', '1', '163 A', ''],
+        ['Z-NU-B', '1', '302/A', ''],
+        // Solo link, nessun numero leggibile: la riga si tiene.
+        ['Z-NU-B', '', 'vedi mappa', 'https://x/node/999'],
+    ]));
+
+    app(RegistroCatastaleImporter::class)->run();
+
+    $rows = RegistroCatastaleRow::orderBy('row_number')->get(['area', 'sector', 'number', 'variant']);
+
+    expect($rows->map->only(['area', 'sector', 'number', 'variant'])->all())->toBe([
+        ['area' => 'B', 'sector' => '1', 'number' => 5, 'variant' => '0'],
+        ['area' => 'B', 'sector' => '1', 'number' => 63, 'variant' => 'A'],
+        ['area' => 'B', 'sector' => '3', 'number' => 2, 'variant' => 'A'],
+        ['area' => 'B', 'sector' => null, 'number' => null, 'variant' => '0'],
+    ]);
+});
