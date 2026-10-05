@@ -75,6 +75,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | L'import è asincrono | il comando accoda e ritorna, quando parte il ricalcolo delle anomalie, cosa succede con i job falliti | [docs/knowledge/import-asincrono-e-anomalie.md](docs/knowledge/import-asincrono-e-anomalie.md) |
 | Valori tecnici dei sentieri | l'import non scrive `manual_data` né calcola il DEM, e perché | [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) |
 | Registro catastale | come si legge il foglio Google, come le righe si agganciano ai codici, quali anomalie produce | [docs/knowledge/registro-catastale.md](docs/knowledge/registro-catastale.md) |
+| Copia del DB Drupal | va accesa a mano; come si interroga, schema Drupal, da dove viene nella copia ogni campo delle API | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
 package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la
@@ -86,6 +87,7 @@ customizzazione di Forestas.
 |---|---|
 | Installare il progetto da zero | [docs/howto/setup-progetto.md](docs/howto/setup-progetto.md) |
 | Creare o ruotare il client SUS | [docs/howto/creazione-client-sus.md](docs/howto/creazione-client-sus.md) |
+| Accendere, caricare o raggiungere la copia del DB Drupal | [docs/howto/copia-database-drupal.md](docs/howto/copia-database-drupal.md) |
 
 ## Ruoli
 
