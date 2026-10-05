@@ -1,6 +1,6 @@
 # Accendere, caricare e raggiungere la copia del database Drupal
 
-> Ticket: oc:8705. Cos'è la copia, come si interroga e com'è fatto lo schema:
+> Ticket: oc:8705, oc:8706. Cos'è la copia, come si interroga e com'è fatto lo schema:
 > [docs/knowledge/copia-database-drupal.md](../knowledge/copia-database-drupal.md).
 
 La copia **non c'è per forza**: esiste solo dove qualcuno ha acceso il container e ci ha caricato
@@ -41,10 +41,57 @@ container. Un dump intero richiede alcuni minuti.
 Si ferma senza toccare nulla se la cartella non contiene un dump con la data nel nome, o se il
 container è spento.
 
+## Scaricare il dump da produzione
+
+```bash
+scripts/drupal-dump-download.sh
+```
+
+Lo può lanciare solo chi ha una chiave autorizzata su Acquia e l'host `prod.sardegnasentieri` nel
+proprio `~/.ssh/config`: oggi il dev e UAT. Sul server esegue solo letture, `ls` su
+`prod/backups/` e lo `scp` del file verso questa macchina.
+
+Su Acquia i dump restano 3 giorni e nascono ogni giorno verso le 08:14 UTC. Lo script prende il
+più recente, lo scarica in un file nascosto (`.<nome>.part`), ne verifica l'integrità con
+`gzip -t` e solo allora gli dà il nome definitivo in `storage/drupal-dump/`. Poi tiene in cartella
+solo i dump delle ultime 2 date e cancella i più vecchi; i file senza data nel nome non li tocca.
+
+Uscita: **0** dump nuovo scaricato, **2** nessun dump nuovo (quello più recente c'è già), **1**
+errore. Per scaricare e ricaricare in un colpo solo:
+
+```bash
+scripts/drupal-dump-sync.sh
+```
+
+che ricarica solo se il download ha portato un dump nuovo.
+
+## La copia su UAT
+
+Su UAT la copia si aggiorna da sola, con questa riga nel crontab di `root`:
+
+```
+0 10 * * * cd /var/www/html/forestas && scripts/drupal-dump-sync.sh >> storage/logs/drupal-dump-sync.log 2>&1
+```
+
+Il log, una manciata di righe per giorno con data e ora di inizio e fine:
+
+```bash
+ssh uat.forestas 'tail -n 30 /var/www/html/forestas/storage/logs/drupal-dump-sync.log'
+```
+
+- **La chiave** è `/root/.ssh/id_rsa_acquia_uat`, dedicata a UAT. Sulla console Acquia è la voce
+  `id_rsa_acquia_to_forestas_uat`: per togliere l'accesso a UAT basta revocare quella.
+- **Il firewall Hetzner di UAT** lascia uscire la porta 22 solo verso alcuni IP; per Acquia c'è una
+  regola in uscita TCP 22 verso `18.201.110.246`. Se il download va in timeout, Acquia può aver
+  cambiato IP: `getent hosts sardegnasentieriuyyrag83f9.ssh.devcloud.acquia-sites.com` dice quello
+  nuovo, da mettere nella regola.
+- **Il container** ha `restart: unless-stopped`: riparte da solo dopo un riavvio, resta spento se
+  lo si ferma a mano.
+
 ## Raggiungere la copia di UAT dal locale
 
-Valido da quando il ticket di sync avrà messo la copia su UAT. La porta del container è pubblicata
-solo sul loopback del server, quindi ci si arriva con un tunnel SSH:
+La porta del container è pubblicata solo sul loopback del server, quindi ci si arriva con un
+tunnel SSH:
 
 ```bash
 ssh -N -L 3308:127.0.0.1:3307 uat.forestas

@@ -6,6 +6,7 @@ services:
   db-sardegnasentieri:
     image: mysql:8.0
     container_name: "mysql-sardegnasentieri-dump"
+    restart: unless-stopped
     command: ["--skip-log-bin"]
     environment:
       MYSQL_ROOT_PASSWORD: readonly
