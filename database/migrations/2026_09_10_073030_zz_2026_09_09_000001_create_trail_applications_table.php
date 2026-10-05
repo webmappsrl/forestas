@@ -31,6 +31,12 @@ return new class extends Migration
             $table->text('name')->nullable();
             $table->jsonb('properties')->nullable();
 
+            // Perche' l'istanza e' stata respinta: lo scrive l'operatore
+            // nell'azione «Respingi» e, con l'integrazione SUS, e' il testo
+            // che torna al richiedente. Null finche' l'istanza non e'
+            // respinta (oc:8567).
+            $table->text('rejection_reason')->nullable();
+
             // geography, non geometry: stesso tipo di ec_tracks.geometry
             // (create_ec_tracks_table.php.stub) e taxonomy_wheres.geometry.
             // Quando un'istanza viene approvata (Task 10) la sua geometria

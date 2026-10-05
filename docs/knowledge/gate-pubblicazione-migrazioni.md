@@ -4,7 +4,8 @@
 
 `.github/workflows/run-tests.yml` esegue
 `php artisan wm-package:publish-missing-migrations --with=trail_registry --dry-run`: fallisce se
-uno stub del package non ha corrispondenza nello schema del database.
+uno stub del package non ha corrispondenza nello schema del database, con l'eccezione descritta
+nell'ultimo punto qui sotto.
 
 Forestas è il **secondo** repo ad averlo, dopo maphub (che lo ha da oc:8218): non è la coda del
 ticket del package, è il primo passo per farne uno standard. (oc:8492)
@@ -19,6 +20,11 @@ ticket del package, è il primo passo per farne uno standard. (oc:8492)
   migration di Spatie non è ricorsiva, serve
   `php artisan wm-package:publish-migration trail_registry/<stub>`. Il dettaglio è nel package,
   sezione «Migration» di `wm-package/docs/resources/TrailRegistry.md`.
+- **Una colonna aggiunta a uno stub già eseguito sfugge al gate.** Se il file pubblicato è
+  identico allo stub, il gate dà «allineati» anche quando sul database la colonna manca. In CI non
+  succede, perché il database parte vuoto; sui database che hanno già la tabella la colonna va
+  aggiunta a mano con un `ALTER`, come per `rejection_reason`. Il dettaglio è nel package,
+  sezione «Migration» di `wm-package/docs/resources/TrailRegistry.md`. (oc:8567)
 
 ## Cosa ha richiesto accenderlo
 

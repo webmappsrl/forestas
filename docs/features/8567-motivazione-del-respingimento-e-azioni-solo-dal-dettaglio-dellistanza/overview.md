@@ -2,8 +2,7 @@
 
 # Motivazione del respingimento, e azioni solo dal dettaglio dell'istanza
 
-Il lavoro vive nel package. L'overview completa, con requisiti, rischi e domande aperte per il
-reviewer, è in
+Il lavoro vive nel package. L'overview completa, con requisiti, rischi e risposte del reviewer, è in
 `wm-package/docs/features/8567-motivazione-del-respingimento-e-azioni-solo-dal-dettaglio-dellistanza/overview.md`.
 
 ## Cosa cambia in forestas
@@ -17,16 +16,14 @@ reviewer, è in
 
 ## Rischi
 
-- **Il DB locale e gli eventuali UAT hanno già la tabella.** La migration è registrata come
-  eseguita nel batch 9, e lo stub esce subito se la tabella esiste. La colonna va aggiunta una volta
-  con:
+- **Il DB locale e UAT hanno già la tabella.** La migration è registrata come eseguita nel batch 9,
+  e lo stub esce subito se la tabella esiste. La colonna va aggiunta una volta con l'`ALTER` qui
+  sotto; su UAT lo lancia il team prima del deploy:
   ```sql
   ALTER TABLE trail_applications ADD COLUMN rejection_reason text NULL;
   ```
   **Non usare `migrate:rollback`**: annulla tutto il batch 9 (10 migration, fra cui
-  `add_identifier_to_taxonomy_wheres`) e distrugge dati importati. Se offrire un rollback mirato
-  delle sole migration del Catasto come alternativa è una domanda aperta per il reviewer,
-  nell'overview del package (domanda 6).
+  `add_identifier_to_taxonomy_wheres`) e distrugge dati importati.
 
 ## Moduli toccati
 
