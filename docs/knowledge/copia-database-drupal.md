@@ -534,6 +534,9 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
 - **Chiave dedicata a UAT** (oc:8706): una chiave autorizzata su Acquia apre una shell completa
   sull'ambiente, quindi la «sola lettura» la garantisce lo script, non la chiave; la chiave a parte
   si revoca senza toccare quella del dev.
+- **Porta unica 3307 per gli script dall'host** (oc:8706): uno script provato in locale su una porta
+  diversa da quella di UAT fallirebbe una volta portato su UAT; con la porta fissa, per lavorare su
+  UAT dal locale si spegne il container locale e si apre il tunnel sulla 3307.
 - **Log dedicato** (oc:8706): l'esito del giro giornaliero sta in un file solo suo, letto dal dev e
   dalle sessioni di lavoro, invece di perdersi fra i log di Laravel.
 

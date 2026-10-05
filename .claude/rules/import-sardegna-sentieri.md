@@ -78,3 +78,7 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   `DB::connection('sardegnasentieri')` verifica che il container `mysql-sardegnasentieri-dump`
   sia acceso e caricato — vedi
   [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8705)
+- **Uno script che legge la copia Drupal dall'host usa sempre `127.0.0.1:3307`**, in locale come su
+  UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
+  sulla 3307, mai su un'altra porta — vedi
+  [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)

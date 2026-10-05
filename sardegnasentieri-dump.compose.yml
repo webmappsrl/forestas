@@ -15,7 +15,8 @@ services:
       - "./storage/drupal-dump:/drupal-dump:ro"
       - "sardegnasentieri-pgdata:/var/lib/mysql"
     ports:
-      - "127.0.0.1:${DOCKER_DRUPAL_DUMP_PORT:-3307}:3306"
+      # Porta fissa, uguale in locale e su UAT (vedi docs/howto/copia-database-drupal.md)
+      - "127.0.0.1:3307:3306"
 
 volumes:
   sardegnasentieri-pgdata:
