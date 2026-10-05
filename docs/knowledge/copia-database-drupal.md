@@ -10,12 +10,16 @@ dismesso: l'ultima copia resterà la fonte del dato.
 ### Dove sta
 
 La copia **non c'è per forza**: esiste solo dove qualcuno ha acceso il container
-`mysql-sardegnasentieri-dump` e ci ha caricato un dump. Come accenderla, caricarla, raggiungere
-quella di UAT e scaricare il codice Drupal:
+`mysql-sardegnasentieri-dump` e ci ha caricato un dump. Come accenderla, caricarla, scaricare il
+dump da produzione, come si aggiorna da sola su UAT, come raggiungere quella di UAT e scaricare il
+codice Drupal:
 [docs/howto/copia-database-drupal.md](../howto/copia-database-drupal.md).
 
 Il dump è un `mysqldump` di MySQL 5.7, senza `CREATE DATABASE` né `USE`. Lo carica solo
 `scripts/drupal-dump-reload.sh`, che ricrea anche l'utente `readonly` con il solo `SELECT`.
+
+Su UAT la copia si aggiorna da sola ogni giorno con il dump di produzione: orario, log e chiave
+sono nella sezione «La copia su UAT» dell'howto.
 
 ### Come si interroga
 
@@ -519,6 +523,19 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
   dichiara chiavi esterne, quindi un'API generata darebbe tabelle scollegate da riunire a mano.
 - **Script shell e non comando artisan** (oc:8705): artisan gira in `php-forestas`, che non ha
   accesso a Docker né il client `mysql`.
+
+- **Download e ricarica separati, ricarica solo con un dump nuovo** (oc:8706): ognuno si prova e
+  si rilancia da solo, e nei giorni senza dump nuovo la copia non resta vuota per una ricarica
+  inutile.
+- **File temporaneo nascosto e `gzip -t` prima del nome definitivo** (oc:8706): un download
+  interrotto non lascia mai un `.sql.gz` che la ricarica prenderebbe per buono.
+- **Ultimi 2 dump in cartella** (oc:8706): se il nuovo è rotto si torna al giorno prima senza
+  riscaricare; più di 2 occupano solo disco, perché su Acquia ne restano comunque 3.
+- **Chiave dedicata a UAT** (oc:8706): una chiave autorizzata su Acquia apre una shell completa
+  sull'ambiente, quindi la «sola lettura» la garantisce lo script, non la chiave; la chiave a parte
+  si revoca senza toccare quella del dev.
+- **Log dedicato** (oc:8706): l'esito del giro giornaliero sta in un file solo suo, letto dal dev e
+  dalle sessioni di lavoro, invece di perdersi fra i log di Laravel.
 
 ## Come ci siamo arrivati
 
