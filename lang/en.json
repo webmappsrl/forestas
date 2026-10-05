@@ -37,5 +37,15 @@
     "Colonna": "Column",
     "Valore": "Value",
     "Source": "Source",
-    ":sheet · row :row": ":sheet · row :row"
+    ":sheet · row :row": ":sheet · row :row",
+    "Questa riga non è agganciata a nessun codice.": "This row is not linked to any code.",
+    "Se è finita in anomalia la trovi in Catasto › Anomalie, filtro provenienza Registro.": "If it ended up as an anomaly, you will find it in Catasto › Anomalies, source filter Registry.",
+    "Registry rows": "Registry rows",
+    "Tab": "Tab",
+    "Area": "Area",
+    "Sector": "Sector",
+    "Number": "Number",
+    "Linked to a code": "Linked to a code",
+    "Yes": "Yes",
+    "No": "No"
 }

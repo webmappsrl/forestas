@@ -134,6 +134,10 @@ class RegistroCatastaleImporter
                 'row_number' => $row->rowNumber,
                 'cells' => json_encode($row->cells),
                 'link' => $row->link,
+                'area' => $row->area,
+                'sector' => $row->sector,
+                'number' => $row->number,
+                'variant' => $row->variant,
                 'trail_registry_code_id' => $match->codeId,
                 'imported_at' => $now,
             ];

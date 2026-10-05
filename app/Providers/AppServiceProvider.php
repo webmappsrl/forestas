@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\RegistroCatastaleRow;
+use App\Policies\RegistroCatastaleRowPolicy;
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
 use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
 use App\Services\RegistroCatastale\AnomalyTypes\RigheMultiple;
@@ -67,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Tile::class, TilePolicy::class);
+        Gate::policy(RegistroCatastaleRow::class, RegistroCatastaleRowPolicy::class);
 
         // Branch API riservato al SUS (oc:8333). Registrato qui e non in
         // routes/api.php perche' bootstrap/app.php non carica quel file:

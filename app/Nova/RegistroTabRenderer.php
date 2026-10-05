@@ -51,6 +51,27 @@ class RegistroTabRenderer
         return '<p>'.e(__('Il registro non ha una riga per questo codice.')).'</p>';
     }
 
+    /**
+     * Il detail di una riga nell'elenco «Righe del registro» (oc:8700): la
+     * stessa tabella della Tab, dallo stesso metodo, cosi' le due viste non
+     * divergono. Per una riga senza codice aggiunge dove cercarne il motivo:
+     * numero prenotato, anomalia o righe multiple li distingue solo la lista
+     * delle anomalie, filtro provenienza Registro.
+     */
+    public static function renderRowDetail(RegistroCatastaleRow $row): string
+    {
+        $html = static::renderRow($row);
+
+        if ($row->trail_registry_code_id !== null) {
+            return $html;
+        }
+
+        return '<p style="margin-bottom:12px">'
+            .e(__('Questa riga non è agganciata a nessun codice.')).' '
+            .e(__('Se è finita in anomalia la trovi in Catasto › Anomalie, filtro provenienza Registro.'))
+            .'</p>'.$html;
+    }
+
     protected static function renderRow(RegistroCatastaleRow $row): string
     {
         $cells = collect($row->cells)->map(fn (array $cell) => sprintf(
