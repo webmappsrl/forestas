@@ -74,3 +74,11 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   scrive `manual_data` e non accoda il DEM. Non rimettere la mappatura dai campi di Drupal né
   accodare la catena DEM dall'import — con il reset notturno ricalcolerebbe tutto ogni giorno:
   [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](../../docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) (oc:8641)
+- **La copia Drupal non c'è per forza**: prima di scrivere codice su
+  `DB::connection('sardegnasentieri')` verifica che il container `mysql-sardegnasentieri-dump`
+  sia acceso e caricato — vedi
+  [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8705)
+- **Uno script che legge la copia Drupal dall'host usa sempre `127.0.0.1:3307`**, in locale come su
+  UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
+  sulla 3307, mai su un'altra porta — vedi
+  [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)

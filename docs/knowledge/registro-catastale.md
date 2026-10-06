@@ -2,7 +2,8 @@
 
 Mirror in piattaforma del foglio Google che Forestas condivide con il CAI: un registro storico dei
 codici del Catasto Sentieri, tenuto a mano, che il cliente vuole smettere di aggiornare ma non
-perdere.
+perdere. Per lunghezza, tempi, meta intermedia e i capi mancanti è anche la sorgente dei valori sul
+sentiero (oc:8540, vedi «Scrittura sui sentieri»).
 
 ## Come funziona oggi
 
@@ -67,6 +68,13 @@ l'intero import, non solo quel foglio. È una scelta voluta — un mirror parzia
 completo — e il costo è che un errore di impaginazione su un foglio blocca l'aggiornamento di
 tutti, finché qualcuno non lo corregge (oc:8539).
 
+**Colonne normalizzate** (oc:8700). Oltre alle `cells`, il mirror salva in colonne vere i valori
+che il parser calcola per l'aggancio: `area`, `sector`, `number`, `variant`. `number` è il numero a
+due cifre del catasto (`162` è settore 1, numero 62) e una variante assente vale `'0'`, come in
+`trail_registry_codes`. Area, settore e numero restano nulli per una riga con solo il link o con
+l'area illeggibile. Il model ricompone il numero come si legge sul foglio in `sheet_number`
+(`100`, `100A`, `162`; `null` se non c'è numero).
+
 **Anomalie prodotte** (provenienza `registro`, distinta da `catasto`):
 
 - `NUMERO_DIVERSO` — traccia agganciata il cui codice ha numero, settore, area o variante diversi
@@ -80,9 +88,42 @@ tutti, finché qualcuno non lo corregge (oc:8539).
   stesso avviso).
 - `RIPIEGO_AMBIGUO` — il ripiego per area+settore+numero+variante trova più di un codice
   candidato. Il contesto porta in `candidates` i codici completi, non gli id.
+- `RIGHE_MULTIPLE` — più righe del foglio cadono sullo stesso codice (di solito tratti diversi
+  dello stesso numero, «prima parte» e «seconda parte»). Resta agganciata solo la riga trovata dal
+  link, se è una sola; altrimenti nessuna. Il contesto porta `code` e in `rows` le coppie
+  foglio/riga coinvolte; il sentiero non riceve valori dal registro (oc:8540).
+- `VALORE_NON_SANITIZZABILE` — una cella di lunghezza o tempi che il sanitizzatore non legge, o
+  che chi l'ha compilata segna come dubbia (`?`, un secondo orario nel testo). Il contesto porta
+  `column` e `value` grezzo. Il valore in tabella è `registro_valore_illeggibile`: la colonna
+  `type` è `varchar(32)` e il nome lungo non ci stava (oc:8540).
 
 Le righe con link vuoto e nessun candidato nel ripiego **non** sono anomalie: sono numeri
 prenotati, senza scheda su Sardegna Sentieri, per accordo esplicito col cliente (oc:8539).
+
+**Scrittura sui sentieri** (oc:8540). Nella stessa transazione del mirror, per ogni sentiero con
+una sola riga agganciata e senza `RIGHE_MULTIPLE`, `RegistroCatastaleTrackWriter` porta sul
+sentiero alcune colonne, cercate per intestazione normalizzata:
+
+| Colonna | Destinazione | Regola |
+|---|---|---|
+| «Origine (da)», «Destinazione (a)» | `properties.from`, `properties.to` | solo se il campo è vuoto: vince Drupal |
+| «… Meta intermedia» | `properties.via` (chiave del package) | sempre, se la cella è piena |
+| «lunghezza (m)» | `manual_data.distance`, in km | sempre, se sanitizzabile |
+| «T. percorrenza (A)», «(R)» | `manual_data.duration_forward`, `duration_backward`, in minuti | sempre, se sanitizzabili |
+
+- I testi si riducono a una riga (ritorni a capo e spazi ripetuti diventano uno spazio): il
+  pannello «Proprietà» di Nova usa un input a riga singola e li perderebbe al primo salvataggio.
+- `RegistroValueSanitizer` legge le varianti reali del foglio, una regola per variante, ciascuna
+  con il suo test in `tests/Unit/RegistroCatastale/RegistroValueSanitizerTest.php`. Un tempo scritto
+  come intero senza unità si legge in ore o in minuti secondo la velocità a piedi della riga
+  (1–6 km/h); se non si decide, è illeggibile.
+- Una cella vuota o illeggibile non scrive nulla: per quel campo vale il DEM. Una cella svuotata sul
+  foglio non svuota il valore già scritto sul sentiero.
+- Gli altri campi di `manual_data` (dislivelli, quote) restano degli operatori.
+- Un valore uguale a quello già salvato non si riscrive, quindi `updated_at` cambia solo quando
+  cambia il dato. `updated_at` si scrive nel fuso dell'app, non in quello della sessione PostgreSQL.
+- Le celle segnaposto (`-`, `?`) si scrivono come testo qualsiasi: la correttezza del foglio è di
+  chi lo compila.
 
 **Interfaccia Nova.** `App\Nova\TrailRegistryCode` aggiunge alla scheda del codice una Tab
 «Registro» (`RegistroTabRenderer`) con le colonne del foglio in righe; se la riga del codice è
@@ -93,12 +134,45 @@ schema (`http`/`https`) e host (`sardegnasentieri.it` o un suo sottodominio) son
 di Sardegna Sentieri: la cella è testo libero del foglio.
 `App\Nova\TrailRegistryAnomaly` distingue le due provenienze con un filtro
 (`App\Nova\Filters\TrailAnomalySourceFilter`) e adatta titolo e testo secondo la provenienza
-(oc:8539).
+(oc:8539). Limite noto: quando in un `RIGHE_MULTIPLE` resta agganciata la riga del link, la Tab
+mostra quella riga e non l'avviso, perché la riga ha la precedenza sull'anomalia; che il sentiero
+non riceva valori si legge solo nella lista anomalie (oc:8540).
+
+Le righe si consultano anche in un elenco, Catasto › Righe del registro
+(`App\Nova\RegistroCatastaleRow`, oc:8700): tutte le righe, anche quelle senza codice, in sola
+lettura, ordinate per nome della tab e poi per riga del foglio (oggi l'ordine alfabetico delle tab
+coincide con quello del file). Colonne Codice · Tab · Area · Settore · Numero, filtri Tab, Area,
+Settore e Agganciato a un codice, ricerca sul numero ricomposto (`101` trova `101` e `101A`). Il
+detail è la stessa tabella della Tab, dallo stesso metodo (`RegistroTabRenderer::renderRowDetail()`),
+con sopra il link al codice; per una riga senza codice, un rimando alla lista delle anomalie. La
+vedono solo Administrator ed Editor, con la regola del Catasto del package
+(`TrailRegistryPolicy::allows()`, vedi `wm-package/docs/resources/TrailRegistry.md`).
 
 ## Perché così
 
-- **Drupal resta l'unica fonte di verità.** Il foglio è compilato a mano e può sbagliare; il
-  mirror lo conserva e segnala le discrepanze, non le corregge (oc:8539).
+- **Sul numero del sentiero Drupal resta la fonte di verità.** Il foglio è compilato a mano e può
+  sbagliare; il mirror segnala le discrepanze di numero, non le corregge (oc:8539).
+- **Su lunghezza e tempi vince il registro, fino al go-live** (oc:8540). I valori di Drupal
+  sono già ignorati ([8641](8641-import-sardegna-sentieri-non-scrive-manual-data.md)); quelli del
+  foglio sono misurati sul campo, e per quei campi la call del 14/09/2026 ha fissato «o il Dem o
+  l'Excel» (Piccioli). A ogni giro il registro sovrascrive anche una correzione fatta in Nova: chi vuole
+  cambiare un valore lo cambia sul foglio. Dal go-live il foglio non si sincronizza più e i valori
+  si correggono in Nova; lo spegnimento della sincronizzazione non fa parte di oc:8540.
+- **Su origine e destinazione vince Drupal**: il registro riempie solo i campi vuoti, come testo,
+  senza creare POI («è presente già su Drupal, lasciamo quello che abbiamo trovato su Drupal»,
+  Piccioli, 14/09/2026) (oc:8540).
+- **Update atomici sulle sole chiavi del registro, non il salvataggio del modello** (oc:8540): la
+  catena DEM salva l'intero `properties`, e due processi che lo fanno insieme si cancellano i valori
+  a vicenda (`wm-package/docs/knowledge/dati-dem-e-valori-manuali.md`, oc:8660). Un lock condiviso è
+  stato scartato: `Bus::chain()` non rispetta `ShouldBeUnique` e il lock di oc:8660 vale solo
+  all'accodamento. Resta il verso opposto: una catena DEM o un salvataggio da Nova che hanno letto
+  il sentiero prima del giro del registro possono cancellarne le chiavi, che il giro dell'ora dopo
+  riscrive.
+- **Una sola riga per codice, e nessun valore finché è `RIGHE_MULTIPLE`** (oc:8540): tratti diversi
+  dello stesso numero finivano sullo stesso sentiero per il ripiego; scegliere o sommare vorrebbe
+  dire indovinare. Il link è la prova più forte, il numero solo un'ipotesi.
+- **Ciò che non si risolve si esplicita** (oc:8540): un valore dubbio non si indovina, diventa
+  un'anomalia che Forestas corregge sul foglio.
 - **Mirror sul codice del catasto, non sulla traccia**, perché il registro è un elenco di numeri:
   la scheda del codice è dove lo cerca chi lavora sul catasto (oc:8539).
 - **Lettura dinamica delle colonne**, non una mappa fissa: i fogli delle diverse aree non hanno le
@@ -110,10 +184,24 @@ di Sardegna Sentieri: la cella è testo libero del foglio.
   la callback del batch non deve allungarsi oltre il timeout della coda
   (`docs/knowledge/import-asincrono-e-anomalie.md`), e un foglio Google irraggiungibile non deve
   bloccare il ricalcolo delle anomalie del catasto (oc:8539).
+- **Colonne normalizzate invece di filtri sul jsonb** (oc:8700): sul foglio il numero ha forme
+  diverse (`101A`, `401 A`, `302/A`, `100 (S.I.)`), e alcune righe hanno la cella dell'area vuota
+  perché l'area è scritta solo sulla prima riga del gruppo (33 sul DB locale al 05/10/2026). Il
+  parser le risolve già; filtrare le `cells` avrebbe dato risultati sbagliati.
+- **Area tenuta insieme a Tab** (oc:8700): oggi ogni tab è un'area e i due filtri danno le stesse
+  righe, ma una tab nuova che non corrisponde a un'area si noterebbe.
+- **Il filtro Agganciato dice solo sì o no** (oc:8700): il motivo di una riga senza codice (numero
+  prenotato, anomalia, righe multiple) sta nella lista delle anomalie; ripeterlo nell'elenco vorrebbe
+  dire tenere due elenchi allineati.
 
 ## Come ci siamo arrivati
 
 Scelte iniziali superate durante l'esecuzione, a beneficio di chi rilegge il ticket:
+
+- **«Drupal resta l'unica fonte di verità», il foglio si specchia e basta** (oc:8539, superata
+  in oc:8540): valeva finché il registro era solo un mirror. Con oc:8540 il foglio scrive sui
+  sentieri lunghezza, tempi, meta intermedia e i capi mancanti, perché per quei dati Drupal non ha
+  valori affidabili o non li ha affatto. Sul numero del sentiero la regola resta.
 
 - **Mirror su un JSON sull'`EcTrack`** (come diceva ancora la description del ticket) → spostato
   sul codice del Catasto Sentieri: la description era superata, l'analisi l'ha corretta in fase di

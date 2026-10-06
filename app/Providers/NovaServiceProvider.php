@@ -11,6 +11,7 @@ use App\Nova\Ente;
 use App\Nova\FeatureCollection;
 use App\Nova\Layer;
 use App\Nova\Media as NovaMedia;
+use App\Nova\RegistroCatastaleRow;
 use App\Nova\TaxonomyActivity;
 use App\Nova\TaxonomyPoiType;
 use App\Nova\TaxonomyTheme as NovaTaxonomyTheme;
@@ -53,6 +54,10 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // a dominio acceso. Senza questa riga la sezione esisterebbe
                 // lo stesso, ma in fondo al menu.
                 MenuSection::make(__('Catasto'), [
+                    // Le righe del registro catastale (oc:8700): le voci del
+                    // package (Istanze, Codici, Anomalie) le mette prima il
+                    // package; questa segue, e la documentazione API resta in coda.
+                    MenuItem::resource(RegistroCatastaleRow::class),
                     // Documentazione delle API SUS generata da Scribe (oc:8333),
                     // consegnata a Engineering per l'integrazione con il SUS.
                     // Sta qui e non piu' fra gli strumenti: e' la stessa
@@ -113,11 +118,11 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // con icona 'briefcase' — dichiararla qui permette di aggiungere
                 // voci di progetto, mantenendo lo stesso aspetto.
                 //
-                // Attenzione: il package ricostruisce la sezione per
-                // accodarvi le proprie voci, e nel farlo conserva icona,
-                // richiudibilita' e stato iniziale ma NON canSee(): la
-                // visibilita' va impostata sul singolo MenuItem, non sulla
-                // sezione.
+                // Il package ricostruisce la sezione per accodarvi le proprie
+                // voci e conserva icona, richiudibilita', stato iniziale e
+                // canSee() (oc:8700). Mostra la sezione solo se almeno una
+                // voce e' visibile: un canSee() messo qui resta in AND con
+                // quella regola (injectMenuSectionItems() / visibleWhenAnyItemIs()).
                 MenuSection::make(__('Tools'), [])
                     ->icon('briefcase')
                     ->collapsedByDefault(),

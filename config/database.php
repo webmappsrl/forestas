@@ -99,8 +99,10 @@ return [
 
         'sardegnasentieri' => [
             'driver' => 'mysql',
-            'host' => env('DB_SARDEGNASENTIERI_HOST', 'host.docker.internal'),
-            'port' => env('DB_SARDEGNASENTIERI_PORT', '3307'),
+            // Copia del DB Drupal (oc:8705): si raggiunge per nome sulla rete Docker,
+            // host.docker.internal su Linux non esiste.
+            'host' => env('DB_SARDEGNASENTIERI_HOST', 'mysql-sardegnasentieri-dump'),
+            'port' => env('DB_SARDEGNASENTIERI_PORT', '3306'),
             'database' => env('DB_SARDEGNASENTIERI_DATABASE', 'sardegnasentieri'),
             'username' => env('DB_SARDEGNASENTIERI_USERNAME', 'readonly'),
             'password' => env('DB_SARDEGNASENTIERI_PASSWORD', 'readonly'),

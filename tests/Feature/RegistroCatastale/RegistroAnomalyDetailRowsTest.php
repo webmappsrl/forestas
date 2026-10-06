@@ -2,7 +2,9 @@
 
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
 use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
+use App\Services\RegistroCatastale\AnomalyTypes\RigheMultiple;
 use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
+use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use Wm\WmPackage\TrailRegistry\Models\TrailRegistryAnomaly;
 
@@ -73,4 +75,27 @@ it('ripiego ambiguo mostra i codici candidati', function () {
     ]));
 
     expect($rows)->toContain([__('Codici candidati'), 'ZNUD332, ZORD332']);
+});
+
+it('righe multiple elenca le righe del foglio e le righe comuni', function () {
+    $rows = (new RigheMultiple)->detailRows(anomaliaRegistro(RegistroAnomalyTypes::RIGHE_MULTIPLE, [
+        'link' => '',
+        'code' => 'ZSSG506C',
+        'rows' => [['sheet' => 'Z-SU-D', 'row' => 34], ['sheet' => 'Z-SU-D', 'row' => 35]],
+    ]));
+
+    expect($rows)->toContain([__('Foglio'), 'Z-SU-D'])
+        ->toContain([__('Righe'), e(__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '34']).', '.__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '35']))]);
+});
+
+it('valore non sanitizzabile mostra colonna e valore', function () {
+    $rows = (new ValoreNonSanitizzabile)->detailRows(anomaliaRegistro(RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE, [
+        'link' => '',
+        'column' => 'Lunghezza',
+        'value' => '12 km <b>?</b>',
+    ]));
+
+    expect($rows)->toContain([__('Foglio'), 'Z-SU-D'])
+        ->toContain([__('Colonna'), 'Lunghezza'])
+        ->toContain([__('Valore'), e('12 km <b>?</b>')]);
 });

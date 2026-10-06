@@ -2,10 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\RegistroCatastaleRow;
+use App\Policies\RegistroCatastaleRowPolicy;
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
 use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
+use App\Services\RegistroCatastale\AnomalyTypes\RigheMultiple;
 use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
 use App\Services\RegistroCatastale\AnomalyTypes\TracciaSenzaCodice;
+use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -51,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
                 RegistroAnomalyTypes::NUMERO_DIVERSO => NumeroDiverso::class,
                 RegistroAnomalyTypes::TRACCIA_SENZA_CODICE => TracciaSenzaCodice::class,
                 RegistroAnomalyTypes::RIPIEGO_AMBIGUO => RipiegoAmbiguo::class,
+                RegistroAnomalyTypes::RIGHE_MULTIPLE => RigheMultiple::class,
+                RegistroAnomalyTypes::VALORE_NON_SANITIZZABILE => ValoreNonSanitizzabile::class,
             ],
         )]);
     }
@@ -63,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Tile::class, TilePolicy::class);
+        Gate::policy(RegistroCatastaleRow::class, RegistroCatastaleRowPolicy::class);
 
         // Branch API riservato al SUS (oc:8333). Registrato qui e non in
         // routes/api.php perche' bootstrap/app.php non carica quel file:

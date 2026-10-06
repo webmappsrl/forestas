@@ -28,4 +28,10 @@ class RegistroAnomalyTypes
 
     /** Il ripiego su area+settore+numero+variante trova piu' di un codice candidato. */
     public const RIPIEGO_AMBIGUO = 'registro_ripiego_ambiguo';
+
+    /** Piu' righe del registro cadono sullo stesso codice: resta agganciata solo quella del link, se e' una (oc:8540). */
+    public const RIGHE_MULTIPLE = 'registro_righe_multiple';
+
+    /** Una cella di lunghezza o tempi che il sanitizzatore non legge, o che chi l'ha scritta segna come dubbia (oc:8540). */
+    public const VALORE_NON_SANITIZZABILE = 'registro_valore_illeggibile';
 }
