@@ -1,3 +1,8 @@
+# Servizi WordPress dello shard (oc:8711): wordpress-${APP_NAME} e mariadb-${APP_NAME}.
+# La configurazione di WordPress sta in wp-forestas/.env, non in questo .env.
+include:
+  - wp-forestas/compose.yml
+
 services:
   php:
     # Generic service for manual operations (artisan, tinker, composer)
