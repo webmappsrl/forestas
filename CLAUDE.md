@@ -49,6 +49,11 @@ docker exec -it php-forestas php artisan tinker --execute="
   package si documenta lì, non qui.
 - **Forestas importa da Sardegna Sentieri, non da GeoHub**: il flusso GeoHub del package non è
   usato qui — vedi le trappole sull'import.
+- **Non usare `scripts/wordpress-reset.sh` in produzione**: cancella database e file di WordPress,
+  che lì sono permanenti. Su UAT è il comando dell'azzeramento quotidiano (oc:8711).
+- **Dopo un aggiornamento che porta un nuovo puntatore di `wp-forestas`, lancia
+  `scripts/wordpress-up.sh` sull'host**: altrimenti i container WordPress restano vecchi e un
+  compose rotto emerge solo al primo riavvio della macchina, bloccando l'intero shard (oc:8711).
 
 ## Trappole
 
@@ -76,6 +81,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | Valori tecnici dei sentieri | l'import non scrive `manual_data` né calcola il DEM, e perché | [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) |
 | Registro catastale | come si legge il foglio Google, come le righe si agganciano ai codici, quali anomalie produce | [docs/knowledge/registro-catastale.md](docs/knowledge/registro-catastale.md) |
 | Copia del DB Drupal | va accesa a mano; come si interroga, schema Drupal, da dove viene nella copia ogni campo delle API | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
+| WordPress nello shard | submodule `wp-forestas`, include nei compose, i due `.env`, aggiornare e azzerare WordPress | [docs/knowledge/wordpress-nello-shard.md](docs/knowledge/wordpress-nello-shard.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
 package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la
