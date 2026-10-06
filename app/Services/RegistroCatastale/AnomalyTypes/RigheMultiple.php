@@ -16,7 +16,7 @@ class RigheMultiple implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Più righe del registro per lo stesso codice');
+        return __('Multiple registry rows for the same code');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array
@@ -30,7 +30,7 @@ class RigheMultiple implements AnomalyTypeDefinition
 
         return [
             ...$this->commonRows($anomaly),
-            [__('Righe'), e(implode(', ', $labels))],
+            [__('Rows'), e(implode(', ', $labels))],
         ];
     }
 }

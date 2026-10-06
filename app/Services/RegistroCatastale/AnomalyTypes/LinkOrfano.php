@@ -15,7 +15,7 @@ class LinkOrfano implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Link del registro senza traccia corrispondente');
+        return __('Registry link with no matching track');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array

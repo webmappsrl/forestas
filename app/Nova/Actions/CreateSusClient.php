@@ -26,11 +26,11 @@ class CreateSusClient extends Action
 {
     public $standalone = true;
 
-    public $confirmButtonText = 'Crea client SUS';
+    public $confirmButtonText = 'Create SUS client';
 
     public function name(): string
     {
-        return __('Crea client SUS');
+        return __('Create SUS client');
     }
 
     /**
@@ -42,7 +42,7 @@ class CreateSusClient extends Action
 
         if (User::where('email', $email)->exists()) {
             return Action::danger(__(
-                'Esiste gia\' un utente con l\'email :email. Per cambiare la password usa il campo Password sulla sua scheda.',
+                'A user with the email :email already exists. To change the password use the Password field on their record.',
                 ['email' => $email]
             ));
         }
@@ -62,7 +62,7 @@ class CreateSusClient extends Action
         Artisan::call('permission:cache-reset');
 
         return Action::message(__(
-            'Client SUS :email creato con il ruolo Sus.',
+            'SUS client :email created with the Sus role.',
             ['email' => $email]
         ));
     }
@@ -76,7 +76,7 @@ class CreateSusClient extends Action
             Text::make(__('Email'), 'email')
                 ->rules('required', 'email', 'max:254', 'unique:users,email'),
 
-            Text::make(__('Nome'), 'name')
+            Text::make(__('Name'), 'name')
                 ->rules('required', 'max:255'),
 
             // Campo di testo e non Password: il valore deve restare leggibile,
@@ -85,7 +85,7 @@ class CreateSusClient extends Action
             Text::make(__('Password'), 'password')
                 ->rules('required', 'string', 'min:16', 'max:255')
                 ->default(fn () => Str::random(32))
-                ->help(__('Suggerita automaticamente: copiala prima di confermare, oppure sostituiscila.')),
+                ->help(__('Suggested automatically: copy it before confirming, or replace it.')),
         ];
     }
 

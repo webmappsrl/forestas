@@ -37,11 +37,11 @@ enum TipoEnte: string
     public function label(): string
     {
         return match ($this) {
-            self::ComplessoForestale => __('Complesso forestale'),
-            self::EntePartner => __('Ente partner'),
-            self::AltrePubbliche => __('Altre Pubbliche Istituzioni'),
-            self::PrivatoAssociazione => __('Privato/associazione'),
-            self::Comune => __('Comune'),
+            self::ComplessoForestale => __('Forest complex'),
+            self::EntePartner => __('Partner body'),
+            self::AltrePubbliche => __('Other public institutions'),
+            self::PrivatoAssociazione => __('Private/association'),
+            self::Comune => __('Municipality'),
         };
     }
 }

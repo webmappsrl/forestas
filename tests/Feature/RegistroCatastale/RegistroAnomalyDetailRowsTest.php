@@ -64,8 +64,8 @@ it('numero diverso mostra il codice completo del catasto', function () {
         'sheet_code' => 'G602C',
     ]));
 
-    expect($rows)->toContain([__('Codice del catasto'), 'ZSSG506C'])
-        ->toContain([__('Codice del foglio'), 'G602C']);
+    expect($rows)->toContain([__('Trail registry code'), 'ZSSG506C'])
+        ->toContain([__('Sheet code'), 'G602C']);
 });
 
 it('ripiego ambiguo mostra i codici candidati', function () {
@@ -74,7 +74,7 @@ it('ripiego ambiguo mostra i codici candidati', function () {
         'candidates' => ['ZNUD332', 'ZORD332'],
     ]));
 
-    expect($rows)->toContain([__('Codici candidati'), 'ZNUD332, ZORD332']);
+    expect($rows)->toContain([__('Candidate codes'), 'ZNUD332, ZORD332']);
 });
 
 it('righe multiple elenca le righe del foglio e le righe comuni', function () {
@@ -84,8 +84,8 @@ it('righe multiple elenca le righe del foglio e le righe comuni', function () {
         'rows' => [['sheet' => 'Z-SU-D', 'row' => 34], ['sheet' => 'Z-SU-D', 'row' => 35]],
     ]));
 
-    expect($rows)->toContain([__('Foglio'), 'Z-SU-D'])
-        ->toContain([__('Righe'), e(__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '34']).', '.__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '35']))]);
+    expect($rows)->toContain([__('Sheet'), 'Z-SU-D'])
+        ->toContain([__('Rows'), e(__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '34']).', '.__(':sheet · row :row', ['sheet' => 'Z-SU-D', 'row' => '35']))]);
 });
 
 it('valore non sanitizzabile mostra colonna e valore', function () {
@@ -95,7 +95,7 @@ it('valore non sanitizzabile mostra colonna e valore', function () {
         'value' => '12 km <b>?</b>',
     ]));
 
-    expect($rows)->toContain([__('Foglio'), 'Z-SU-D'])
-        ->toContain([__('Colonna'), 'Lunghezza'])
-        ->toContain([__('Valore'), e('12 km <b>?</b>')]);
+    expect($rows)->toContain([__('Sheet'), 'Z-SU-D'])
+        ->toContain([__('Column'), 'Lunghezza'])
+        ->toContain([__('Value'), e('12 km <b>?</b>')]);
 });
