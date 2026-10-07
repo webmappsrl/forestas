@@ -16,7 +16,7 @@ class RipiegoAmbiguo implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Più codici candidati per lo stesso numero del registro');
+        return __('Multiple candidate codes for the same registry number');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array
@@ -26,7 +26,7 @@ class RipiegoAmbiguo implements AnomalyTypeDefinition
 
         return [
             ...$this->commonRows($anomaly),
-            [__('Codici candidati'), e(implode(', ', $candidates))],
+            [__('Candidate codes'), e(implode(', ', $candidates))],
         ];
     }
 }

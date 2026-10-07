@@ -53,7 +53,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                 // (WmPackageServiceProvider::injectMenuSectionItems()) e solo
                 // a dominio acceso. Senza questa riga la sezione esisterebbe
                 // lo stesso, ma in fondo al menu.
-                MenuSection::make(__('Catasto'), [
+                MenuSection::make(__('Trail registry'), [
                     // Le righe del registro catastale (oc:8700): le voci del
                     // package (Istanze, Codici, Anomalie) le mette prima il
                     // package; questa segue, e la documentazione API resta in coda.
@@ -62,7 +62,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     // consegnata a Engineering per l'integrazione con il SUS.
                     // Sta qui e non piu' fra gli strumenti: e' la stessa
                     // materia del catasto — le istanze arrivano da quelle API.
-                    MenuItem::externalLink(__('Documentazione API SUS'), url('/docs/api/sus'))
+                    MenuItem::externalLink(__('SUS API documentation'), url('/docs/api/sus'))
                         ->openInNewTab()
                         ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                 ])

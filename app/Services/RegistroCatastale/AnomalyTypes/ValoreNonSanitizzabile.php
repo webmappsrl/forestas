@@ -16,7 +16,7 @@ class ValoreNonSanitizzabile implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Valore del registro non interpretabile');
+        return __('Unreadable registry value');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array
@@ -25,8 +25,8 @@ class ValoreNonSanitizzabile implements AnomalyTypeDefinition
 
         return [
             ...$this->commonRows($anomaly),
-            [__('Colonna'), e((string) ($context['column'] ?? ''))],
-            [__('Valore'), e((string) ($context['value'] ?? ''))],
+            [__('Column'), e((string) ($context['column'] ?? ''))],
+            [__('Value'), e((string) ($context['value'] ?? ''))],
         ];
     }
 }

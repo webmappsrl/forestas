@@ -31,8 +31,8 @@ class TrailAnomalySourceFilter extends Filter
     public function options(NovaRequest $request): array
     {
         return [
-            __('Catasto') => TrailRegistryAnomaly::SOURCE_CATASTO,
-            __('Registro') => RegistroAnomalyTypes::SOURCE,
+            __('Trail registry') => TrailRegistryAnomaly::SOURCE_CATASTO,
+            __('Registry') => RegistroAnomalyTypes::SOURCE,
         ];
     }
 }

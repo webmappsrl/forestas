@@ -20,8 +20,8 @@ trait RegistroDetailRows
         $context = $anomaly->context ?? [];
 
         $rows = [
-            [__('Foglio'), e((string) ($context['sheet'] ?? ''))],
-            [__('Riga'), e((string) ($context['row'] ?? ''))],
+            [__('Sheet'), e((string) ($context['sheet'] ?? ''))],
+            [__('Row'), e((string) ($context['row'] ?? ''))],
         ];
 
         $link = (string) ($context['link'] ?? '');

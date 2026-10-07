@@ -45,7 +45,7 @@ class TrailRegistryAnomaly extends WmTrailRegistryAnomaly
     {
         if ($this->resource->source === RegistroAnomalyTypes::SOURCE && $this->resource->ec_track_id === null) {
             return Text::make(
-                __('Sentiero'),
+                __('Trail'),
                 fn () => e($this->context['link'] ?? ''),
             )->asHtml();
         }
@@ -59,8 +59,8 @@ class TrailRegistryAnomaly extends WmTrailRegistryAnomaly
      */
     protected function noticeBody(): string
     {
-        $registro = '<h3 class="text-lg font-bold mb-3 mt-6">'.e(__('Le anomalie del registro')).'</h3>'
-            .'<p class="mb-3">'.e(__('Sono le righe del foglio Google del registro catastale che non si sono agganciate in modo pulito a un codice del Catasto: un numero diverso da quello sul foglio, un link che non porta a nessuna traccia, una traccia senza codice attivo, un numero che il ripiego non sa attribuire a un solo codice, più righe del foglio per lo stesso codice, o valori di lunghezza o tempi che non si riescono a interpretare. Anche queste si correggono alla fonte — il foglio o la scheda del sentiero — non da qui: il prossimo giro dell\'import le fa sparire da sole quando il dato torna coerente.')).'</p>';
+        $registro = '<h3 class="text-lg font-bold mb-3 mt-6">'.e(__('Anomalies from the registry')).'</h3>'
+            .'<p class="mb-3">'.e(__('These are rows from the registro catastale Google Sheet that did not cleanly attach to a trail registry code: a number different from the sheet, a link that leads to no track, a track without an active code, a number the fallback cannot attribute to a single code, several sheet rows for the same code, or length or time values that cannot be interpreted. These are also corrected at the source — the sheet or the trail record — not here: the next import run makes them disappear on their own once the data is consistent again.')).'</p>';
 
         return parent::noticeBody().$registro;
     }

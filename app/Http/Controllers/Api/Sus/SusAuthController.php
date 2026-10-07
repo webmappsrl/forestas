@@ -56,7 +56,7 @@ class SusAuthController extends Controller
 
         if (! $token) {
             return response()->json([
-                'error' => __('Credenziali non valide.'),
+                'error' => __('Invalid credentials.'),
             ], 401);
         }
 
@@ -67,7 +67,7 @@ class SusAuthController extends Controller
             Auth::guard('api')->logout();
 
             return response()->json([
-                'error' => __('Questo endpoint e\' riservato al client SUS.'),
+                'error' => __('This endpoint is reserved for the SUS client.'),
             ], 403);
         }
 
@@ -91,7 +91,7 @@ class SusAuthController extends Controller
             return $this->rispostaConToken(Auth::guard('api')->refresh());
         } catch (Throwable) {
             return response()->json([
-                'error' => __('Impossibile rinnovare il token: rieseguire il login.'),
+                'error' => __('Unable to refresh the token: log in again.'),
             ], 401);
         }
     }

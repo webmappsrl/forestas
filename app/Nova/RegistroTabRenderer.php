@@ -48,7 +48,7 @@ class RegistroTabRenderer
             return static::renderAnomalyNotice($anomaly);
         }
 
-        return '<p>'.e(__('Il registro non ha una riga per questo codice.')).'</p>';
+        return '<p>'.e(__('The registry has no row for this code.')).'</p>';
     }
 
     /**
@@ -67,8 +67,8 @@ class RegistroTabRenderer
         }
 
         return '<p style="margin-bottom:12px">'
-            .e(__('Questa riga non è agganciata a nessun codice.')).' '
-            .e(__('Se è finita in anomalia la trovi in Catasto › Anomalie, filtro provenienza Registro.'))
+            .e(__('This row is not linked to any code.')).' '
+            .e(__('If it ended up as an anomaly, you will find it in Trail registry › Anomalies, source filter Registry.'))
             .'</p>'.$html;
     }
 
@@ -82,11 +82,11 @@ class RegistroTabRenderer
 
         $meta = sprintf(
             '<p style="margin-top:12px;font-size:0.875rem">%s: %s &middot; %s: %s &middot; %s: %s</p>',
-            e(__('Foglio')),
+            e(__('Sheet')),
             e($row->sheet_name),
             e(__('Registry row')),
             e((string) $row->row_number),
-            e(__('Importato il')),
+            e(__('Imported on')),
             e($row->imported_at->format('d/m/Y H:i')),
         );
 
@@ -125,8 +125,8 @@ class RegistroTabRenderer
         $url = rtrim(Nova::path(), '/').'/resources/'.TrailRegistryAnomaly::uriKey().'/'.$anomaly->id;
 
         return '<p style="color:#b91c1c">'
-            .e(__('La riga del registro per questo codice è finita in anomalia:')).' '
-            .'<a href="'.e(url($url)).'" target="_blank" rel="noopener">'.e(__('vedi l\'anomalia')).'</a>'
+            .e(__('The registry row for this code has become an anomaly:')).' '
+            .'<a href="'.e(url($url)).'" target="_blank" rel="noopener">'.e(__('view the anomaly')).'</a>'
             .'</p>';
     }
 }
