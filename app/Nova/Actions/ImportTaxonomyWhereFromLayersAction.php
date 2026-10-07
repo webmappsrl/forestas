@@ -21,7 +21,7 @@ class ImportTaxonomyWhereFromLayersAction extends Action
 
     public function name(): string
     {
-        return __('Import TaxonomyWhere (Aree Catastali)');
+        return __('Import TaxonomyWhere (Cadastral areas)');
     }
 
     public function handle(ActionFields $fields, \Illuminate\Support\Collection $models): mixed

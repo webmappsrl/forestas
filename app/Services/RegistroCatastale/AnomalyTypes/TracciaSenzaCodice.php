@@ -15,7 +15,7 @@ class TracciaSenzaCodice implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Traccia del registro senza codice attivo');
+        return __('Registry track without an active code');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array

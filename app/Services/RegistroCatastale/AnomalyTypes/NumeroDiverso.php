@@ -15,7 +15,7 @@ class NumeroDiverso implements AnomalyTypeDefinition
 
     public function label(): string
     {
-        return __('Numero del registro diverso da quello del catasto');
+        return __('Registry number different from the trail registry');
     }
 
     public function detailRows(TrailRegistryAnomaly $anomaly): array
@@ -24,8 +24,8 @@ class NumeroDiverso implements AnomalyTypeDefinition
 
         return [
             ...$this->commonRows($anomaly),
-            [__('Codice del catasto'), e((string) ($context['code'] ?? ''))],
-            [__('Codice del foglio'), e((string) ($context['sheet_code'] ?? ''))],
+            [__('Trail registry code'), e((string) ($context['code'] ?? ''))],
+            [__('Sheet code'), e((string) ($context['sheet_code'] ?? ''))],
         ];
     }
 }

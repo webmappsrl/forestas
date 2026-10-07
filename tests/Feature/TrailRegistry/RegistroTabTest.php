@@ -196,5 +196,5 @@ it('il detail di una riga non agganciata rimanda alle anomalie (oc:8700)', funct
 
     expect(RegistroTabRenderer::renderRowDetail($row))
         ->toContain('102')
-        ->toContain(e(__('Questa riga non è agganciata a nessun codice.')));
+        ->toContain(e(__('This row is not linked to any code.')));
 });
