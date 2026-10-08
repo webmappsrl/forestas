@@ -2,8 +2,10 @@
 # Azzera WordPress e lo ricrea da zero: cancella i soli volumi wordpress-<APP_NAME> e
 # mariadb-<APP_NAME>, poi rilancia scripts/wordpress-up.sh. Gli altri volumi dello shard non
 # vengono toccati.
-# Su UAT WordPress si ricrea ogni giorno; in produzione i suoi dati sono permanenti e questo
-# script NON va usato (oc:8711).
+# Il sito ricreato ha già temi, plugin, licenze e configurazione di wp-forestas, se sull'host ci sono
+# gli zip commerciali e le chiavi nel wp-forestas/.env (oc:8717). Su UAT si
+# lancia a mano: il ciclo giornaliero non è ancora attivo. In produzione i dati di WordPress sono
+# permanenti e questo script NON va usato (oc:8711).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
