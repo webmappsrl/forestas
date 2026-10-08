@@ -25,10 +25,12 @@ qui conta come entra nello shard.
   label `com.docker.compose.project.config_files` del container `php-${APP_NAME}`.
   `scripts/deploy_dev.sh` non può farlo: gira dentro il container PHP, dove Docker non c'è.
 - **Azzerare:** `scripts/wordpress-reset.sh --conferma`, che tocca solo i volumi di WordPress. Il
-  sito ricreato ha già temi, plugin, licenze e configurazione, che `wp-forestas` rimette dagli zip,
-  dal suo `.env` e da `config/` (oc:8717), purché zip e chiavi siano già sull'host; si perdono contenuti e uploads. Su UAT WordPress verrà
-  ripopolato ogni giorno dai dati di Drupal (ticket successivo); in produzione i dati saranno
-  permanenti.
+  sito ricreato ha già temi, plugin e configurazione, che `wp-forestas` rimette dagli zip e da
+  `config/` (oc:8717), purché gli zip siano già sull'host; le licenze le rimette dal suo `.env` solo
+  su un indirizzo che non è `localhost`, quindi in locale il sito nasce senza licenze, come vuole il
+  README di `wp-forestas`. Si perdono contenuti e uploads. Su UAT WordPress verrà ripopolato ogni
+  giorno dai dati di Drupal (ticket successivo); in produzione i dati saranno permanenti. Questa è la
+  descrizione di riferimento: procedura di UAT e `wordpress-reset.sh` rimandano qui.
 - **UAT** (`https://wp.forestas.uat.maphub.it`): messa in opera, aggiornamenti e azzeramento in
   [docs/howto/messa-in-opera-wordpress-uat.md](../howto/messa-in-opera-wordpress-uat.md).
 

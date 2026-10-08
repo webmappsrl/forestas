@@ -2,10 +2,9 @@
 # Azzera WordPress e lo ricrea da zero: cancella i soli volumi wordpress-<APP_NAME> e
 # mariadb-<APP_NAME>, poi rilancia scripts/wordpress-up.sh. Gli altri volumi dello shard non
 # vengono toccati.
-# Il sito ricreato ha già temi, plugin, licenze e configurazione di wp-forestas, se sull'host ci sono
-# gli zip commerciali e le chiavi nel wp-forestas/.env (oc:8717). Su UAT si
-# lancia a mano: il ciclo giornaliero non è ancora attivo. In produzione i dati di WordPress sono
-# permanenti e questo script NON va usato (oc:8711).
+# Cosa ha il sito ricreato e cosa si perde: docs/knowledge/wordpress-nello-shard.md, «Azzerare»
+# (oc:8717). Su UAT si lancia a mano: il ciclo giornaliero non è ancora attivo. In produzione i dati
+# di WordPress sono permanenti e questo script NON va usato (oc:8711).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -16,7 +15,9 @@ if [ "${1:-}" != "--conferma" ]; then
     exit 1
 fi
 
-APP_NAME=$(grep -E '^APP_NAME=' .env | head -1 | cut -d= -f2- | tr -d '"'"'")
+# sed e non «grep | head»: con pipefail grep senza risultati (o head che chiude prima) farebbe uscire lo
+# script senza il messaggio qui sotto
+APP_NAME=$(sed -n 's/^APP_NAME=//p' .env | sed -n 1p | tr -d '"'"'")
 if [ -z "$APP_NAME" ]; then
     echo "APP_NAME non trovato nel .env di forestas" >&2
     exit 1

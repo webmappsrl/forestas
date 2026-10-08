@@ -6,6 +6,8 @@
 Questa pagina copre ciò che riguarda l'host e lo shard (DNS, `.env`, Apache, certificato). Zip
 commerciali, chiavi di licenza e configurazione del sito sono di `wp-forestas`: li descrive il
 [README di `wp-forestas`, «Messa in opera su UAT»](https://github.com/webmappsrl/wp-forestas#messa-in-opera-su-uat).
+Esistono solo da quando il puntatore di `wp-forestas` include oc:8717: con un puntatore precedente
+`bin/wordpress-config.sh` e `config/` non ci sono, e i passi che li citano non si applicano.
 
 WordPress gira sull'host di UAT come parte dello shard, nei container `wordpress-forestasuat` e
 `mariadb-forestasuat`, ed è pubblicato su `https://wp.forestas.uat.maphub.it` dall'Apache
@@ -92,8 +94,8 @@ esistente non si applica da sola: `wp-forestas/bin/wordpress-config.sh apply` mo
 scripts/wordpress-reset.sh --conferma
 ```
 
-Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri volumi. Il sito
-ricreato ha già temi, plugin, licenze e configurazione, a patto che sull'host ci siano gli zip
-commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel README di `wp-forestas`): li
-rimette `wp-forestas` dagli zip, dal `.env` e da `config/`. Si perdono contenuti e uploads. Oggi si lancia solo a mano: il ciclo
-giornaliero su UAT non è ancora attivo. **In produzione non va usato**.
+Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri volumi. Cosa ha il
+sito ricreato e cosa si perde: [WordPress nello shard](../knowledge/wordpress-nello-shard.md),
+«Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel
+README di `wp-forestas`). Oggi si lancia solo a mano: il ciclo giornaliero su UAT non è ancora
+attivo. **In produzione non va usato**.
