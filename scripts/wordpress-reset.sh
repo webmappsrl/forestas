@@ -17,6 +17,10 @@ fi
 
 # sed e non «grep | head»: con pipefail grep senza risultati (o head che chiude prima) farebbe uscire lo
 # script senza il messaggio qui sotto
+if [ ! -f .env ]; then
+    echo "Il .env di forestas non c'è: crealo da .env-example prima di avviare WordPress" >&2
+    exit 1
+fi
 APP_NAME=$(sed -n 's/^APP_NAME=//p' .env | sed -n 1p | tr -d '"'"'")
 if [ -z "$APP_NAME" ]; then
     echo "APP_NAME non trovato nel .env di forestas" >&2
