@@ -50,7 +50,8 @@ docker exec -it php-forestas php artisan tinker --execute="
 - **Forestas importa da Sardegna Sentieri, non da GeoHub**: il flusso GeoHub del package non è
   usato qui — vedi le trappole sull'import.
 - **Non usare `scripts/wordpress-reset.sh` in produzione**: cancella database e file di WordPress,
-  che lì sono permanenti. Su UAT è il comando dell'azzeramento quotidiano (oc:8711).
+  che lì sono permanenti. Su UAT si lancia a mano: il ciclo giornaliero non è ancora attivo (oc:8711,
+  oc:8717).
 - **Dopo un aggiornamento che porta un nuovo puntatore di `wp-forestas`, lancia
   `scripts/wordpress-up.sh` sull'host**: altrimenti i container WordPress restano vecchi e un
   compose rotto emerge solo al primo riavvio della macchina, bloccando l'intero shard (oc:8711).

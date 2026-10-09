@@ -7,11 +7,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-APP_NAME=$(grep -E '^APP_NAME=' .env | head -1 | cut -d= -f2- | tr -d '"'"'")
-if [ -z "$APP_NAME" ]; then
-    echo "APP_NAME non trovato nel .env di forestas" >&2
-    exit 1
-fi
+# shellcheck source=wordpress-app-name.sh
+source scripts/wordpress-app-name.sh
 
 SHARD="php-${APP_NAME}"
 if [ "$(docker inspect -f '{{.State.Running}}' "$SHARD" 2>/dev/null)" != "true" ]; then
