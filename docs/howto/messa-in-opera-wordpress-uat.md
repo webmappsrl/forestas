@@ -1,6 +1,6 @@
 # Mettere in opera WordPress su UAT
 
-> Ticket: oc:8711, oc:8717. Cos'è e come funziona l'ambiente: README di
+> Ticket: oc:8711, oc:8717, oc:8757. Cos'è e come funziona l'ambiente: README di
 > [`wp-forestas`](https://github.com/webmappsrl/wp-forestas).
 
 Questa pagina copre ciò che riguarda l'host e lo shard (DNS, `.env`, Apache, certificato). Zip
@@ -71,6 +71,9 @@ Se `WP_PORT` non è `8090`, cambia la porta di `ProxyPass` nel file HTTPS.
 - `https://wp.forestas.uat.maphub.it/wp-admin` accetta l'utente amministratore del `.env`.
 - Aspetto → Temi mostra `forestas-child` attivo, con Impreza come tema padre; con le chiavi nel
   `.env` la licenza di Impreza e la registrazione di WPML si riattivano da sole.
+- Il sito mostra header e footer di Sardegna Sentieri (logo, blocco FESR, IT EN), non quelli demo di
+  Impreza, anche in inglese sotto `/en/`: arrivano con l'apply automatico della configurazione. Se
+  manca, nei log di `wordpress-forestasuat` c'è il motivo.
 
 ## Aggiornamenti successivi
 
@@ -87,6 +90,14 @@ emergerebbe solo al primo riavvio della macchina, bloccando l'intero shard.
 Se il nuovo puntatore porta una configurazione del sito diversa (`wp-forestas/config/`), su un sito
 esistente non si applica da sola: `wp-forestas/bin/wordpress-config.sh apply` mostra le differenze,
 `apply --conferma` le applica dopo un backup. Dettagli nel [README di `wp-forestas`, «Messa in opera su UAT»](https://github.com/webmappsrl/wp-forestas#messa-in-opera-su-uat).
+
+Child theme e configurazione si rilasciano insieme: il child cambia con il puntatore, header e footer
+solo con `apply --conferma`, da lanciare subito dopo. Con uno solo dei due il sito mostra header e
+footer demo, o gli shortcode del child come testo. Conserva il percorso del backup creato dal primo
+`apply --conferma` del rilascio (`wp-forestas/backup/<data-ora>`): è quello che serve per tornare
+indietro, perché ogni apply successivo crea un backup nuovo che contiene già le modifiche. Rilascio e rollback a passi nella
+[pagina di conoscenza 8757 di `wp-forestas`](../../wp-forestas/docs/knowledge/8757-header-e-footer-di-wordpress-forestas-secondo-il-mockup.md),
+«Come funziona oggi».
 
 ## Azzerare WordPress
 
