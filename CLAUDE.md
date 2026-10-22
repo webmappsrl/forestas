@@ -81,6 +81,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | L'import è asincrono | il comando accoda e ritorna, quando parte il ricalcolo delle anomalie, cosa succede con i job falliti | [docs/knowledge/import-asincrono-e-anomalie.md](docs/knowledge/import-asincrono-e-anomalie.md) |
 | Valori tecnici dei sentieri | l'import non scrive `manual_data` né calcola il DEM, e perché | [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) |
 | Registro catastale | come si legge il foglio Google, come le righe si agganciano ai codici, quali anomalie produce | [docs/knowledge/registro-catastale.md](docs/knowledge/registro-catastale.md) |
+| Messa in sicurezza PHP2Shell | Dockerfile sorgente dell'immagine PHP dello shard e cosa è specifico di forestas rispetto alla procedura del package | [docs/knowledge/8833-messa-in-sicurezza-php2shell.md](docs/knowledge/8833-messa-in-sicurezza-php2shell.md) |
 | Copia del DB Drupal | va accesa a mano; come si interroga, schema Drupal, da dove viene nella copia ogni campo delle API | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
 | WordPress nello shard | submodule `wp-forestas`, include nei compose, i due `.env`, aggiornare e azzerare WordPress | [docs/knowledge/wordpress-nello-shard.md](docs/knowledge/wordpress-nello-shard.md) |
 
