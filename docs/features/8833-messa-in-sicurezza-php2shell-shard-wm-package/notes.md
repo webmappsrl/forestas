@@ -61,8 +61,25 @@
 - Nessun bug applicativo nuovo. Confermata la mole di 500 del filtro layer EC Tracce (ticket
   cliente già aperto il 21/10, fuori da questo lavoro).
 
+## Esecuzione (22/10, pomeriggio)
+
+- Riscontro UAT sui limiti: max 16,7MB anche lì (il file da 613MB è un dump di backup su disco,
+  non un upload HTTP) — 32M/64M confermati definitivamente.
+- PR mergiate in squash su develop: wm-package#312, wp-forestas#12, forestas#30 (merge autorizzati
+  esplicitamente dal dev in sessione).
+- CI forestas `laravel-tests` fallisce **già su develop** da prima di questo lavoro (il service
+  container PostGIS non si inizializza sul runner): non è il nostro diff — in locale 237/237.
+  Da sistemare a parte.
+- Scoperto il server develop (`dev.forestas`): PHP 8.4.15 vulnerabile, niente WordPress,
+  Ubuntu 20.04.6 (aggiunto a oc:8835). Applicazione lì: evidenze rapide → tag `pre-8833`
+  dell'immagine → pull develop → build `--pull` → riavvio → verifica.
+
 ## Follow-up
 
+- **WordPress su dev.forestas non in opera**: il pull dei 58 commit ha portato lo stack WordPress
+  (oc:8711) su dev, ma manca `wp-forestas/.env` e i container andavano in crash-loop: li ho
+  fermati (`docker stop wordpress-forestasdev mariadb-forestasdev`). La messa in opera segue
+  `docs/howto/messa-in-opera-wordpress-uat.md`, fuori da oc:8833.
 - Applicazione su UAT (team, con la procedura in wm-package) + test funzionale dei limiti (Task 7)
   + `php -v` nei container UAT.
 - Rotazione token SUS e password DB UAT (Task 8, rimandata — vedi Decisioni).
