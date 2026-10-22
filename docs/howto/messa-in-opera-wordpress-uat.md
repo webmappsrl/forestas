@@ -1,6 +1,6 @@
 # Mettere in opera WordPress su UAT
 
-> Ticket: oc:8711, oc:8717, oc:8757. Cos'è e come funziona l'ambiente: README di
+> Ticket: oc:8711, oc:8717, oc:8757, oc:8758. Cos'è e come funziona l'ambiente: README di
 > [`wp-forestas`](https://github.com/webmappsrl/wp-forestas).
 
 Questa pagina copre ciò che riguarda l'host e lo shard (DNS, `.env`, Apache, certificato). Zip
@@ -88,16 +88,27 @@ Senza questo passo i container di WordPress restano quelli vecchi, e un errore n
 emergerebbe solo al primo riavvio della macchina, bloccando l'intero shard.
 
 Se il nuovo puntatore porta una configurazione del sito diversa (`wp-forestas/config/`), su un sito
-esistente non si applica da sola: `wp-forestas/bin/wordpress-config.sh apply` mostra le differenze,
-`apply --conferma` le applica dopo un backup. Dettagli nel [README di `wp-forestas`, «Messa in opera su UAT»](https://github.com/webmappsrl/wp-forestas#messa-in-opera-su-uat).
+esistente non si applica da sola: `wp-forestas/bin/wordpress-config.sh applica` mostra le differenze,
+`applica --conferma` le applica dopo un backup. Dettagli nel [README di `wp-forestas`, «Messa in opera su UAT»](https://github.com/webmappsrl/wp-forestas#messa-in-opera-su-uat).
 
 Child theme e configurazione si rilasciano insieme: il child cambia con il puntatore, header e footer
-solo con `apply --conferma`, da lanciare subito dopo. Con uno solo dei due il sito mostra header e
+solo con `applica --conferma`, da lanciare subito dopo. Con uno solo dei due il sito mostra header e
 footer demo, o gli shortcode del child come testo. Conserva il percorso del backup creato dal primo
-`apply --conferma` del rilascio (`wp-forestas/backup/<data-ora>`): è quello che serve per tornare
+`applica --conferma` del rilascio (`wp-forestas/backup/<data-ora>`): è quello che serve per tornare
 indietro, perché ogni apply successivo crea un backup nuovo che contiene già le modifiche. Rilascio e rollback a passi nella
 [pagina di conoscenza 8757 di `wp-forestas`](../../wp-forestas/docs/knowledge/8757-header-e-footer-di-wordpress-forestas-secondo-il-mockup.md),
 «Come funziona oggi».
+
+Le pagine statiche importate da Drupal (oc:8758) si scrivono con un comando a parte, dopo
+`applica --conferma`: `wp-forestas/bin/wordpress-config.sh pagine`, poi `pagine --conferma`, poi di
+nuovo `applica --conferma`, che collega alle pagine appena create le voci di menu. Al primo
+rilascio servono nel `wp-forestas/.env` `DRUPAL_DB_USER`, `DRUPAL_DB_PASSWORD` e `DRUPAL_SYNC=on`, poi
+`scripts/wordpress-up.sh`; passi e avvisi nel README di `wp-forestas`, «Messa in opera su UAT». Gli
+ultimi tre passi (pagine, anteprima, menu) li fa da solo `wp-forestas/bin/wordpress-config.sh allinea`,
+il comando da mettere nel cron, ma solo su un sito con `config/` già applicata: il primo
+`applica --conferma` di un rilascio resta a mano, e `allinea` lo segnala con `STATO non allineato`. La
+riga del cron è in `wp-forestas/cron/allinea.crontab`, la procedura in
+`wp-forestas/docs/howto/cron-sincronizzazione-pagine.md`.
 
 ## Azzerare WordPress
 
@@ -108,5 +119,7 @@ scripts/wordpress-reset.sh --conferma
 Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri volumi. Cosa ha il
 sito ricreato e cosa si perde: [WordPress nello shard](../knowledge/wordpress-nello-shard.md),
 «Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel
-README di `wp-forestas`). Oggi si lancia solo a mano: il ciclo giornaliero su UAT non è ancora
-attivo. **In produzione non va usato**.
+README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu, non le
+pagine statiche di oc:8758: le crea `wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron
+quando ci sarà), che collega anche i menu. Oggi il reset si lancia solo a mano: il ciclo giornaliero su
+UAT non è ancora attivo. **In produzione non va usato**.
