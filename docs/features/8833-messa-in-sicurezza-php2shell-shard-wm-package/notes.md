@@ -74,6 +74,17 @@
   Ubuntu 20.04.6 (aggiunto a oc:8835). Applicazione lì: evidenze rapide → tag `pre-8833`
   dell'immagine → pull develop → build `--pull` → riavvio → verifica.
 
+## Esecuzione su UAT e rilascio (22/10, chiusura)
+
+- develop → main (merge, conflitto sul puntatore wp-forestas risolto prendendo il lato develop);
+  wp-forestas main fast-forward su develop; wm-package main allineato dal dev con hard reset.
+- UAT applicato e verificato: php/horizon 8.4.27, pool coi valori nuovi, Horizon attivo,
+  WordPress ricreato su 8.3.36 via `wordpress-up.sh` (confermato anche da WP Site Health).
+- Test oversize su UAT: POST 70MB → HTTP 413, worker vivo (warning PHP «exceeds the limit»
+  nei log del container). L'upload legittimo (<32M) via Nova/API resta da verificare con
+  credenziali.
+- Release **wm-package v1.6.0** pubblicata (merge della release PR di release-please, #210).
+
 ## Follow-up
 
 - **WordPress su dev.forestas non in opera**: il pull dei 58 commit ha portato lo stack WordPress
@@ -85,4 +96,7 @@
 - Rotazione token SUS e password DB UAT (Task 8, rimandata — vedi Decisioni).
 - Replica sugli altri shard (~20 server): un ticket per shard agganciato al tag `php2shell`.
 - oc:8835: censimento OS degli host e piano di aggiornamento.
+- WordPress a PHP 8.4 (oggi linea 8.3): solo dopo verifica di compatibilità di core, tema
+  Impreza e plugin (WPML) — se emergono effetti collaterali resta 8.3, che è supportata e
+  patchata.
 - Debito: unificazione dei Dockerfile `wm-phpfpm` (forestas / wm-package / tag 8.2.15 del package).
