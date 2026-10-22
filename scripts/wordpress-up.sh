@@ -30,5 +30,6 @@ done
 
 echo "File compose dello shard: ${FILES}"
 docker compose "${ARGS[@]}" config --quiet
-docker compose "${ARGS[@]}" up -d --build wordpress mariadb
+docker compose "${ARGS[@]}" build --pull wordpress
+docker compose "${ARGS[@]}" up -d wordpress mariadb
 echo "WordPress aggiornato: docker logs -f wordpress-${APP_NAME}"
