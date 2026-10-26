@@ -18,7 +18,7 @@ class TaxonomyWhereLayersImportService
 
     private const CONFIG_URL = 'https://wmfe.s3.eu-central-1.amazonaws.com/geohub/conf/32.json';
 
-    private const SOURCE_KEY = 'geohub_conf_32';
+    public const SOURCE_KEY = 'geohub_conf_32';
 
     /**
      * @return array{
