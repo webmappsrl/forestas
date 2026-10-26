@@ -16,7 +16,7 @@ use Wm\WmPackage\Services\GeometryComputationService;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 /**
- * Filtri della lista Nova delle EC Tracce (oc:8806): le tipologie restano nel filtro dei
+ * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825): le tipologie restano nel filtro dei
  * layer, le aree catastali hanno un filtro a parte, a scelta multipla in OR.
  *
  * Le aree sono tre quadrati affiancati: B (lon 9-10), C (10-11), G (11-12), lat 40-41.
@@ -214,4 +214,91 @@ it('legge anche la voce dell area scritta nella forma di oc:8487', function () {
     calcolaAree();
 
     expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => spuntate($areaB)]))->toBe([$vecchia->id]);
+});
+
+/*
+ * Filtro dei layer con le tracce del layer, non le candidate di onLayer() (oc:8825).
+ */
+
+function layerTipologia(string $nome): Layer
+{
+    return Layer::factory()->createQuietly(['name' => ['it' => $nome, 'en' => $nome], 'properties' => []]);
+}
+
+function attivitaSentiero(): TaxonomyActivity
+{
+    // L'attività legge le icone dal disco wmfe: senza disco finto andrebbe su S3.
+    Storage::fake('wmfe');
+    Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
+
+    return TaxonomyActivity::createQuietly(['name' => ['it' => 'Sentiero', 'en' => 'Trail'], 'identifier' => 'sentiero']);
+}
+
+it('un layer senza attività con tracce associate restituisce solo quelle', function () {
+    $cammini = layerTipologia('Cammini di Sardegna');
+    $associate = [traccia(9.2, 9.4)->id, traccia(9.5, 9.6)->id];
+    traccia(10.2, 10.4);
+    traccia(11.2, 11.4);
+    $cammini->ecTracks()->attach($associate);
+
+    expect(idFiltrati($this, [LAYER_FILTER_KEY => $cammini->id]))->toEqualCanonicalizing($associate);
+});
+
+it('un layer in automatico con attività resta su onLayer anche se ha un associata diversa', function () {
+    $attivita = attivitaSentiero();
+    $sentieri = layerTipologia('Sentieri');
+    $sentieri->taxonomyActivities()->attach($attivita->id);
+    $sentiero = traccia(9.2, 9.4);
+    $sentiero->taxonomyActivities()->attach($attivita->id);
+    $altra = traccia(10.2, 10.4);
+    $sentieri->ecTracks()->attach($altra->id);
+
+    expect($sentieri->fresh()->isAutoTrackMode())->toBeTrue()
+        ->and(idFiltrati($this, [LAYER_FILTER_KEY => $sentieri->id]))->toBe([$sentiero->id]);
+});
+
+it('un layer in automatico con aree nelle properties resta su onLayer anche se ha un associata diversa', function () {
+    $sentieri = Layer::factory()->createQuietly([
+        'name' => ['it' => 'Sentieri del Nuorese', 'en' => 'Sentieri del Nuorese'],
+        'properties' => ['taxonomy_where' => ['nuoro' => ['it' => 'Nuoro']]],
+    ]);
+    $nelNuorese = traccia(9.2, 9.4, ['taxonomy_where' => ['nuoro' => ['it' => 'Nuoro']]]);
+    $altra = traccia(10.2, 10.4);
+    $sentieri->ecTracks()->attach($altra->id);
+
+    expect(idFiltrati($this, [LAYER_FILTER_KEY => $sentieri->id]))->toBe([$nelNuorese->id]);
+});
+
+it('un layer in modalità manuale restituisce le tracce associate anche se ha un attività', function () {
+    $attivita = attivitaSentiero();
+    $layer = layerTipologia('Sentieri scelti');
+    $layer->taxonomyActivities()->attach($attivita->id);
+    $layer->setTrackMode('manual');
+    traccia(9.2, 9.4)->taxonomyActivities()->attach($attivita->id);
+    $scelta = traccia(10.2, 10.4);
+    $layer->ecTracks()->attach($scelta->id);
+
+    expect(idFiltrati($this, [LAYER_FILTER_KEY => $layer->id]))->toBe([$scelta->id]);
+});
+
+it('un layer senza attività né tracce associate restituisce tutte le tracce come oggi', function () {
+    $vuoto = layerTipologia('Sentieri accessibili');
+    $tutte = [traccia(9.2, 9.4)->id, traccia(10.2, 10.4)->id];
+
+    expect(idFiltrati($this, [LAYER_FILTER_KEY => $vuoto->id]))->toEqualCanonicalizing($tutte);
+});
+
+it('le tracce associate si combinano con le aree catastali', function () {
+    $areaB = areaCatastale('Area B', 9);
+    $cammini = layerTipologia('Cammini di Sardegna');
+    $camminoInB = traccia(9.2, 9.4);
+    $camminoInC = traccia(10.2, 10.4);
+    traccia(9.5, 9.6);
+    $cammini->ecTracks()->attach([$camminoInB->id, $camminoInC->id]);
+    calcolaAree();
+
+    expect(idFiltrati($this, [
+        LAYER_FILTER_KEY => $cammini->id,
+        EcTrackCadastralAreaFilter::class => spuntate($areaB),
+    ]))->toBe([$camminoInB->id]);
 });

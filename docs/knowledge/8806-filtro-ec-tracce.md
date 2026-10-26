@@ -18,6 +18,18 @@ filtri al posto del filtro dei layer del package:
 con due filtri sulla stessa chiave Nova applicherebbe il primo che trova
 (`vendor/laravel/nova/src/Filters/FilterDecoder.php:43-45`).
 
+Il filtro dei layer restituisce le tracce **del layer**, non le candidate di `onLayer()`
+(oc:8825):
+
+1. layer in modalità manuale (`Layer::isAutoTrackMode()` falso) → le tracce associate
+   (tabella `layerables`);
+2. layer in automatico con un'attività o aree in `properties.taxonomy_where` → `onLayer()`;
+3. layer in automatico senza filtro ma con tracce associate → le tracce associate;
+4. altrimenti → `onLayer()`.
+
+Sui dati locali del 26/10 Sentieri e Itinerari passano dal punto 2 (614 e 165 tracce), Cammini di
+Sardegna e Sentieri accessibili dal punto 3 (50 e 2).
+
 Il filtro per area non ricalcola la geometria: legge `properties->taxonomy_where`, scritto da
 `GeometryComputationService::syncTaxonomyWhere()` del package. Una traccia esce se nel suo
 `taxonomy_where` c'è la chiave dell'area (l'id della `TaxonomyWhere`) **e** quella voce ha
@@ -34,10 +46,12 @@ Vincoli:
   `COALESCE(osmfeatures_id, osm2cai_id, id)`, quindi una `TaxonomyWhere` osm2cai con `osm2cai_id`
   uguale all'id di un'area può prendere il posto della voce dell'area su una traccia che le
   attraversa entrambe. Il controllo della sorgente evita i falsi positivi, non questa perdita;
-- **«Cammini di Sardegna» e «Sentieri accessibili» restituiscono tutte le tracce** nel filtro dei
-  layer, perché `onLayer()` seleziona per aree e attività del layer e quei due layer, sui dati
-  locali del 26/10, non hanno né l'una né l'altra: combinati con un'area danno tutte le tracce
-  dell'area (oc:8825).
+- **il filtro dei layer mostra le associazioni come sono**: fra le 50 tracce locali di «Cammini
+  di Sardegna» c'è almeno un sentiero (G 126). Si correggono nel layer, in modalità manuale;
+- **il reset notturno non ripulisce `layerables`**: `TRUNCATE TABLE ec_tracks RESTART IDENTITY
+  CASCADE` non la tocca, perché non ha chiavi esterne verso `ec_tracks`, e le associazioni
+  manuali possono restare su id che ora indicano altre tracce.
+  Follow-up non ancora aperto (oc:8825).
 
 ## Perché così
 
@@ -50,9 +64,22 @@ Vincoli:
   gli `osm2cai_id` (in locale ZNUB2 ha `osm2cai_id = 81`, l'id di Area T).
 - **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806): un
   layer legato a una `TaxonomyWhere` di altra sorgente resta una tipologia.
+- **Si corregge il filtro, non la configurazione dei layer** (oc:8825): un'attività «cammino» non
+  esiste, e la configurazione andrebbe ripetuta su ogni ambiente. Per l'app le tracce di un layer
+  sono quelle associate (`LayerService::getRelatedModels()`).
+- **I layer con un filtro automatico restano su `onLayer()`** (oc:8825): per loro `layerables` è
+  una copia del filtro, aggiornata da `SyncAutoLayerAfterTrackTaxonomyChangeJob` con almeno 5
+  minuti di attesa sulla coda `default`; leggerla darebbe risultati vecchi dopo un import.
 
 ## Come ci siamo arrivati
 
+- **Filtro dei layer con `apply()` del package** (oc:8806, superato da oc:8825): `onLayer()`
+  restituisce le tracce candidate per attività e aree del layer; «Cammini di Sardegna» e «Sentieri
+  accessibili», senza né l'una né l'altra, davano tutte le tracce (779 in locale), anche combinati
+  con un'area. Il cliente l'aveva segnalato su UAT (oc:8827).
+- **Tracce associate per tutti i layer, poi `onLayer()` se non ce ne sono** (oc:8825, superata):
+  era la prima regola; avrebbe spostato anche Sentieri e Itinerari sulla copia in `layerables`,
+  aggiornata in differita.
 - **Area a scelta singola, con una tendina** (oc:8806, superata): era la proposta dello scrum del
   21/10; nella review del 26/10 si è passati alle checkbox perché il cliente combina più aree.
 - **Codice catastale come criterio dell'area** (oc:8806, scartata): vale solo per i sentieri;
