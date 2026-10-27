@@ -1,0 +1,8 @@
+{
+  "novaMultiselectFilter.maxElements": "Massimo :max selezionati.",
+  "novaMultiselectFilter.noResult": "Nessun risultato.",
+  "novaMultiselectFilter.noOptions": "La lista è vuota.",
+  "novaMultiselectFilter.limitText": "e altri :count",
+  "novaMultiselectFilter.placeholder": "Seleziona una o più voci",
+  "novaMultiselectFilter.nItemsSelected": ":count voci selezionate"
+}

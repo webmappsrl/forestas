@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1326d59ef5198c435a84b3a77260a69e",
+    "content-hash": "5b998054e7194c8d1c434402ff52a751",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -5788,6 +5788,77 @@
                 }
             ],
             "time": "2025-08-28T20:14:33+00:00"
+        },
+        {
+            "name": "outl1ne/nova-multiselect-filter",
+            "version": "5.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/outl1ne/nova-multiselect-filter.git",
+                "reference": "698f0b86bf206a09be37965a68842a331488afe9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/outl1ne/nova-multiselect-filter/zipball/698f0b86bf206a09be37965a68842a331488afe9",
+                "reference": "698f0b86bf206a09be37965a68842a331488afe9",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/nova": "^5.0",
+                "outl1ne/nova-translations-loader": "^5.0.0",
+                "php": ">=8.0"
+            },
+            "require-dev": {
+                "laravel/nova-devtool": "^1.8"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Outl1ne\\NovaMultiselectFilter\\FilterServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Outl1ne\\NovaMultiselectFilter\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kaspar Rosin",
+                    "email": "kaspar.rosin@gmail.com",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Tarvo Reinpalu",
+                    "email": "tarvoreinpalu@gmail.com",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Outl1ne",
+                    "email": "info@optimistdigital.com",
+                    "role": "Maintainer"
+                }
+            ],
+            "description": "Multiselect filter for Laravel Nova.",
+            "keywords": [
+                "filter",
+                "laravel",
+                "laravel-nova",
+                "multiselect",
+                "nova",
+                "select"
+            ],
+            "support": {
+                "issues": "https://github.com/outl1ne/nova-multiselect-filter/issues",
+                "source": "https://github.com/outl1ne/nova-multiselect-filter/tree/5.0.3"
+            },
+            "time": "2026-10-19T11:51:58+00:00"
         },
         {
             "name": "outl1ne/nova-translations-loader",
@@ -11754,7 +11825,7 @@
             "dist": {
                 "type": "path",
                 "url": "./wm-package",
-                "reference": "f9d8390bd829b4246edbc4eadfdc19ff1572d71c"
+                "reference": "912bbfca2f6858ae27f34f337627bd991f0d5644"
             },
             "require": {
                 "chillerlan/php-qrcode": "^5.0",
@@ -11778,6 +11849,7 @@
                 "marshmallow/nova-tiptap": "^5.1 || ^6.0",
                 "matchish/laravel-scout-elasticsearch": "^7.10",
                 "ndamiens/gisconverter": "^1.0",
+                "outl1ne/nova-multiselect-field": "^5.0.1",
                 "php": ">8.1",
                 "predis/predis": "^2.3",
                 "sentry/sentry-laravel": "^4.13",
