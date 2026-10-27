@@ -99,8 +99,9 @@ indietro, perché ogni apply successivo crea un backup nuovo che contiene già l
 [pagina di conoscenza 8757 di `wp-forestas`](../../wp-forestas/docs/knowledge/8757-header-e-footer-di-wordpress-forestas-secondo-il-mockup.md),
 «Come funziona oggi».
 
-Le pagine statiche importate da Drupal (oc:8758) si scrivono con un comando a parte, dopo
-`applica --conferma`: `wp-forestas/bin/wordpress-config.sh pagine`, poi `pagine --conferma`, poi di
+Le pagine statiche (oc:8758) e le news (oc:8759) importate da Drupal si scrivono con un comando a
+parte, dopo `applica --conferma`: `wp-forestas/bin/wordpress-config.sh pagine`, poi `pagine --conferma` (il primo
+giro con le news dura una ventina di minuti: scarica dal sito Drupal circa 300 file), poi di
 nuovo `applica --conferma`, che collega alle pagine appena create le voci di menu. Al primo
 rilascio servono nel `wp-forestas/.env` `DRUPAL_DB_USER`, `DRUPAL_DB_PASSWORD` e `DRUPAL_SYNC=on`, poi
 `scripts/wordpress-up.sh`; passi e avvisi nel README di `wp-forestas`, «Messa in opera su UAT». Gli
@@ -120,6 +121,6 @@ Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri v
 sito ricreato e cosa si perde: [WordPress nello shard](../knowledge/wordpress-nello-shard.md),
 «Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel
 README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu, non le
-pagine statiche di oc:8758: le crea `wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron
+pagine statiche di oc:8758 né le news di oc:8759: le crea `wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron
 quando ci sarà), che collega anche i menu. Oggi il reset si lancia solo a mano: il ciclo giornaliero su
 UAT non è ancora attivo. **In produzione non va usato**.
