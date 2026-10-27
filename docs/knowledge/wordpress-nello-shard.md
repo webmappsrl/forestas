@@ -28,11 +28,13 @@ qui conta come entra nello shard.
   sito ricreato ha già temi, plugin e configurazione, che `wp-forestas` rimette dagli zip e da
   `config/` (oc:8717), purché gli zip siano già sull'host; le licenze le rimette dal suo `.env` solo
   su un indirizzo che non è `localhost`, quindi in locale il sito nasce senza licenze, come vuole il
-  README di `wp-forestas`. Si perdono contenuti e uploads. Le pagine statiche importate da Drupal
-  (oc:8758) non le rimette l'init: le crea `wp-forestas/bin/wordpress-config.sh allinea`, che collega
-  anche i menu e verifica lo stato; è il comando pensato per il cron giornaliero su UAT
-  (`wp-forestas/cron/allinea.crontab`, non ancora installato). Gli altri contenuti di Drupal (news, da
-  sapere…) arriveranno con i loro ticket. In produzione i dati saranno permanenti. Questa è la
+  README di `wp-forestas`. Si perdono contenuti e uploads. Le pagine statiche (oc:8758) e le news
+  (oc:8759) importate da Drupal non le rimette l'init: le crea `wp-forestas/bin/wordpress-config.sh
+  allinea`, che collega anche i menu e verifica lo stato; è il comando pensato per il cron giornaliero
+  su UAT (`wp-forestas/cron/allinea.crontab`, non ancora installato). Gli altri contenuti di Drupal (da
+  sapere, eventi, carte) arriveranno con oc:8760. I file dei media si scaricano dal sito pubblico di
+  Drupal: dopo lo spegnimento servirà una copia della cartella `sites/default/files`
+  (`DRUPAL_FILES_URL` nel `wp-forestas/.env`). In produzione i dati saranno permanenti. Questa è la
   descrizione di riferimento: procedura di UAT e `wordpress-reset.sh` rimandano qui.
 - **UAT** (`https://wp.forestas.uat.maphub.it`): messa in opera, aggiornamenti e azzeramento in
   [docs/howto/messa-in-opera-wordpress-uat.md](../howto/messa-in-opera-wordpress-uat.md).
