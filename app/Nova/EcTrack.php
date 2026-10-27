@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Enums\StatoValidazione;
+use App\Nova\Filters\EcTrackCadastralAreaFilter;
+use App\Nova\Filters\EcTrackLayerFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
-use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\BelongsToMany;
+use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
-use Marshmallow\Tiptap\Tiptap;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
+use Marshmallow\Tiptap\Tiptap;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\EcTrackApiLinksCard;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
+use Wm\WmPackage\Nova\Filters\FeaturesByLayerFilter;
 use Wm\WmPackage\Nova\Layer;
 use Wm\WmPackage\Nova\TaxonomyActivity;
 
@@ -29,14 +32,14 @@ class EcTrack extends WmNovaEcTrack
     {
         $parentFields = parent::fields($request);
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
-        $regularFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
+        $regularFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
 
         return [
             ...$regularFields,
             Select::make('Stato validazione', 'stato_validazione')
                 ->options(
                     collect(StatoValidazione::cases())
-                        ->mapWithKeys(fn($case) => [$case->value => $case->label()])
+                        ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
                         ->toArray()
                 )
                 ->nullable()
@@ -56,8 +59,21 @@ class EcTrack extends WmNovaEcTrack
 
     public function filters(NovaRequest $request): array
     {
+        // Il filtro dei layer del package va sostituito, non affiancato: con due filtri
+        // sulla stessa chiave Nova applicherebbe il primo che trova (oc:8806).
+        $filters = [];
+        foreach (parent::filters($request) as $filter) {
+            if (get_class($filter) === FeaturesByLayerFilter::class) {
+                $filters[] = new EcTrackLayerFilter($this->resource->getLayerRelationName());
+                $filters[] = new EcTrackCadastralAreaFilter;
+
+                continue;
+            }
+            $filters[] = $filter;
+        }
+
         return [
-            ...parent::filters($request),
+            ...$filters,
             new EcTrackRuoloFilter,
         ];
     }
@@ -69,13 +85,12 @@ class EcTrack extends WmNovaEcTrack
         }
 
         /** @var \App\Models\EcTrack $track */
-
         $track = $request->findModelOrFail();
         $card = new EcTrackApiLinksCard($track);
 
         $sourceId = data_get($track->properties, 'forestas.source_id');
         if ($sourceId) {
-            $card->addLink('Sardegna Sentieri', 'https://www.sardegnasentieri.it/ss/track/' . $sourceId . '?_format=json');
+            $card->addLink('Sardegna Sentieri', 'https://www.sardegnasentieri.it/ss/track/'.$sourceId.'?_format=json');
         }
 
         return [$card];
