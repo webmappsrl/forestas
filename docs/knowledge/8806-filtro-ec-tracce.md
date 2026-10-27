@@ -1,19 +1,31 @@
-# Filtri delle EC Tracce: tipologie e aree catastali
+# Filtri della lista EC Tracce
 
 ## Come funziona oggi
 
-Nella lista Nova delle EC Tracce (anche nei pannelli delle tracce del dettaglio Ente) ci sono due
-filtri al posto del filtro dei layer del package:
+Nella lista Nova delle EC Tracce (anche nei pannelli delle tracce del dettaglio Ente) il menu dei
+filtri ha quattro voci: **Layer**, **Aree catastali**, **Ruolo** e **Stato validazione** (oc:8875).
+I primi due sostituiscono il filtro dei layer del package:
 
-- **filtro dei layer** (`app/Nova/Filters/EcTrackLayerFilter.php`): stessa etichetta e stessa
-  chiave del package (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a
-  un'area catastale, cioè le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri
+- **«Layer»** (`app/Nova/Filters/EcTrackLayerFilter.php`): stessa chiave del package
+  (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a un'area catastale, cioè le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri
   accessibili);
 - **«Aree catastali»** (`app/Nova/Filters/EcTrackCadastralAreaFilter.php`): multiselect con
   ricerca (`MultiselectFilter` di `outl1ne/nova-multiselect-filter`) con le `TaxonomyWhere` di
   sorgente `geohub_conf_32` (`TaxonomyWhereLayersImportService::SOURCE_KEY`). Il valore è la lista
   degli id delle aree scelte; le aree valgono in OR; i due filtri si combinano in AND. Il pacchetto
   non ha l'italiano: i testi del componente sono in `lang/vendor/nova-multiselect-filter/it.json`.
+
+Gli altri due:
+
+- **«Ruolo»** (`app/Nova/Filters/EcTrackRuoloFilter.php`): tracce con almeno un ente in quel ruolo
+  (tabella `enteables`, scritta dall'import di Sardegna Sentieri); le tracce senza enti non hanno
+  un valore che le trovi;
+- **«Stato validazione»**: filtro del campo `Select` `stato_validazione`; le tracce senza stato non
+  hanno un valore che le trovi.
+
+Non ci sono il filtro **App** (il campo del package è reso non filtrabile in
+`App\Nova\EcTrack::fields()`; colonna, dettaglio e form restano, e sulle altre liste il filtro
+c'è ancora) né **Include/Exclude per id** (scartati in `App\Nova\EcTrack::filters()`).
 
 `App\Nova\EcTrack::filters()` **sostituisce** il filtro del package invece di aggiungerne uno:
 con due filtri sulla stessa chiave Nova applicherebbe il primo che trova
@@ -52,7 +64,12 @@ Vincoli:
 - **il reset notturno non ripulisce `layerables`**: `TRUNCATE TABLE ec_tracks RESTART IDENTITY
   CASCADE` non la tocca, perché non ha chiavi esterne verso `ec_tracks`, e le associazioni
   manuali possono restare su id che ora indicano altre tracce.
-  Follow-up non ancora aperto (oc:8825).
+  Follow-up non ancora aperto (oc:8825);
+- **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: in
+  locale il 27/10 è la 730 (G 606), tutta dentro l'area G ma con solo tre aree amministrative nel
+  formato di osmfeatures, scritte da `SyncModelTaxonomyWhereJob` quando il calcolo locale non trova
+  nulla. `wm:resync-taxonomy-where --only-legacy` non la prende, perché ha `_admin_level`
+  (oc:8875).
 
 ## Perché così
 
@@ -78,6 +95,11 @@ Vincoli:
 - **I layer con un filtro automatico restano su `onLayer()`** (oc:8825): per loro `layerables` è
   una copia del filtro, aggiornata da `SyncAutoLayerAfterTrackTaxonomyChangeJob` con almeno 5
   minuti di attesa sulla coda `default`; leggerla darebbe risultati vecchi dopo un import.
+- **Niente filtro App sulla lista EC Tracce** (oc:8875): forestas ha una sola app, e il filtro
+  restituiva sempre tutte le tracce. Si toglie in forestas perché il package è condiviso.
+- **Niente Include/Exclude per id** (oc:8875): servivano al vecchio campo che associa le tracce ai
+  layer, riscritto a settembre 2025 con rotte proprie (`ee8a5551` nel package): nessuno li usa
+  più, e nel menu comparivano solo come titolo, senza nessun controllo.
 
 ## Come ci siamo arrivati
 

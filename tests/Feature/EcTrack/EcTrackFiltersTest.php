@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
+use App\Nova\Filters\EcTrackRuoloFilter;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -115,7 +116,7 @@ it('il filtro dei layer elenca solo le tipologie e conserva etichetta e chiave',
 
     $filtro = definizioneFiltro($this, LAYER_FILTER_KEY);
 
-    expect($filtro['name'])->toBe('Features By Layer Filter')
+    expect($filtro['name'])->toBe(__('Layer'))
         ->and(collect($filtro['options'])->pluck('label')->all())->toBe(['Sentieri']);
 });
 
@@ -308,3 +309,85 @@ it('le tracce associate si combinano con le aree catastali', function () {
         EcTrackCadastralAreaFilter::class => scelte($areaB),
     ]))->toBe([$camminoInB->id]);
 });
+
+/*
+ * Verifica dei filtri della lista (oc:8875): App e Include/Exclude per id fuori dal menu, Ruolo e
+ * Stato validazione fissati sul comportamento verificato nel browser, titoli tradotti.
+ */
+
+/**
+ * @return list<string>
+ */
+function chiaviFiltri($test): array
+{
+    return collect($test->actingAs(amministratore())->getJson('/nova-api/ec-tracks/filters')->assertOk()->json())
+        ->pluck('class')->all();
+}
+
+function conEnte(EcTrack $traccia, string $ruolo): void
+{
+    $enteId = DB::table('entes')->insertGetId([
+        'sardegnasentieri_id' => random_int(1, 1_000_000),
+        'name' => json_encode(['it' => 'Ente '.$ruolo]),
+    ]);
+    // Come l'import: enteable_type è il model di forestas (SardegnaSentieriImportService).
+    DB::table('enteables')->insert([
+        'ente_id' => $enteId,
+        'enteable_id' => $traccia->id,
+        'enteable_type' => \App\Models\EcTrack::class,
+        'ruolo' => $ruolo,
+    ]);
+}
+
+function conStato(EcTrack $traccia, ?string $stato): EcTrack
+{
+    DB::table('ec_tracks')->where('id', $traccia->id)->update(['stato_validazione' => $stato]);
+
+    return $traccia;
+}
+
+it('il menu dei filtri non ha App né Include/Exclude per id', function () {
+    $chiavi = chiaviFiltri($this);
+
+    expect($chiavi)->not->toContain('resource:apps:app')
+        ->and(collect($chiavi)->filter(fn (string $chiave) => str_starts_with($chiave, 'features_include_ids_')
+            || str_starts_with($chiave, 'features_exclude_ids_'))->all())->toBe([])
+        ->and($chiavi)->toContain(
+            LAYER_FILTER_KEY,
+            EcTrackCadastralAreaFilter::class,
+            EcTrackRuoloFilter::class,
+            'Select:stato_validazione',
+        );
+});
+
+it('il filtro Ruolo restituisce le tracce con un ente in quel ruolo', function () {
+    $conGestore = traccia(9.2, 9.4);
+    conEnte($conGestore, 'gestore');
+    conEnte(traccia(9.5, 9.6), 'rilevatore');
+    traccia(9.7, 9.8);
+
+    expect(idFiltrati($this, [EcTrackRuoloFilter::class => 'gestore']))->toBe([$conGestore->id]);
+});
+
+it('il filtro Stato validazione restituisce le tracce con quel valore', function () {
+    $percorribile = conStato(traccia(9.2, 9.4), 'percorribile');
+    conStato(traccia(9.5, 9.6), 'in_revisione_validazione');
+    conStato(traccia(9.7, 9.8), null);
+
+    expect(idFiltrati($this, ['Select:stato_validazione' => 'percorribile']))->toBe([$percorribile->id]);
+});
+
+it('i titoli dei filtri sono tradotti', function (string $lingua, array $attesi) {
+    // La CI gira con APP_LOCALE=en: la lingua va impostata qui.
+    app()->setLocale($lingua);
+
+    $nomi = collect($this->actingAs(amministratore())->getJson('/nova-api/ec-tracks/filters')->assertOk()->json())
+        ->pluck('name', 'class');
+
+    expect($nomi[LAYER_FILTER_KEY])->toBe($attesi[0])
+        ->and($nomi[EcTrackRuoloFilter::class])->toBe($attesi[1])
+        ->and($nomi['Select:stato_validazione'])->toBe($attesi[2]);
+})->with([
+    'italiano' => ['it', ['Layer', 'Ruolo', 'Stato validazione']],
+    'inglese' => ['en', ['Layer', 'Role', 'Validation status']],
+]);

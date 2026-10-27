@@ -55,8 +55,8 @@ App e Include/Exclude non hanno nessun test.
       stato di validazione, 190 su 779 senza enti), così la somma dei conteggi torna al totale
 - [ ] Verifica di una combinazione che usa insieme Layer + Aree catastali + Ruolo + Stato
       validazione, con lo stesso riscontro sul DB
-- [ ] Prove in `notes.md`: tabella con filtro, valore, conteggio Nova, conteggio query, frase e
-      query usata; uno screenshot per filtro (e per la combinazione) nella cartella del cantiere
+- [ ] Prove: tabella con filtro, valore, conteggio Nova, conteggio query e frase (sezione «Esito»
+      sotto), query usate in `notes.md`
 - [ ] Test automatici per Ruolo, Stato validazione, assenza del filtro App e titoli tradotti, in
       `tests/Feature/EcTrack/EcTrackFiltersTest.php`; i test sul testo italiano impostano la lingua
       (`app()->setLocale('it')`), perché la CI gira con `APP_LOCALE=en`
@@ -166,5 +166,4 @@ Tutto in forestas:
 - `lang/en.json`, `lang/it.json` — chiavi dei titoli
 - `tests/Feature/EcTrack/EcTrackFiltersTest.php` — test nuovi e aggiornamento del test sul titolo
   del Layer
-- `docs/features/8875-verifica-filtri-lista-ec-tracce/` — overview, piano, note con le prove,
-  screenshot
+- `docs/features/8875-verifica-filtri-lista-ec-tracce/` — overview, piano, note con le query

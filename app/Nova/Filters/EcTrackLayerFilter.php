@@ -49,11 +49,12 @@ class EcTrackLayerFilter extends FeaturesByLayerFilter
     }
 
     /**
-     * Stessa etichetta del filtro del package: Nova la ricaverebbe dal nome della classe.
+     * Senza name() Nova ricaverebbe l'etichetta dal nome della classe; quella del package era
+     * «Features By Layer Filter», in inglese anche per l'utente italiano (oc:8875).
      */
     public function name(): string
     {
-        return 'Features By Layer Filter';
+        return __('Layer');
     }
 
     /**
