@@ -29,7 +29,13 @@ Nessuno nei filtri. Due cose emerse dalla verifica, fuori scope (vedi «Follow-u
 ## Decisioni
 
 - Le domande aperte della prima overview le ha chiuse la dev il 27/10 (sezione «Decisioni»
-  dell'overview), non Giuseppe come previsto all'inizio.
+  dell'overview), non Giuseppe come previsto all'inizio. La rimozione di Include/Exclude è stata
+  concordata in call con Alessandro Peci, reviewer del ticket.
+- Le chiavi `Layer`, `Role` e `Validation status` non esistevano in `lang/*.json` né nel package:
+  nessuna traduzione esistente cambia.
+- Il caso concreto dell'anomalia sulle aree: la traccia 730 «Iscuvudè - Santu Jorzi - Attalai
+  (G 606)», tutta dentro l'area G, ha solo tre aree amministrative nel formato di osmfeatures,
+  scritte il 23/09. Nella pagina di conoscenza c'è la condizione, non l'id, che cambia a ogni reset.
 - I totali di Nova per valore sono letti con la stessa richiesta della lista
   (`/nova-api/ec-tracks/count` con i filtri codificati in base64); la combinazione è verificata
   anche a schermo («1-10 of 10»).
@@ -78,10 +84,11 @@ select count(distinct t.id) from ec_tracks t join taxonomy_wheres w on w.id betw
 where not (coalesce(t.properties->'taxonomy_where', '{}'::jsonb) ? (w.id::text));
 ```
 
-Dopo le modifiche: menu con Layer, Aree catastali, Ruolo, Stato validazione; conteggi invariati
+Dopo le modifiche: menu con Layer, Aree catastali, Ruolo, Stato validazione; colonna App ancora
+in lista; conteggi invariati
 (779 totali, Sentieri accessibili 2, Area G 166, gestore 305, percorribile 225, combinazione 10).
 
-Test: `EcTrackFiltersTest` 20 passati (5 nuovi più il dataset dei titoli), suite completa 257
+Test: `EcTrackFiltersTest` 20 passati (4 test nuovi, 5 casi: quello dei titoli ha un dataset di 2), suite completa 257
 passati. PHPStan: nessun errore sui file toccati (restano i 5 preesistenti in
 `tests/Feature/Sus/`).
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\EcTrack as ForestasEcTrack;
 use App\Models\User;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
@@ -17,8 +18,9 @@ use Wm\WmPackage\Services\GeometryComputationService;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 /**
- * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825): le tipologie restano nel filtro dei
- * layer, le aree catastali hanno un filtro a parte, a scelta multipla in OR.
+ * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825, oc:8875): le tipologie restano nel
+ * filtro dei layer, le aree catastali hanno un filtro a parte, a scelta multipla in OR; Ruolo e Stato
+ * validazione completano il menu, senza App né Include/Exclude per id.
  *
  * Le aree sono tre quadrati affiancati: B (lon 9-10), C (10-11), G (11-12), lat 40-41.
  */
@@ -110,13 +112,13 @@ function scelte(TaxonomyWhere ...$aree): array
     return collect($aree)->map(fn ($area) => $area->id)->values()->all();
 }
 
-it('il filtro dei layer elenca solo le tipologie e conserva etichetta e chiave', function () {
+it('il filtro dei layer elenca solo le tipologie e conserva la chiave del package', function () {
     areaCatastale('Area B', 9);
     Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
 
     $filtro = definizioneFiltro($this, LAYER_FILTER_KEY);
 
-    expect($filtro['name'])->toBe(__('Layer'))
+    expect($filtro['name'])->toBe('Layer')
         ->and(collect($filtro['options'])->pluck('label')->all())->toBe(['Sentieri']);
 });
 
@@ -327,14 +329,15 @@ function chiaviFiltri($test): array
 function conEnte(EcTrack $traccia, string $ruolo): void
 {
     $enteId = DB::table('entes')->insertGetId([
-        'sardegnasentieri_id' => random_int(1, 1_000_000),
+        // sardegnasentieri_id è unique: un valore derivato evita collisioni fra chiamate.
+        'sardegnasentieri_id' => "test-{$traccia->id}-{$ruolo}",
         'name' => json_encode(['it' => 'Ente '.$ruolo]),
     ]);
     // Come l'import: enteable_type è il model di forestas (SardegnaSentieriImportService).
     DB::table('enteables')->insert([
         'ente_id' => $enteId,
         'enteable_id' => $traccia->id,
-        'enteable_type' => \App\Models\EcTrack::class,
+        'enteable_type' => ForestasEcTrack::class,
         'ruolo' => $ruolo,
     ]);
 }
@@ -346,18 +349,15 @@ function conStato(EcTrack $traccia, ?string $stato): EcTrack
     return $traccia;
 }
 
-it('il menu dei filtri non ha App né Include/Exclude per id', function () {
-    $chiavi = chiaviFiltri($this);
-
-    expect($chiavi)->not->toContain('resource:apps:app')
-        ->and(collect($chiavi)->filter(fn (string $chiave) => str_starts_with($chiave, 'features_include_ids_')
-            || str_starts_with($chiave, 'features_exclude_ids_'))->all())->toBe([])
-        ->and($chiavi)->toContain(
-            LAYER_FILTER_KEY,
-            EcTrackCadastralAreaFilter::class,
-            EcTrackRuoloFilter::class,
-            'Select:stato_validazione',
-        );
+it('il menu dei filtri ha solo Layer, Aree catastali, Ruolo e Stato validazione', function () {
+    // Elenco esatto, non l'assenza di chiavi note: un filtro che ricompare con un'altra chiave
+    // (App, Include/Exclude per id o uno nuovo del package) fa fallire il test.
+    expect(chiaviFiltri($this))->toEqualCanonicalizing([
+        LAYER_FILTER_KEY,
+        EcTrackCadastralAreaFilter::class,
+        EcTrackRuoloFilter::class,
+        'Select:stato_validazione',
+    ]);
 });
 
 it('il filtro Ruolo restituisce le tracce con un ente in quel ruolo', function () {

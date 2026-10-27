@@ -37,31 +37,34 @@ App e Include/Exclude non hanno nessun test.
 
 ## Requisiti
 
-- [ ] Il filtro App non compare nel menu filtri della lista EC Tracce di forestas; colonna e campo
+- [x] Il filtro App non compare nel menu filtri della lista EC Tracce di forestas; colonna e campo
       App restano invariati; `wm-package` non è modificato
-- [ ] I filtri Include per id ed Exclude per id non compaiono nel menu della lista EC Tracce;
+- [x] I filtri Include per id ed Exclude per id non compaiono nel menu della lista EC Tracce;
       `wm-package` non è modificato
-- [ ] Titoli tradotti via `__()` con chiave inglese, presenti in `lang/en.json` e `lang/it.json`:
+- [x] Titoli tradotti via `__()` con chiave inglese, presenti in `lang/en.json` e `lang/it.json`:
       `Layer` → «Layer», `Role` → «Ruolo», `Validation status` → «Stato validazione» (etichetta del
       campo, quindi anche colonna, dettaglio e form)
-- [ ] Verifica nel browser di ogni filtro del menu (Layer, Aree catastali, Ruolo, Stato
+- [x] Verifica nel browser di ogni filtro del menu (Layer, Aree catastali, Ruolo, Stato
       validazione): per ogni valore, conteggio in Nova confrontato con una
       `SELECT` sul DB locale
-- [ ] Ogni query di riscontro parte dal **significato** che l'operatore dà al filtro, non dal
+- [x] Ogni query di riscontro parte dal **significato** che l'operatore dà al filtro, non dal
       codice di `apply()` (Layer = tracce che l'app mostra in quel layer; Ruolo = tracce con un ente
       con quel ruolo; Stato = valore della colonna; Aree = tracce dentro quell'area), con accanto la
       frase che dice cosa conta. Un conteggio che non torna finisce nell'elenco per Giuseppe
-- [ ] Per ogni filtro, una riga anche per le tracce che nessun valore raggiunge (in locale 22 senza
-      stato di validazione, 190 su 779 senza enti), così la somma dei conteggi torna al totale
-- [ ] Verifica di una combinazione che usa insieme Layer + Aree catastali + Ruolo + Stato
+- [x] Per Ruolo e Stato validazione, una riga anche per le tracce che nessun valore raggiunge (in
+      locale 22 senza stato di validazione, 190 su 779 senza enti), così la somma dei conteggi
+      torna al totale. Per Layer e Aree catastali la somma non torna per costruzione: una traccia
+      può stare in più layer o toccare più aree
+- [x] Verifica di una combinazione che usa insieme Layer + Aree catastali + Ruolo + Stato
       validazione, con lo stesso riscontro sul DB
-- [ ] Prove: tabella con filtro, valore, conteggio Nova, conteggio query e frase (sezione «Esito»
+- [x] Prove: tabella con filtro, valore, conteggio Nova, conteggio query e frase (sezione «Esito»
       sotto), query usate in `notes.md`
-- [ ] Test automatici per Ruolo, Stato validazione, assenza del filtro App e titoli tradotti, in
+- [x] Test automatici per Ruolo, Stato validazione, assenza del filtro App e titoli tradotti, in
       `tests/Feature/EcTrack/EcTrackFiltersTest.php`; i test sul testo italiano impostano la lingua
       (`app()->setLocale('it')`), perché la CI gira con `APP_LOCALE=en`
-- [ ] Elenco dei filtri che non funzionano o non servono, con comportamento attuale e proposta,
-      pronto per Giuseppe; nessuno di questi viene corretto o tolto in questo ticket
+- [x] Elenco dei filtri che non funzionano o non servono, con comportamento attuale e proposta:
+      chiuso nella sezione «Decisioni». Oltre ad App si tolgono solo Include/Exclude, decisi con il
+      reviewer; nessun altro filtro viene corretto o tolto in questo ticket
 
 ## Esito della verifica nel browser (27/10, Nova locale)
 
@@ -104,9 +107,10 @@ Considerazioni:
 - **La chiave del filtro App è `resource:apps:app`**, non `BelongsTo:app`: il test sull'assenza va
   scritto su quella.
 
-## Decisioni (27/10, dev)
+## Decisioni (27/10)
 
-Le domande aperte della prima versione sono state chiuse dalla dev:
+Le domande aperte della prima versione le ha chiuse la dev; la rimozione di Include/Exclude è
+stata concordata in call con Alessandro Peci, reviewer del ticket («rimuovili insieme ad app»):
 
 - **Titoli**: «Layer» per il filtro dei layer (scartate «Tipologia» e «Tipologia di percorso»),
   «Ruolo» invariato, «Stato validazione» passato da `__()`.
@@ -149,7 +153,7 @@ La verifica nel browser ha chiuso anche l'ultima domanda: nessun filtro è rotto
 
 ## Out of scope
 
-- Correzione o rimozione di filtri diversi da App: si discutono prima con Giuseppe.
+- Correzione o rimozione di filtri diversi da App e Include/Exclude.
 - Rimozione del filtro App dalle liste diverse da EC Tracce (follow-up).
 - Opzioni «Senza stato» / «Senza ente» (follow-up).
 - Modifiche a `wm-package`, compresa la pulizia di Include/Exclude (follow-up).
@@ -166,4 +170,5 @@ Tutto in forestas:
 - `lang/en.json`, `lang/it.json` — chiavi dei titoli
 - `tests/Feature/EcTrack/EcTrackFiltersTest.php` — test nuovi e aggiornamento del test sul titolo
   del Layer
+- `docs/knowledge/8806-filtro-ec-tracce.md` — pagina di conoscenza dei filtri
 - `docs/features/8875-verifica-filtri-lista-ec-tracce/` — overview, piano, note con le query

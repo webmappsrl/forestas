@@ -7,8 +7,8 @@ filtri ha quattro voci: **Layer**, **Aree catastali**, **Ruolo** e **Stato valid
 I primi due sostituiscono il filtro dei layer del package:
 
 - **«Layer»** (`app/Nova/Filters/EcTrackLayerFilter.php`): stessa chiave del package
-  (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a un'area catastale, cioè le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri
-  accessibili);
+  (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a un'area catastale, cioè
+  le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri accessibili);
 - **«Aree catastali»** (`app/Nova/Filters/EcTrackCadastralAreaFilter.php`): multiselect con
   ricerca (`MultiselectFilter` di `outl1ne/nova-multiselect-filter`) con le `TaxonomyWhere` di
   sorgente `geohub_conf_32` (`TaxonomyWhereLayersImportService::SOURCE_KEY`). Il valore è la lista
@@ -65,11 +65,11 @@ Vincoli:
   CASCADE` non la tocca, perché non ha chiavi esterne verso `ec_tracks`, e le associazioni
   manuali possono restare su id che ora indicano altre tracce.
   Follow-up non ancora aperto (oc:8825);
-- **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: in
-  locale il 27/10 è la 730 (G 606), tutta dentro l'area G ma con solo tre aree amministrative nel
-  formato di osmfeatures, scritte da `SyncModelTaxonomyWhereJob` quando il calcolo locale non trova
-  nulla. `wm:resync-taxonomy-where --only-legacy` non la prende, perché ha `_admin_level`
-  (oc:8875).
+- **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: succede
+  quando `SyncModelTaxonomyWhereJob` del package non trova aree con il calcolo locale e ripiega su
+  osmfeatures, che scrive solo aree amministrative (chiavi `R…` con `_admin_level`).
+  `wm:resync-taxonomy-where --only-legacy` non le prende, perché hanno `_admin_level`. In locale il
+  27/10 era una traccia su 779 (oc:8875).
 
 ## Perché così
 
