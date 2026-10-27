@@ -27,6 +27,20 @@ Sui dati locali (tutti e quattro i layer sono in modalità automatica):
 Di conseguenza funziona anche la combinazione con «Aree catastali»: «Cammini di Sardegna» + un'area
 dà i cammini del layer che passano per quell'area.
 
+### Seconda parte (27/10): «Aree catastali» diventa una multiselect
+
+Il filtro «Aree catastali» (`EcTrackCadastralAreaFilter`, introdotto da oc:8806 e già in
+`develop`) oggi estende il `BooleanFilter` di Nova: una casella per ogni area, tutte sempre
+visibili nel menu dei filtri. Dopo questo lavoro estende `MultiselectFilter` del pacchetto
+`outl1ne/nova-multiselect-filter`: una tendina con ricerca, in cui le aree scelte restano visibili
+come etichette (lo stesso componente della multiselect nel form delle App, che però è un campo e
+non un filtro).
+
+Il risultato del filtro non cambia: le aree scelte valgono in OR, nessuna area scelta non
+restringe nulla, il filtro si combina in AND con quello dei layer. Cambiano solo l'aspetto e il
+formato del valore che arriva ad `apply()`: una lista di id (`[12, 15]`) invece di
+`[id area => true/false]`.
+
 ## Perché
 
 Il cliente ha segnalato su UAT che il filtro dei layer restituisce sempre tutte le tracce (oc:8827,
@@ -45,16 +59,50 @@ Decisioni del 26/10:
 - **oc:8825 si fa dopo oc:8806** e la risposta al cliente copre i due ticket, una volta che i
   filtri funzionano in produzione.
 
+Decisioni del 27/10 (seconda parte):
+
+- **Giuseppe Bonfanti, allo scrum del 27/10, chiede la multiselect al posto delle caselle**:
+  «Aree catastali io lo visualizzerei come una select che puoi selezionare più cose
+  contemporaneamente perché prende molto spazio», anche in vista di un filtro per province. Il
+  risultato del filtro va bene così com'è («come risultato va bene… era esattamente quello che
+  volevo»).
+- **Si fa in oc:8825, sullo stesso branch e sulla stessa PR**, perché il filtro è già in `develop`
+  ed esce in produzione insieme a questa correzione.
+- **Pacchetto `outl1ne/nova-multiselect-filter` invece della multiselect nativa di Nova**: la
+  nativa (`MultiSelectFilter`, da un campo `MultiSelect` filtrabile) è una `<select multiple>` HTML
+  senza ricerca, dove le scelte multiple richiedono Cmd/Ctrl+clic. Un utente che non lo sa la usa
+  come una select singola. Il pacchetto `outl1ne/nova-multiselect-field`, già nel progetto, non
+  offre un filtro. La serie 5.x del pacchetto dei filtri richiede `laravel/nova: ^5.0`.
+- **La verifica di tutti i filtri della lista e la rimozione del filtro App, chieste nello stesso
+  scrum, vanno in oc:8875**, così eventuali altri bug si rendicontano lì.
+
 ## Requisiti
 
-- [ ] `EcTrackLayerFilter::apply()` segue i quattro passi di «Cosa cambia»; la modalità si legge
+- [x] `EcTrackLayerFilter::apply()` segue i quattro passi di «Cosa cambia»; la modalità si legge
   con `Layer::isAutoTrackMode()`
-- [ ] Le tracce associate si filtrano sulla query di Nova (`whereHas` sulla relazione `layers`
+- [x] Le tracce associate si filtrano sulla query di Nova (`whereHas` sulla relazione `layers`
   della traccia), così si combinano in AND con gli altri filtri
-- [ ] Il controllo «il layer ha tracce associate» è una query `exists`, senza caricare la relazione
-- [ ] Etichetta, chiave (`features_by_layer_ecTracks`) e opzioni del filtro restano quelle di oc:8806
-- [ ] Feature test su `/nova-api/ec-tracks`, un caso per passo, più la combinazione con «Aree
+- [x] Il controllo «il layer ha tracce associate» è una query `exists`, senza caricare la relazione
+- [x] Etichetta, chiave (`features_by_layer_ecTracks`) e opzioni del filtro restano quelle di oc:8806
+- [x] Feature test su `/nova-api/ec-tracks`, un caso per passo, più la combinazione con «Aree
   catastali»
+
+Seconda parte (27/10):
+
+- [x] `outl1ne/nova-multiselect-filter` `^5.0` nel `composer.json` di forestas, installato senza
+  aggiornare altri pacchetti: `laravel/nova` resta su 5.7.6
+- [x] `EcTrackCadastralAreaFilter` estende `MultiselectFilter`; `options()` restituisce
+  `id => nome` (formato del pacchetto, inverso di quello di oggi), con lo stesso ordinamento per nome
+- [x] `apply()` riceve una lista di id: aree in OR, lista vuota o assente = nessuna restrizione,
+  stessa query di oggi (sorgente letta nelle due forme, nessuna collisione con gli `osm2cai_id`)
+- [x] Etichetta («Cadastral areas» / «Aree Catastali») e chiave del filtro invariate
+- [x] I testi del componente visibili all'utente (segnaposto, «nessun risultato» e simili) sono in
+  italiano e in inglese
+- [x] I 7 test delle aree catastali in `EcTrackFiltersTest.php` riscritti con il valore come lista
+  di id, stessi casi; un test controlla che Nova riceva il filtro con il componente del pacchetto e
+  le opzioni `id => nome`
+- [x] Prova a mano in Nova locale, poi la multiselect si mostra in locale ad Alessandro Peci prima
+  di passare il ticket in `testing`
 
 ## Rischi
 
@@ -63,6 +111,14 @@ Decisioni del 26/10:
 - **Il reset notturno lascia in `layerables` gli id vecchi** (`TRUNCATE ec_tracks RESTART IDENTITY`,
   nessuna chiave esterna): le associazioni manuali di Cammini e Sentieri accessibili possono puntare
   ad altre tracce. Follow-up separato, non in questo ticket.
+- **Una dipendenza nuova in forestas**: va installata senza far muovere `laravel/nova`, che non
+  può salire oltre la 5.7.6 per la licenza scaduta. L'ultima versione del pacchetto (5.0.3) è del
+  19/10/2026.
+
+## Domande aperte
+
+- ~~**Alessandro Peci conferma l'uso di `outl1ne/nova-multiselect-filter`?**~~ Risolta il 27/10:
+  confermato in call, insieme al segnaposto «Seleziona area catastale» (vedi notes.md).
 
 ## Out of scope
 
@@ -71,6 +127,7 @@ Decisioni del 26/10:
 - La conservazione delle associazioni manuali al reset notturno: follow-up separato.
 - `FeaturesByLayerFilter` e `onLayer()` nel wm-package.
 - La risposta al cliente, su oc:8827 insieme a oc:8806.
+- La verifica degli altri filtri della lista EC Tracce e la rimozione del filtro App: oc:8875.
 
 ## Moduli toccati
 
@@ -80,3 +137,11 @@ Tutti nel repo **forestas**:
 - `tests/Feature/EcTrack/EcTrackFiltersTest.php` — casi del filtro dei layer
 - `docs/knowledge/8806-filtro-ec-tracce.md` — il limite su «Cammini» e «Sentieri accessibili»
   diventa la regola nuova
+
+Seconda parte (27/10), sempre in **forestas**:
+
+- `composer.json`, `composer.lock` — `outl1ne/nova-multiselect-filter`
+- `app/Nova/Filters/EcTrackCadastralAreaFilter.php` — classe base, `options()`, `apply()`
+- `tests/Feature/EcTrack/EcTrackFiltersTest.php` — test delle aree catastali
+- `lang/` — eventuali testi del componente in italiano e inglese
+- `docs/knowledge/8806-filtro-ec-tracce.md` — il filtro delle aree diventa una multiselect

@@ -102,11 +102,11 @@ function definizioneFiltro($test, string $chiave): array
 }
 
 /**
- * @return array<string, bool>
+ * @return list<int>
  */
-function spuntate(TaxonomyWhere ...$aree): array
+function scelte(TaxonomyWhere ...$aree): array
 {
-    return collect($aree)->mapWithKeys(fn ($area) => [(string) $area->id => true])->all();
+    return collect($aree)->map(fn ($area) => $area->id)->values()->all();
 }
 
 it('il filtro dei layer elenca solo le tipologie e conserva etichetta e chiave', function () {
@@ -130,15 +130,21 @@ it('un layer legato a una where di altra sorgente resta nel filtro dei layer', f
 });
 
 it('il filtro aree catastali elenca le aree ordinate per nome', function () {
-    areaCatastale('Area G', 11);
-    areaCatastale('Area B', 9);
-    areaCatastale('Area C', 10);
+    $areaG = areaCatastale('Area G', 11);
+    $areaB = areaCatastale('Area B', 9);
+    $areaC = areaCatastale('Area C', 10);
     taxonomyWhereConGeometria('Nuoro', ['source' => 'osmfeatures'], quadrato(30));
 
     $filtro = definizioneFiltro($this, EcTrackCadastralAreaFilter::class);
 
     expect($filtro['name'])->toBe(__('Cadastral areas'))
-        ->and(collect($filtro['options'])->pluck('label')->all())->toBe(['Area B', 'Area C', 'Area G']);
+        ->and($filtro['component'])->toBe('nova-multiselect-filter')
+        ->and($filtro['placeholder'])->toBe(__('Select cadastral area'))
+        ->and($filtro['options'])->toBe([
+            ['label' => 'Area B', 'value' => $areaB->id],
+            ['label' => 'Area C', 'value' => $areaC->id],
+            ['label' => 'Area G', 'value' => $areaG->id],
+        ]);
 });
 
 it('una sola area: le tracce che la attraversano, anche per un tratto breve', function () {
@@ -149,11 +155,11 @@ it('una sola area: le tracce che la attraversano, anche per un tratto breve', fu
     traccia(10.2, 10.4);
     calcolaAree();
 
-    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => spuntate($areaB)]))
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => scelte($areaB)]))
         ->toEqualCanonicalizing([$dentroB->id, $acavallo->id]);
 });
 
-it('più aree spuntate valgono in OR', function () {
+it('più aree scelte valgono in OR', function () {
     $areaB = areaCatastale('Area B', 9);
     areaCatastale('Area C', 10);
     $areaG = areaCatastale('Area G', 11);
@@ -162,16 +168,16 @@ it('più aree spuntate valgono in OR', function () {
     $dentroG = traccia(11.2, 11.4);
     calcolaAree();
 
-    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => spuntate($areaB, $areaG)]))
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => scelte($areaB, $areaG)]))
         ->toEqualCanonicalizing([$dentroB->id, $dentroG->id]);
 });
 
-it('nessuna casella spuntata non restringe nulla', function () {
+it('nessuna area scelta non restringe nulla', function () {
     $areaB = areaCatastale('Area B', 9);
     $tracce = [traccia(9.2, 9.4)->id, traccia(20, 20.5)->id];
     calcolaAree();
 
-    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => [(string) $areaB->id => false]]))
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => []]))
         ->toEqualCanonicalizing($tracce);
 });
 
@@ -192,7 +198,7 @@ it('tipologia e area si combinano in AND', function () {
 
     expect(idFiltrati($this, [
         LAYER_FILTER_KEY => $sentieri->id,
-        EcTrackCadastralAreaFilter::class => spuntate($areaB),
+        EcTrackCadastralAreaFilter::class => scelte($areaB),
     ]))->toBe([$sentieroInB->id]);
 });
 
@@ -203,7 +209,7 @@ it('una where osm2cai con osm2cai_id uguale all id di un area non fa uscire le s
     $dentroB = traccia(9.2, 9.4);
     calcolaAree();
 
-    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => spuntate($areaB)]))->toBe([$dentroB->id]);
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => scelte($areaB)]))->toBe([$dentroB->id]);
 });
 
 it('legge anche la voce dell area scritta nella forma di oc:8487', function () {
@@ -213,7 +219,7 @@ it('legge anche la voce dell area scritta nella forma di oc:8487', function () {
     ]]);
     calcolaAree();
 
-    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => spuntate($areaB)]))->toBe([$vecchia->id]);
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => scelte($areaB)]))->toBe([$vecchia->id]);
 });
 
 /*
@@ -299,6 +305,6 @@ it('le tracce associate si combinano con le aree catastali', function () {
 
     expect(idFiltrati($this, [
         LAYER_FILTER_KEY => $cammini->id,
-        EcTrackCadastralAreaFilter::class => spuntate($areaB),
+        EcTrackCadastralAreaFilter::class => scelte($areaB),
     ]))->toBe([$camminoInB->id]);
 });

@@ -9,10 +9,11 @@ filtri al posto del filtro dei layer del package:
   chiave del package (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a
   un'area catastale, cioè le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri
   accessibili);
-- **«Aree catastali»** (`app/Nova/Filters/EcTrackCadastralAreaFilter.php`): checkbox con le
-  `TaxonomyWhere` di sorgente `geohub_conf_32`
-  (`TaxonomyWhereLayersImportService::SOURCE_KEY`). Le aree spuntate valgono in OR; i due filtri
-  si combinano in AND.
+- **«Aree catastali»** (`app/Nova/Filters/EcTrackCadastralAreaFilter.php`): multiselect con
+  ricerca (`MultiselectFilter` di `outl1ne/nova-multiselect-filter`) con le `TaxonomyWhere` di
+  sorgente `geohub_conf_32` (`TaxonomyWhereLayersImportService::SOURCE_KEY`). Il valore è la lista
+  degli id delle aree scelte; le aree valgono in OR; i due filtri si combinano in AND. Il pacchetto
+  non ha l'italiano: i testi del componente sono in `lang/vendor/nova-multiselect-filter/it.json`.
 
 `App\Nova\EcTrack::filters()` **sostituisce** il filtro del package invece di aggiungerne uno:
 con due filtri sulla stessa chiave Nova applicherebbe il primo che trova
@@ -60,6 +61,13 @@ Vincoli:
 - **Aree a scelta multipla, in OR, e «passa per l'area» anche per un tratto breve** (oc:8806):
   review del 26/10. Il cliente chiede «i cammini delle aree B, G e T»; il criterio geometrico è
   l'unico valido anche per cammini e itinerari, che non hanno codice catastale.
+- **Multiselect con ricerca invece delle checkbox** (oc:8825): richiesta di Giuseppe Bonfanti
+  allo scrum del 27/10. Le checkbox occupano spazio in proporzione al numero di aree, e un filtro
+  per province ne aggiungerebbe altre.
+- **Il pacchetto e non la multiselect nativa di Nova** (oc:8825): la nativa (`MultiSelectFilter`,
+  da un campo `MultiSelect` filtrabile) è una `<select multiple>` senza ricerca, in cui si sceglie
+  più di una voce solo con Cmd/Ctrl+clic. `outl1ne/nova-multiselect-field`, già nel progetto, è
+  un campo e non offre un filtro.
 - **Si legge la sorgente della voce, non solo la chiave** (oc:8806): la chiave da sola collide con
   gli `osm2cai_id` (in locale ZNUB2 ha `osm2cai_id = 81`, l'id di Area T).
 - **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806): un
@@ -81,7 +89,10 @@ Vincoli:
   era la prima regola; avrebbe spostato anche Sentieri e Itinerari sulla copia in `layerables`,
   aggiornata in differita.
 - **Area a scelta singola, con una tendina** (oc:8806, superata): era la proposta dello scrum del
-  21/10; nella review del 26/10 si è passati alle checkbox perché il cliente combina più aree.
+  21/10; nella review del 26/10 si è passati alla scelta multipla perché il cliente combina più
+  aree.
+- **Checkbox (`BooleanFilter` di Nova)** (oc:8806, superata da oc:8825): davano la scelta multipla
+  ma una casella per area, tutte sempre aperte nel menu dei filtri.
 - **Codice catastale come criterio dell'area** (oc:8806, scartata): vale solo per i sentieri;
   cammini e itinerari non hanno codice. Sui dati locali del 21/10 coincideva con l'intersezione
   su 394 tracce su 404.
