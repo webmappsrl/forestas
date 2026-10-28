@@ -9,6 +9,7 @@ use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Nova\Filters\EcTrackLayerFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
+use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\MorphToMany;
@@ -21,6 +22,8 @@ use Marshmallow\Tiptap\Tiptap;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\EcTrackApiLinksCard;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 use Wm\WmPackage\Nova\Filters\FeaturesByLayerFilter;
+use Wm\WmPackage\Nova\Filters\FeaturesExcludeByIds;
+use Wm\WmPackage\Nova\Filters\FeaturesIncludeByIds;
 use Wm\WmPackage\Nova\Layer;
 use Wm\WmPackage\Nova\TaxonomyActivity;
 
@@ -33,10 +36,16 @@ class EcTrack extends WmNovaEcTrack
         $parentFields = parent::fields($request);
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
         $regularFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
+        // Forestas ha una sola app: il filtro App restituirebbe sempre tutte le tracce (oc:8875).
+        foreach ($regularFields as $field) {
+            if ($field instanceof BelongsTo && $field->attribute === 'app') {
+                $field->withoutFilterable();
+            }
+        }
 
         return [
             ...$regularFields,
-            Select::make('Stato validazione', 'stato_validazione')
+            Select::make(__('Validation status'), 'stato_validazione')
                 ->options(
                     collect(StatoValidazione::cases())
                         ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
@@ -61,12 +70,17 @@ class EcTrack extends WmNovaEcTrack
     {
         // Il filtro dei layer del package va sostituito, non affiancato: con due filtri
         // sulla stessa chiave Nova applicherebbe il primo che trova (oc:8806).
+        // Include/Exclude per id servivano al vecchio campo dei layer, che oggi usa rotte sue:
+        // nel menu comparivano senza controllo, inutilizzabili (oc:8875).
         $filters = [];
         foreach (parent::filters($request) as $filter) {
             if (get_class($filter) === FeaturesByLayerFilter::class) {
                 $filters[] = new EcTrackLayerFilter($this->resource->getLayerRelationName());
                 $filters[] = new EcTrackCadastralAreaFilter;
 
+                continue;
+            }
+            if ($filter instanceof FeaturesIncludeByIds || $filter instanceof FeaturesExcludeByIds) {
                 continue;
             }
             $filters[] = $filter;
