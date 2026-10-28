@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\Import\ImportRegistroCatastaleJob;
+use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\RegistroCatastale\RegistroCatastaleImporter;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Testing\Fakes\BatchFake;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
+use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 
 /**
@@ -255,4 +258,74 @@ it('un giro che trova il lock occupato non esegue l importer', function () {
     } finally {
         $lock->release();
     }
+});
+
+/**
+ * La catena delle aree (oc:8880): sync di taxonomy_where e poi reindex,
+ * sulla coda dell'import, per l'app di Sardegna Sentieri. Parte su tutte le
+ * strade del `finally`, anche quelle che saltano anomalie e registro.
+ */
+function assertCatenaAree(): void
+{
+    Bus::assertChained([
+        SyncTaxonomyWhereJob::class,
+        RegenerateTaxonomyWhereOutputsJob::class,
+    ]);
+
+    Bus::assertDispatched(SyncTaxonomyWhereJob::class, function ($job) {
+        return $job->queue === ImportSardegnaSentieriTrackJob::QUEUE
+            && $job->chainQueue === ImportSardegnaSentieriTrackJob::QUEUE
+            && unserialize($job->chained[0])->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
+    });
+}
+
+/**
+ * Lancia il comando e invoca a mano la callback `finally` del batch con il
+ * numero di job falliti indicato (null = tutti).
+ */
+function importaEChiudiBatch(array $opzioni, ?int $falliti = 0): void
+{
+    Artisan::call('sardegnasentieri:import', $opzioni);
+
+    Bus::assertBatched(function ($batch) use ($falliti) {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $callback(fakeFinishedBatch($batch->jobs->count(), $falliti ?? $batch->jobs->count()));
+        }
+
+        return true;
+    });
+}
+
+it('con --reset riuscito accoda la catena delle aree', function () {
+    Bus::fake();
+
+    importaEChiudiBatch(['--reset' => true]);
+
+    assertCatenaAree();
+});
+
+it('con --reset oltre la soglia accoda comunque la catena delle aree', function () {
+    Bus::fake();
+
+    importaEChiudiBatch(['--reset' => true], null);
+
+    assertCatenaAree();
+    Bus::assertNotDispatched(ImportRegistroCatastaleJob::class);
+});
+
+it('nell import orario accoda la catena delle aree', function () {
+    Bus::fake();
+
+    importaEChiudiBatch([]);
+
+    assertCatenaAree();
+});
+
+it('con --only accoda comunque la catena delle aree', function () {
+    Bus::fake();
+
+    importaEChiudiBatch(['--only' => 'tracks']);
+
+    assertCatenaAree();
+    Bus::assertNotDispatched(ImportRegistroCatastaleJob::class);
 });

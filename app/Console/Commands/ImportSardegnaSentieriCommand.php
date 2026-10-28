@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
+use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
@@ -187,6 +189,13 @@ class ImportSardegnaSentieriCommand extends Command
      * Con `--only` (catasto parziale, `$withNormalize` false) non parte ne'
      * l'uno ne' l'altro.
      *
+     * Le aree catastali (oc:8880) invece si ricalcolano sempre, prima di ogni
+     * guardia: l'import salva con `saveQuietly()`, quindi nessun observer
+     * scrive `properties.taxonomy_where`, e dopo un reset le tracce
+     * resterebbero senza aree. Il sync e' quello dell'action Nova
+     * `SyncEcTaxonomyWhereAction`, seguito in catena dal reindex
+     * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`.
+     *
      * @param  list<ImportSardegnaSentieriPoiJob|ImportSardegnaSentieriTrackJob>  $jobs
      */
     private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize, bool $reset): void
@@ -200,6 +209,18 @@ class ImportSardegnaSentieriCommand extends Command
             ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
             ->allowFailures()
             ->finally(function (Batch $batch) use ($runId, $withNormalize, $reset) {
+                // Prima delle guardie: il sync ricalcola le aree dalla
+                // geometria e si puo' ripetere senza danni, anche su un
+                // archivio incompleto — le guardie servono ad anomalie e
+                // registro. Sulla coda dell'import, perche' su `default`
+                // finirebbe dietro le conversioni immagine (oc:8607).
+                Bus::chain([
+                    new SyncTaxonomyWhereJob,
+                    new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
+                ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
+
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali e reindex accodati.");
+
                 if (! $withNormalize) {
                     Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");
 
