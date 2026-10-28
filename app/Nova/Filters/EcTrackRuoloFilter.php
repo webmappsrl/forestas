@@ -13,7 +13,7 @@ class EcTrackRuoloFilter extends Filter
 {
     public function name(): string
     {
-        return 'Ruolo';
+        return __('Role');
     }
 
     public function apply(Request $request, $query, $value): Builder
