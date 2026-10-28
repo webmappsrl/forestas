@@ -17,10 +17,15 @@ un batch (`Bus::batch`, nome `sardegnasentieri import`) e il ricalcolo delle ano
 callback del batch, cioè quando l'ultimo job ha finito di scrivere.
 
 **Il ricalcolo tollera una quota di job falliti.** La decisione sta in
-`ImportSardegnaSentieriCommand::shouldNormalize()`: sotto il 2% di job caduti si ricalcola, sopra
-no. Sotto soglia si accetta un archivio quasi completo; sopra ci si ferma, perché le anomalie
+`ImportSardegnaSentieriCommand::shouldNormalize()`: sotto il 2% di job caduti le anomalie si
+ricalcolano, sopra no. Sotto soglia si accetta un archivio quasi completo; sopra ci si ferma, perché le anomalie
 sono relazioni fra tracciati e su un archivio gravemente incompleto non ne escono di meno, ne
 escono di sbagliate. In entrambi i casi il canale di log `import` registra quanti sono.
+
+**Le aree catastali invece si ricalcolano a ogni batch, senza soglia.** La callback `finally`
+accoda per prima la catena sync delle aree → reindex Elasticsearch, sulla coda
+`sardegnasentieri-import`; il dettaglio è nel docblock di `dispatchImportBatch()`. Non parte solo
+quando non c'è un batch, cioè quando non c'è nessun job da importare.
 
 **I job di import hanno una coda tutta loro, `sardegnasentieri-import`.** Ogni job che completa ne
 accoda altri — conversione delle immagini, aggiornamento delle relazioni — e su una coda condivisa
@@ -65,6 +70,13 @@ vocabolari.
 - **La soglia invece della tolleranza zero** (oc:8607): con 1736 chiamate a ogni reset qualche
   timeout è la norma, e rinunciare al ricalcolo per quello avrebbe lasciato la lista vuota — cioè
   il difetto stesso che si stava correggendo.
+- **Le aree fuori dalle guardie** (oc:8880): la soglia esiste perché anomalie e registro,
+  calcolati su un archivio incompleto, escono sbagliati. Le aree si ricalcolano dalla geometria di
+  ogni traccia e non hanno questo problema. Dietro la soglia, un reset con il 3% di job falliti
+  avrebbe lasciato tutte le tracce senza aree fino al giorno dopo.
+- **Il reindex in catena** (oc:8880): Elasticsearch legge `taxonomyWheres` da
+  `properties.taxonomy_where`, che il sync scrive solo nel DB. In catena il reindex parte quando le
+  aree sono già scritte.
 
 ## Come si verifica
 
@@ -78,6 +90,10 @@ Il riscontro giusto è la riga nel canale `import`:
 [sardegnasentieri:<runId>] Anomalie ricalcolate (job falliti: 0/1736).
 ```
 
+Per le aree il riscontro è `[sardegnasentieri:<runId>] Sync aree catastali e reindex accodati.`
+nel canale `import`, poi i due job in Horizon nell'ordine sync → reindex (in locale 32 s e 4 s su
+780 tracce, 28/10/2026).
+
 ## Come ci siamo arrivati
 
 - **Ricalcolo affidato a un `->then()` nello scheduler** (oc:8607, superata): sembrava il posto
@@ -89,3 +105,7 @@ Il riscontro giusto è la riga nel canale `import`:
   ritentativi non si notava nulla. Bastava un job caduto per rimandare di ore la chiusura del
   batch, e con essa il ricalcolo — il sintomo era identico a quello che oc:8607 aveva appena
   corretto, tanto che sembrava una regressione del fix.
+- **Sync delle aree solo a mano** (oc:8880, superata): partiva dall'action Nova o da
+  `wm:resync-taxonomy-where`. Con il reset quotidiano le tracce rinascevano ogni mattina senza aree:
+  su collaudo, il 27/10/2026, 0 tracce su 762 avevano `taxonomy_where` (misura riportata nel
+  ticket).

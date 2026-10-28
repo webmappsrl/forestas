@@ -67,7 +67,9 @@ Vincoli:
   Follow-up non ancora aperto (oc:8825);
 - **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: succede
   quando `SyncModelTaxonomyWhereJob` del package non trova aree con il calcolo locale e ripiega su
-  osmfeatures, che scrive solo aree amministrative (chiavi `R…` con `_admin_level`).
+  osmfeatures, che scrive solo aree amministrative (chiavi `R…` con `_admin_level`). Dopo un import
+  le aree le ricalcola il batch: vedi [import-asincrono-e-anomalie.md](import-asincrono-e-anomalie.md)
+  (oc:8880).
   `wm:resync-taxonomy-where --only-legacy` non le prende, perché hanno `_admin_level`. In locale il
   27/10 era una traccia su 779 (oc:8875).
 
