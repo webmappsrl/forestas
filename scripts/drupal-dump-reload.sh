@@ -14,6 +14,9 @@ DATABASE="sardegnasentieri"
 ROOT_PASSWORD="readonly"
 READONLY_USER="readonly"
 READONLY_PASSWORD="readonly"
+# Il lock che l'import rispetta mentre la copia è vuota o caricata a metà (oc:8900). Sta sempre
+# in storage/drupal-dump/ del repo, anche con DRUPAL_DUMP_DIR: è lì che lo cerca Laravel.
+LOCK_FILE="$REPO_DIR/storage/drupal-dump/reload.lock"
 
 fail() {
     echo "ERRORE: $*" >&2
@@ -50,6 +53,11 @@ fi
 
 echo "Carico $(basename "$DUMP") in $CONTAINER..."
 
+# Da qui la copia non è leggibile: l'import salta finché il lock c'è. Nessun trap: se la ricarica
+# fallisce il lock resta, e l'import resta fermo invece di leggere una copia a metà.
+mkdir -p "$(dirname "$LOCK_FILE")"
+touch "$LOCK_FILE"
+
 # 3. Database ricreato da zero.
 mysql_root -e "DROP DATABASE IF EXISTS \`$DATABASE\`; CREATE DATABASE \`$DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
@@ -61,6 +69,9 @@ esac
 
 # 5. Utente in sola lettura, ricreato anche se esisteva con altri permessi.
 mysql_root -e "DROP USER IF EXISTS '$READONLY_USER'@'%'; CREATE USER '$READONLY_USER'@'%' IDENTIFIED BY '$READONLY_PASSWORD'; GRANT SELECT ON \`$DATABASE\`.* TO '$READONLY_USER'@'%';"
+
+# Copia completa: l'import può tornare a leggerla.
+rm -f "$LOCK_FILE"
 
 # 6. Riepilogo.
 TABLES="$(mysql_root -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DATABASE'")"

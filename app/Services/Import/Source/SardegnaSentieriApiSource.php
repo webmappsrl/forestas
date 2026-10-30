@@ -1,0 +1,184 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Import\Source;
+
+use App\Dto\Api\ApiPoiResponse;
+use App\Dto\Api\ApiTrackResponse;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
+
+/**
+ * La fonte HTTP di oggi: le API di Drupal (`/ss/*`, REST `/node/{id}` e
+ * `/taxonomy/term/{id}`).
+ *
+ * L'import non la usa più: legge dalla copia del DB Drupal
+ * (SardegnaSentieriDatabaseSource). Resta solo per
+ * `sardegnasentieri:compare-source`, che confronta le due fonti, e va rimossa
+ * con quel comando alla dismissione di Drupal (oc:8900).
+ */
+class SardegnaSentieriApiSource implements SardegnaSentieriSource
+{
+    private const BASE_URL = 'https://www.sardegnasentieri.it/ss';
+
+    private const TIMEOUT = 30;
+
+    /**
+     * La fonte risponde? Una sola chiamata leggera, prima di toccare
+     * qualunque cosa.
+     *
+     * Serve a chi sta per cancellare per poi riscaricare: `--reset` fa il
+     * troncamento e SOLO DOPO scarica, quindi una fonte irraggiungibile
+     * lascia la piattaforma vuota. È successo il 10/09/2026 sul collaudo —
+     * Drupal ha risposto «Temporarily Unavailable» subito dopo il
+     * troncamento, e i dati sono stati recuperati copiandoli da un altro
+     * ambiente.
+     *
+     * Si interroga l'elenco dei tracciati e non la home: la home è servita
+     * da una pagina statica che risponde 200 anche mentre l'applicazione
+     * dietro è ferma — verificato quel giorno, con la home a 200 e ogni
+     * endpoint a 503.
+     */
+    public function isAvailable(int $timeoutSeconds = 15): bool
+    {
+        try {
+            return Http::timeout($timeoutSeconds)
+                ->get(self::BASE_URL.'/list-tracks/', ['_format' => 'json'])
+                ->successful();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Get POI list: {id: timestamp, ...}
+     *
+     * @return array<string, string>
+     *
+     * @throws ConnectionException
+     */
+    public function getPoiList(): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get(self::BASE_URL.'/listpoi/', ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch POI list: '.$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get POI detail by ID
+     *
+     * @throws ConnectionException
+     */
+    public function getPoiDetail(int $id): ApiPoiResponse
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get(self::BASE_URL."/poi/{$id}", ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch POI {$id}: ".$response->body());
+
+        return ApiPoiResponse::fromJson($response->json() ?? []);
+    }
+
+    /**
+     * Get Track list: {id: timestamp, ...}
+     *
+     * @return array<string, string>
+     *
+     * @throws ConnectionException
+     */
+    public function getTrackList(): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get(self::BASE_URL.'/list-tracks/', ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, 'Failed to fetch track list: '.$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get Track detail by ID
+     *
+     * @throws ConnectionException
+     */
+    public function getTrackDetail(int $id): ApiTrackResponse
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get(self::BASE_URL."/track/{$id}", ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch track {$id}: ".$response->body());
+
+        return ApiTrackResponse::fromJson($response->json() ?? []);
+    }
+
+    /**
+     * Get taxonomy vocabulary
+     *
+     * Le chiavi sono gli id dei termini: numerici nel JSON, quindi PHP li
+     * converte in int, ma il chiamante li tratta come stringhe.
+     *
+     * @return array<int|string, array<string, mixed>>
+     *
+     * @throws ConnectionException
+     */
+    public function getTaxonomy(string $vocabulary): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get(self::BASE_URL."/tassonomia/{$vocabulary}", ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch taxonomy {$vocabulary}: ".$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get Drupal node detail by ID (used for enti/istituzioni)
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException
+     */
+    public function getNodeDetail(int $id): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get('https://www.sardegnasentieri.it/node/'.$id, ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch node {$id}: ".$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get Drupal taxonomy term by ID.
+     * Used as fallback when TipoEnte::fromDrupalId() returns null.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException
+     */
+    public function getTaxonomyTerm(int $id): array
+    {
+        $response = Http::timeout(self::TIMEOUT)
+            ->get('https://www.sardegnasentieri.it/taxonomy/term/'.$id, ['_format' => 'json']);
+
+        throw_if($response->failed(), \RuntimeException::class, "Failed to fetch taxonomy term {$id}: ".$response->body());
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get warning type taxonomy: {id: {vid, name: {it, en}, parent}, ...}
+     *
+     * @return array<int|string, array<string, mixed>>
+     *
+     * @throws ConnectionException
+     */
+    public function getTaxonomyWarnings(): array
+    {
+        return $this->getTaxonomy('tipologia_di_avvertenze');
+    }
+}

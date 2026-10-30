@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
+use App\Services\Import\Source\SardegnaSentieriApiSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -54,9 +54,7 @@ function resetGuardsApp(): App
 }
 
 it('non cancella nulla se la sorgente non risponde', function () {
-    Http::fake([
-        '*sardegnasentieri.it*' => Http::response('Temporarily Unavailable', 503),
-    ]);
+    fonteSardegnaSentieriFinta(available: false);
 
     EcTrack::factory()->createQuietly();
     $prima = DB::table('ec_tracks')->count();
@@ -68,11 +66,23 @@ it('non cancella nulla se la sorgente non risponde', function () {
         ->and(DB::table('ec_tracks')->count())->toBe($prima);
 });
 
+it('nell import orario non marca nulla come sparito se la copia è vuota', function () {
+    fonteSardegnaSentieriFinta(available: false);
+
+    $track = EcTrack::factory()->createQuietly([
+        'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
+        'properties' => ['sardegnasentieri_id' => '75'],
+    ]);
+
+    $exit = Artisan::call('sardegnasentieri:import');
+
+    expect($exit)->toBe(1)
+        ->and(data_get($track->fresh()->properties, 'forestas.deleted_from_source'))->toBeNull();
+});
+
 it('non cancella nulla se il backup fallisce', function () {
     // Sorgente raggiungibile: la guardia che deve scattare è la seconda.
-    Http::fake([
-        '*sardegnasentieri.it*' => Http::response([], 200),
-    ]);
+    fonteSardegnaSentieriFinta();
 
     // Un backup che fallisce: il comando esiste, accetta le stesse opzioni
     // del vero, ed esce con errore.
@@ -91,7 +101,7 @@ it('non cancella nulla se il backup fallisce', function () {
 it('riconosce una sorgente raggiungibile', function () {
     Http::fake(['*sardegnasentieri.it*' => Http::response([1, 2, 3], 200)]);
 
-    expect(app(SardegnaSentieriClient::class)->isReachable())->toBeTrue();
+    expect(app(SardegnaSentieriApiSource::class)->isAvailable())->toBeTrue();
 });
 
 it('non si fida della home: interroga un endpoint dei dati', function () {
@@ -103,5 +113,5 @@ it('non si fida della home: interroga un endpoint dei dati', function () {
         '*' => Http::response('<html>ok</html>', 200),
     ]);
 
-    expect(app(SardegnaSentieriClient::class)->isReachable())->toBeFalse();
+    expect(app(SardegnaSentieriApiSource::class)->isAvailable())->toBeFalse();
 });

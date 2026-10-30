@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\RegistroCatastaleRow;
 use App\Policies\RegistroCatastaleRowPolicy;
+use App\Services\Import\Source\SardegnaSentieriDatabaseSource;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
 use App\Services\RegistroCatastale\AnomalyTypes\NumeroDiverso;
 use App\Services\RegistroCatastale\AnomalyTypes\RigheMultiple;
@@ -32,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Da dove l'import di Sardegna Sentieri legge i dati (oc:8900).
+        $this->app->bind(SardegnaSentieriSource::class, SardegnaSentieriDatabaseSource::class);
+
         // oc:8333 — la documentazione vive su /docs/api/sus e non sul default
         // /docs/api: il branch SUS e' una delle integrazioni del Catasto, e il
         // path lascia spazio a documentazioni separate per gli altri partner

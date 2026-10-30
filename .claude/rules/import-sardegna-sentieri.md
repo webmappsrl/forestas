@@ -11,8 +11,9 @@ paths:
 
 Forestas usa un import custom da Sardegna Sentieri (piattaforma Drupal), **non** l'import standard
 da GeoHub. Comando `sardegnasentieri:import`, service
-`app/Services/Import/SardegnaSentieriImportService.php`, client
-`app/Http/Clients/SardegnaSentieriClient.php`, job in `app/Jobs/Import/`.
+`app/Services/Import/SardegnaSentieriImportService.php`, fonte dei dati
+`app/Services/Import/Source/SardegnaSentieriDatabaseSource.php` (la copia del DB Drupal), job in
+`app/Jobs/Import/`. `SardegnaSentieriClient` scarica solo i GPX.
 
 - **Il flusso GeoHub del package (`ImportTaxonomyActivityJob`, `ImportTaxonomyJob`,
   `wm-geohub-import.php`) non è usato qui**: indagando un bug su tassonomie, POI o track si perde
@@ -82,3 +83,18 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
   sulla 3307, mai su un'altra porta — vedi
   [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)
+- **Non filtrare `status = 1` nelle query dell'import**, anche se le query d'esempio della pagina
+  sulla copia lo fanno: le API esponevano le bozze, e filtrarle cambia cosa si importa e marca
+  quei nodi come spariti alla fonte (oc:8900)
+- **Date della copia convertite in PHP, mai con `FROM_UNIXTIME`**: usa il fuso della sessione
+  MySQL, e un `changed` spostato di un'ora fa reimportare tutto al primo giro (oc:8900)
+- **URL dei file codificati segmento per segmento con `rawurlencode`**: l'URL è la chiave con cui
+  `SardegnaSentieriMediaSyncService` riconosce un'immagine già scaricata, e un carattere diverso
+  le fa cancellare e riscaricare tutte (oc:8900)
+- **Un dato di Drupal che l'import non usa ancora si prende dal record completo**
+  (`SardegnaSentieriDatabaseSource::record()`), non con una query nuova: `DrupalRecordReader` legge
+  già tutti i campi del tipo e le entità richiamate — vedi
+  [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)
+- **Dopo ogni modifica a `SardegnaSentieriDatabaseSource`, `sardegnasentieri:compare-source`**
+  finché le API esistono: le regole del modulo Drupal replicate non sono deducibili dallo schema —
+  vedi [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)

@@ -53,12 +53,7 @@ beforeEach(function () {
     // Le liste restituiscono un elemento per tipo: serve solo che qualche job
     // venga prodotto, non che l'import scriva davvero. Le tassonomie tornano
     // vuote, cosi' `importAll()` non ha nulla da costruire.
-    Http::fake([
-        '*/tassonomia/*' => Http::response([], 200),
-        '*/list-tracks/*' => Http::response(['1' => '2026-01-01T00:00:00'], 200),
-        '*/listpoi/*' => Http::response(['2' => '2026-01-01T00:00:00'], 200),
-        '*sardegnasentieri.it*' => Http::response([], 200),
-    ]);
+    fonteSardegnaSentieriFinta(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
 
     // Il backup che `--reset` esegue prima di troncare: qui deve riuscire.
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
