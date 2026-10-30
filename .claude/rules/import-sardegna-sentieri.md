@@ -91,6 +91,12 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **URL dei file codificati segmento per segmento con `rawurlencode`**: l'URL è la chiave con cui
   `SardegnaSentieriMediaSyncService` riconosce un'immagine già scaricata, e un carattere diverso
   le fa cancellare e riscaricare tutte (oc:8900)
+- **Gli enti sono uno specchio di Drupal**: l'import li riscrive quando cambia il loro `changed`,
+  svuotando anche i campi svuotati là; una modifica fatta in Nova si perde al primo aggiornamento
+  dell'ente in Drupal, e su UAT ogni notte con il reset. È voluto finché Drupal è vivo (oc:8513)
+- **Il `--reset` svuota `enteables` ma non `entes`**: i collegamenti non hanno chiavi esterne e
+  dopo `RESTART IDENTITY` punterebbero ai tracciati nuovi con lo stesso id; gli enti restano con il
+  loro id e le loro immagini e vengono riscritti tutti (oc:8513)
 - **Un dato di Drupal che l'import non usa ancora si prende dal record completo**
   (`SardegnaSentieriDatabaseSource::record()`), non con una query nuova: `DrupalRecordReader` legge
   già tutti i campi del tipo e le entità richiamate — vedi

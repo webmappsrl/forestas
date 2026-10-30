@@ -71,13 +71,15 @@ function fonteSardegnaSentieriMock(): SardegnaSentieriClient&SardegnaSentieriSou
  *
  * @param  array<int|string, string>  $tracks  nid ⇒ changed
  * @param  array<int|string, string>  $pois  nid ⇒ changed
+ * @param  array<int|string, string>  $enti  nid ⇒ changed
  */
-function fonteSardegnaSentieriFinta(array $tracks = [], array $pois = [], bool $available = true): void
+function fonteSardegnaSentieriFinta(array $tracks = [], array $pois = [], bool $available = true, array $enti = []): void
 {
     $source = Mockery::mock(SardegnaSentieriSource::class);
     $source->shouldReceive('isAvailable')->andReturn($available);
     $source->shouldReceive('getTrackList')->andReturn($tracks);
     $source->shouldReceive('getPoiList')->andReturn($pois);
+    $source->shouldReceive('getEnteList')->andReturn($enti);
     $source->shouldReceive('getTaxonomy', 'getTaxonomyWarnings')->andReturn([]);
 
     app()->instance(SardegnaSentieriSource::class, $source);

@@ -61,6 +61,11 @@ class SardegnaSentieriImportService
     /** @var array<string, int|null> */
     private array $enteCache = [];
 
+    /**
+     * Se il POI o il sentiero in import ha saltato un ente mancante.
+     */
+    private bool $entiMancanti = false;
+
     /** @var array<string, array<string, array<string, mixed>>> */
     private array $taxonomyTermsCache = [];
 
@@ -805,6 +810,7 @@ class SardegnaSentieriImportService
 
     private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
+        $this->entiMancanti = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         $pairs = [];
@@ -820,7 +826,7 @@ class SardegnaSentieriImportService
             if ($nodeId === null) {
                 continue;
             }
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
             }
@@ -831,16 +837,14 @@ class SardegnaSentieriImportService
             : [];
 
         foreach ($operatori as $nodeId) {
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
             }
         }
 
-        if (empty($pairs)) {
-            return;
-        }
-
+        // Anche senza enti: un POI a cui in Drupal li hanno tolti tutti deve
+        // perdere i collegamenti, come i sentieri (oc:8513).
         DB::table('enteables')
             ->where('enteable_id', $ecPoi->id)
             ->where('enteable_type', EcPoi::class)
@@ -854,10 +858,13 @@ class SardegnaSentieriImportService
                 'ruolo' => $pair['ruolo'],
             ]);
         }
+
+        $this->rememberEntiMancanti($ecPoi);
     }
 
     private function syncEnti(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
+        $this->entiMancanti = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         // Collect all (enteId, ruolo) pairs — same ente can have multiple roles
@@ -874,7 +881,7 @@ class SardegnaSentieriImportService
             if ($nodeId === null) {
                 continue;
             }
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
             }
@@ -885,14 +892,14 @@ class SardegnaSentieriImportService
             : [];
 
         foreach ($operatori as $nodeId) {
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
             }
         }
 
         if ($response->complesso_forestale !== null) {
-            $enteId = $this->resolveOrImportEnte((int) $response->complesso_forestale);
+            $enteId = $this->resolveEnte((int) $response->complesso_forestale);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'complesso_forestale'];
             }
@@ -912,127 +919,176 @@ class SardegnaSentieriImportService
                 'ruolo' => $pair['ruolo'],
             ]);
         }
+
+        $this->rememberEntiMancanti($ecTrack);
     }
 
-    private function resolveOrImportEnte(int $nodeId): ?int
+    /**
+     * Segna nel nodo se ha saltato un ente mancante, o toglie il segno quando
+     * li ha trovati tutti: il comando rimette in coda i nodi segnati anche
+     * con lo stesso `changed`, altrimenti il collegamento in produzione
+     * tornerebbe solo al prossimo cambio del nodo in Drupal (oc:8513).
+     */
+    private function rememberEntiMancanti(EcPoi|EcTrack $model): void
+    {
+        $properties = is_array($model->properties) ? $model->properties : [];
+        $before = $properties['forestas']['enti_mancanti'] ?? false;
+
+        if ($before === $this->entiMancanti) {
+            return;
+        }
+
+        if ($this->entiMancanti) {
+            $properties['forestas']['enti_mancanti'] = true;
+        } else {
+            unset($properties['forestas']['enti_mancanti']);
+        }
+
+        $model->properties = $properties;
+        $model->saveQuietly();
+    }
+
+    /**
+     * L'id locale dell'ente richiamato da un POI o da un sentiero.
+     *
+     * Non lo importa: gli enti hanno un batch loro, che il comando fa girare
+     * prima di quello di POI e sentieri (oc:8513). Un ente assente vuol dire
+     * che il suo job e' fallito: il collegamento si salta e il nodo si
+     * marca con `properties.forestas.enti_mancanti`, cosi' il comando lo
+     * rilegge al giro dopo anche se in Drupal non e' cambiato.
+     */
+    private function resolveEnte(int $nodeId): ?int
     {
         $cacheKey = (string) $nodeId;
 
-        if (array_key_exists($cacheKey, $this->enteCache)) {
-            return $this->enteCache[$cacheKey];
+        if (! array_key_exists($cacheKey, $this->enteCache)) {
+            $this->enteCache[$cacheKey] = Ente::where('sardegnasentieri_id', $cacheKey)->value('id');
+
+            if ($this->enteCache[$cacheKey] === null) {
+                Log::channel('import')->warning("Ente {$nodeId} non ancora importato: collegamento saltato.");
+            }
         }
 
-        // Check if already imported
-        $existing = Ente::where('sardegnasentieri_id', $cacheKey)->value('id');
-
-        if ($existing !== null) {
-            $this->enteCache[$cacheKey] = $existing;
-
-            return $existing;
+        if ($this->enteCache[$cacheKey] === null) {
+            $this->entiMancanti = true;
         }
 
-        $result = $this->importOrUpdateEnte($cacheKey);
-        $this->enteCache[$cacheKey] = $result;
-
-        return $result;
+        return $this->enteCache[$cacheKey];
     }
 
-    public function importOrUpdateEnte(string $sardegnaSentieriId): ?int
+    /**
+     * Scrive l'ente com'e' in Drupal: un campo svuotato la' si svuota qui, e
+     * le modifiche fatte in Nova si perdono al primo aggiornamento, perche'
+     * finche' Drupal e' vivo la fonte e' una sola (oc:8513).
+     *
+     * Salva il `changed` di Drupal in `properties.forestas.updated_at`, come
+     * sentieri e POI, per non riscrivere al giro dopo un ente non cambiato.
+     * Un errore arriva al job, che si ritenta; un'immagine che non si scarica
+     * resta un avviso nel log, come per sentieri e POI.
+     */
+    public function importOrUpdateEnte(string $sardegnaSentieriId, string $changed): int
     {
-        try {
-            $node = $this->source->getNodeDetail((int) $sardegnaSentieriId);
-            $title = $node['title'][0]['value'] ?? null;
+        $node = $this->source->getNodeDetail((int) $sardegnaSentieriId);
+        $title = $node['title'][0]['value'] ?? null;
 
-            if (empty($title)) {
-                return null;
-            }
+        if (empty($title)) {
+            throw new \RuntimeException("Ente {$sardegnaSentieriId} senza titolo nella copia del DB Drupal");
+        }
 
-            $contattiRaw = $node['field_contatti'][0]['value'] ?? null;
-            $contatti = (is_string($contattiRaw) && $contattiRaw !== '') ? $contattiRaw : null;
+        $contattiRaw = $node['field_contatti'][0]['value'] ?? null;
+        $contatti = (is_string($contattiRaw) && $contattiRaw !== '') ? $contattiRaw : null;
 
-            $paginaWebRaw = $node['field_pagina_web'][0]['uri'] ?? null;
-            $paginaWeb = is_string($paginaWebRaw) ? $paginaWebRaw : null;
+        $paginaWebRaw = $node['field_pagina_web'][0]['uri'] ?? null;
+        $paginaWeb = is_string($paginaWebRaw) ? $paginaWebRaw : null;
 
-            $tipoEnteId = isset($node['field_tipo_ente'][0]['target_id'])
-                ? (int) $node['field_tipo_ente'][0]['target_id']
-                : null;
+        $tipoEnteId = isset($node['field_tipo_ente'][0]['target_id'])
+            ? (int) $node['field_tipo_ente'][0]['target_id']
+            : null;
 
-            /** @var TipoEnte|string|null $tipoEnteValue */
-            $tipoEnteValue = null;
-            if ($tipoEnteId !== null) {
-                $enum = TipoEnte::fromDrupalId($tipoEnteId);
-                if ($enum !== null) {
-                    $tipoEnteValue = $enum;
-                } else {
-                    try {
-                        $term = $this->source->getTaxonomyTerm($tipoEnteId);
-                        $label = $term['name'][0]['value'] ?? null;
-                        if ($label !== null) {
-                            $tipoEnteSlug = Str::slug($label);
-                            Log::warning("TipoEnte Drupal ID {$tipoEnteId} non mappato nell'enum: slug '{$tipoEnteSlug}'");
-                            $tipoEnteValue = $tipoEnteSlug;
-                        }
-                    } catch (\Exception) {
-                        Log::warning("TipoEnte Drupal ID {$tipoEnteId} non risolvibile via API");
+        /** @var TipoEnte|string|null $tipoEnteValue */
+        $tipoEnteValue = null;
+        if ($tipoEnteId !== null) {
+            $enum = TipoEnte::fromDrupalId($tipoEnteId);
+            if ($enum !== null) {
+                $tipoEnteValue = $enum;
+            } else {
+                try {
+                    $term = $this->source->getTaxonomyTerm($tipoEnteId);
+                    $label = $term['name'][0]['value'] ?? null;
+                    if ($label !== null) {
+                        $tipoEnteSlug = Str::slug($label);
+                        Log::warning("TipoEnte Drupal ID {$tipoEnteId} non mappato nell'enum: slug '{$tipoEnteSlug}'");
+                        $tipoEnteValue = $tipoEnteSlug;
                     }
+                } catch (\Exception) {
+                    Log::warning("TipoEnte Drupal ID {$tipoEnteId} non risolvibile via API");
                 }
             }
-
-            $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
-                ? (string) $node['field_immagine_principale'][0]['url']
-                : null;
-
-            $description = isset($node['body'][0]['value'])
-                ? trim(strip_tags((string) $node['body'][0]['value']))
-                : null;
-
-            $lat = isset($node['field_geolocalizzazione'][0]['lat'])
-                ? (float) $node['field_geolocalizzazione'][0]['lat']
-                : null;
-
-            $lon = isset($node['field_geolocalizzazione'][0]['lon'])
-                ? (float) $node['field_geolocalizzazione'][0]['lon']
-                : null;
-
-            $geometry = ($lat !== null && $lon !== null)
-                ? "POINT({$lon} {$lat})"
-                : null;
-
-            $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
-            $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
-            if ($contatti !== null) {
-                // Campo translatable come name e description: assegnarlo come
-                // stringa nuda popolerebbe solo la locale corrente.
-                $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
-            }
-            $ente->pagina_web = $paginaWeb;
-            if ($description !== null && $description !== '') {
-                $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
-            }
-            if ($tipoEnteValue instanceof TipoEnte) {
-                $ente->tipo_ente = $tipoEnteValue;
-            } else {
-                // Arbitrary slug (not yet in enum): bypass Eloquent enum cast
-                $rawAttrs = $ente->getAttributes();
-                $rawAttrs['tipo_ente'] = $tipoEnteValue;
-                $ente->setRawAttributes($rawAttrs, true);
-            }
-            if ($geometry !== null) {
-                $ente->geometry = $geometry;
-            }
-            $ente->properties = null;
-            $ente->saveQuietly();
-
-            if ($featureImageUrl !== null) {
-                $this->mediaSync->syncImportedImages($ente, [
-                    ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
-                ]);
-            }
-
-            return $ente->id;
-        } catch (\Exception) {
-            return null;
         }
+
+        $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
+            ? (string) $node['field_immagine_principale'][0]['url']
+            : null;
+
+        $description = isset($node['body'][0]['value'])
+            ? trim(strip_tags((string) $node['body'][0]['value']))
+            : null;
+
+        $lat = isset($node['field_geolocalizzazione'][0]['lat'])
+            ? (float) $node['field_geolocalizzazione'][0]['lat']
+            : null;
+
+        $lon = isset($node['field_geolocalizzazione'][0]['lon'])
+            ? (float) $node['field_geolocalizzazione'][0]['lon']
+            : null;
+
+        $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
+        $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
+        // Campi translatable come name: assegnarli come stringa nuda
+        // popolerebbe solo la locale corrente.
+        if ($contatti !== null) {
+            $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
+        } else {
+            $this->clearTranslatable($ente, 'contatti');
+        }
+        $ente->pagina_web = $paginaWeb;
+        if ($description !== null && $description !== '') {
+            $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
+        } else {
+            $this->clearTranslatable($ente, 'description');
+        }
+        if ($tipoEnteValue instanceof TipoEnte) {
+            $ente->tipo_ente = $tipoEnteValue;
+        } else {
+            // Arbitrary slug (not yet in enum): bypass Eloquent enum cast
+            $rawAttrs = $ente->getAttributes();
+            $rawAttrs['tipo_ente'] = $tipoEnteValue;
+            $ente->setRawAttributes($rawAttrs);
+        }
+        $ente->geometry = ($lat !== null && $lon !== null) ? "POINT({$lon} {$lat})" : null;
+
+        $properties = is_array($ente->properties) ? $ente->properties : [];
+        $forestas = is_array($properties['forestas'] ?? null) ? $properties['forestas'] : [];
+        unset($forestas['deleted_from_source']);
+        $properties['forestas'] = ['updated_at' => $changed] + $forestas;
+        $ente->properties = $properties;
+        $ente->saveQuietly();
+
+        // Senza immagine in Drupal la lista vuota toglie quella importata.
+        $this->mediaSync->syncImportedImages($ente, $featureImageUrl === null ? [] : [
+            ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
+        ]);
+
+        return $ente->id;
+    }
+
+    /**
+     * Svuota un campo translatable: assegnare null passerebbe dal trait e
+     * svuoterebbe solo la locale corrente, lasciando le altre.
+     */
+    private function clearTranslatable(Ente $ente, string $field): void
+    {
+        $ente->setRawAttributes(array_merge($ente->getAttributes(), [$field => null]));
     }
 
     private function convertGeoJsonGeometryToWkt(?array $geometry): ?string

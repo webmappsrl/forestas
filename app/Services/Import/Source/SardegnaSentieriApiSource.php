@@ -84,6 +84,15 @@ class SardegnaSentieriApiSource implements SardegnaSentieriSource
     }
 
     /**
+     * Le API non hanno una lista degli enti: questa fonte serve solo al
+     * confronto con la copia, che gli enti li confronta nodo per nodo.
+     */
+    public function getEnteList(): array
+    {
+        throw new \LogicException('Le API non espongono la lista degli enti');
+    }
+
+    /**
      * Get Track list: {id: timestamp, ...}
      *
      * @return array<string, string>

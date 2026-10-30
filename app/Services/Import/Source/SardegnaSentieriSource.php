@@ -39,6 +39,15 @@ interface SardegnaSentieriSource
     public function getTrackDetail(int $id): ApiTrackResponse;
 
     /**
+     * Gli enti (soggetti gestori, manutentori, rilevatori, operatori,
+     * complessi forestali), con la data di modifica come per sentieri e POI
+     * (oc:8513).
+     *
+     * @return array<string, string> {nid: 'Y-m-d H:i:s' in ora italiana}
+     */
+    public function getEnteList(): array;
+
+    /**
      * @return array<int|string, array<string, mixed>>
      */
     public function getTaxonomy(string $vocabulary): array;

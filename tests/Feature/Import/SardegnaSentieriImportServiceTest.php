@@ -521,6 +521,7 @@ it('il Command non marca come rimossi i POI presenti nella API', function () {
         function ($mock) {
             $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getPoiList')->andReturn(['42' => '2024-01-15T10:00:00']);
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
@@ -547,6 +548,7 @@ it('il Command marca come deleted_from_source i POI non più nell\'API (fix P5)'
         function ($mock) {
             $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getPoiList')->andReturn([]); // API vuota
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
@@ -575,6 +577,7 @@ it('il Command marca come deleted_from_source i Track non più nell\'API (fix P5
         function ($mock) {
             $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getTrackList')->andReturn([]); // API vuota
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
