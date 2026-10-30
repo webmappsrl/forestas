@@ -263,6 +263,10 @@ Gli endpoint `/ss/*` sono nel modulo Drupal `api_webmapp`.
 | chiave | nodo `.nid` con `type IN ('sentiero','itinerario')` / `type = 'poi'` | **include anche i nodi non pubblicati** (bozze in `draft`, `status = 0`): verificato il 05/10/2026, l'elenco ha tutti i sentieri e itinerari della copia, compresi quelli non pubblicati, mentre la pagina pubblica del nodo risponde 403 |
 | valore | nodo `.changed` | l'API lo restituisce già formattato come data |
 
+**Lista degli enti** (`getEnteList()`, oc:8513) — le API non l'avevano: la copia dà `{nid: changed}`
+dei nodi `type = 'ente_istituzione_societa'`, bozze comprese, nella stessa forma delle liste sopra.
+L'import confronta il `changed` con `properties.forestas.updated_at` dell'ente.
+
 **`/ss/track/{id}`** — `ApiTrackResponse` (serve sia sentieri sia itinerari)
 
 | Campo del DTO | Copia | Note |
