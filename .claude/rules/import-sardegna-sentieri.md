@@ -11,16 +11,28 @@ paths:
 
 Forestas usa un import custom da Sardegna Sentieri (piattaforma Drupal), **non** l'import standard
 da GeoHub. Comando `sardegnasentieri:import`, service
-`app/Services/Import/SardegnaSentieriImportService.php`, client
-`app/Http/Clients/SardegnaSentieriClient.php`, job in `app/Jobs/Import/`.
+`app/Services/Import/SardegnaSentieriImportService.php`, fonte dei dati
+`app/Services/Import/Source/SardegnaSentieriDatabaseSource.php` (la copia del DB Drupal), job in
+`app/Jobs/Import/`. `SardegnaSentieriClient` scarica solo i GPX.
 
 - **Il flusso GeoHub del package (`ImportTaxonomyActivityJob`, `ImportTaxonomyJob`,
   `wm-geohub-import.php`) non è usato qui**: indagando un bug su tassonomie, POI o track si perde
   tempo a leggerlo — la causa sta in `SardegnaSentieriImportService` (oc:8489)
-- **`--reset` fa `TRUNCATE ... RESTART IDENTITY CASCADE` globale** su `ec_tracks`, `ec_pois` e le
-  tassonomie, non una cancellazione selettiva per `app_id`: su Forestas è innocuo perché l'app è
+- **`--reset` fa `TRUNCATE ... RESTART IDENTITY CASCADE` globale** su `ec_tracks`, `ec_pois` e i tipi
+  di POI, non una cancellazione selettiva per `app_id`: su Forestas è innocuo perché l'app è
   una sola (`SardegnaSentieriImportService::IMPORT_APP_ID` = 1), diventerebbe un problema con più
-  app nello stesso database (oc:8489)
+  app nello stesso database (oc:8489). **Le attività invece non si troncano**: si cancellano a mano
+  solo le righe di tracce e POI in `taxonomy_activityables` e `layerables`, e i legami dei layer
+  restano (oc:8827)
+- **L'import scrive le attività delle tracce senza eventi sul pivot**: i layer li ricalcola solo
+  `RecalculateSardegnaSentieriLayersJob` nella catena di fine batch, prima del reindex. Un nuovo
+  percorso che scrive attività sulle tracce fuori da quel batch deve accodarlo, altrimenti layer e
+  `properties.layers` restano vecchi — vedi
+  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
+- **Un layer di tipologia senza attività viene saltato dal ricalcolo**: `sardegnasentieri:configure-layers`
+  va lanciato una volta su ogni ambiente e di nuovo dopo `sardegnasentieri:reset`, sempre dopo un
+  `sardegnasentieri:import --force` (o il reset notturno) e la fine dei suoi job — vedi
+  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
 - **Il troncamento notturno porta via anche ciò che non viene da Drupal**, per vincolo a cascata: la
   storia dei cambi di stato dei codici e le istanze di accatastamento. Oggi è **deliberato**:
   `--reset` tronca esplicitamente anche `trail_applications`, che altrimenti sopravvivrebbe ai
@@ -82,3 +94,21 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
   sulla 3307, mai su un'altra porta — vedi
   [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)
+- **Non filtrare `status = 1` nelle query dell'import**, anche se le query d'esempio della pagina
+  sulla copia lo fanno: le API esponevano le bozze, e filtrarle cambia cosa si importa e marca
+  quei nodi come spariti alla fonte (oc:8900)
+- **Date della copia convertite in PHP, mai con `FROM_UNIXTIME`**: usa il fuso della sessione
+  MySQL, e un `changed` spostato di un'ora fa reimportare tutto al primo giro (oc:8900)
+- **URL dei file codificati segmento per segmento con `rawurlencode`**: l'URL è la chiave con cui
+  `SardegnaSentieriMediaSyncService` riconosce un'immagine già scaricata, e un carattere diverso
+  le fa cancellare e riscaricare tutte (oc:8900)
+- **Gli enti sono uno specchio di Drupal**: l'import li riscrive quando cambia il loro `changed`,
+  svuotando anche i campi svuotati là; una modifica fatta in Nova si perde al primo aggiornamento
+  dell'ente in Drupal, e su UAT ogni notte con il reset. È voluto finché Drupal è vivo (oc:8513)
+- **Il `--reset` svuota `enteables` ma non `entes`**: i collegamenti non hanno chiavi esterne e
+  dopo `RESTART IDENTITY` punterebbero ai tracciati nuovi con lo stesso id; gli enti restano con il
+  loro id e le loro immagini e vengono riscritti tutti (oc:8513)
+- **Un dato di Drupal che l'import non usa ancora si prende dal record completo**
+  (`SardegnaSentieriDatabaseSource::record()`), non con una query nuova: `DrupalRecordReader` legge
+  già tutti i campi del tipo e le entità richiamate — vedi
+  [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)

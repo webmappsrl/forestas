@@ -53,12 +53,7 @@ beforeEach(function () {
     // Le liste restituiscono un elemento per tipo: serve solo che qualche job
     // venga prodotto, non che l'import scriva davvero. Le tassonomie tornano
     // vuote, cosi' `importAll()` non ha nulla da costruire.
-    Http::fake([
-        '*/tassonomia/*' => Http::response([], 200),
-        '*/list-tracks/*' => Http::response(['1' => '2026-01-01T00:00:00'], 200),
-        '*/listpoi/*' => Http::response(['2' => '2026-01-01T00:00:00'], 200),
-        '*sardegnasentieri.it*' => Http::response([], 200),
-    ]);
+    fonteSardegnaSentieriFinta(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
 
     // Il backup che `--reset` esegue prima di troncare: qui deve riuscire.
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
@@ -139,6 +134,75 @@ it('azzera anche le domande di iscrizione', function () {
     Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
     expect(DB::table('trail_applications')->count())->toBe(0);
+});
+
+it('il reset conserva le attività e i loro legami con i layer (oc:8827)', function () {
+    Bus::fake();
+
+    $activityId = DB::table('taxonomy_activities')->insertGetId([
+        'identifier' => 'sardegnasentieri:type:sentiero',
+        'name' => json_encode(['it' => 'Sentiero']),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    // Le righe vere dei layer sono `App\Models\Layer` (morphMap del package): vanno
+    // conservate entrambe le forme.
+    foreach (['Wm\WmPackage\Models\Layer', 'App\Models\Layer'] as $type) {
+        DB::table('taxonomy_activityables')->insert([
+            'taxonomy_activity_id' => $activityId,
+            'taxonomy_activityable_id' => 5,
+            'taxonomy_activityable_type' => $type,
+        ]);
+    }
+
+    Artisan::call('sardegnasentieri:import', ['--reset' => true]);
+
+    expect(DB::table('taxonomy_activities')->where('identifier', 'sardegnasentieri:type:sentiero')->value('id'))->toBe($activityId)
+        ->and(DB::table('taxonomy_activityables')
+            ->where('taxonomy_activity_id', $activityId)
+            ->orderBy('taxonomy_activityable_type')
+            ->pluck('taxonomy_activityable_type')
+            ->all())->toBe(['App\Models\Layer', 'Wm\WmPackage\Models\Layer']);
+});
+
+it('il reset cancella i legami di tracce e POI con attività e layer (oc:8827)', function () {
+    Bus::fake();
+
+    $activityId = DB::table('taxonomy_activities')->insertGetId([
+        'identifier' => 'sardegnasentieri:type:sentiero',
+        'name' => json_encode(['it' => 'Sentiero']),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $types = [
+        'App\Models\EcTrack',
+        'Wm\WmPackage\Models\EcTrack',
+        'App\Models\EcPoi',
+        'Wm\WmPackage\Models\EcPoi',
+        'Wm\WmPackage\Models\Layer',
+        'App\Models\Layer',
+    ];
+
+    foreach ($types as $type) {
+        DB::table('taxonomy_activityables')->insert([
+            'taxonomy_activity_id' => $activityId,
+            'taxonomy_activityable_id' => 1,
+            'taxonomy_activityable_type' => $type,
+        ]);
+        DB::table('layerables')->insert([
+            'layer_id' => 1,
+            'layerable_id' => 1,
+            'layerable_type' => $type,
+        ]);
+    }
+
+    Artisan::call('sardegnasentieri:import', ['--reset' => true]);
+
+    $layerTypes = ['App\Models\Layer', 'Wm\WmPackage\Models\Layer'];
+
+    expect(DB::table('taxonomy_activityables')->orderBy('taxonomy_activityable_type')->pluck('taxonomy_activityable_type')->all())->toBe($layerTypes)
+        ->and(DB::table('layerables')->orderBy('layerable_type')->pluck('layerable_type')->all())->toBe($layerTypes);
 });
 
 it('ricalcola le anomalie se i job falliti stanno sotto la soglia', function () {

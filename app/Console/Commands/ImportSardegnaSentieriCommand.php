@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Http\Clients\SardegnaSentieriClient;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
+use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
+use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
+use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
+use App\Services\Import\Source\DrupalDumpLock;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Bus\Batch;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
@@ -31,6 +36,19 @@ class ImportSardegnaSentieriCommand extends Command
      * Quota di job falliti oltre la quale le anomalie non si ricalcolano.
      */
     private const NORMALIZE_FAILURE_THRESHOLD = 0.02;
+
+    /**
+     * Oltre quest'età il lock della copia è di una ricarica fallita (oc:8900).
+     */
+    private const STALE_LOCK_HOURS = 2;
+
+    /** Tipi morph con cui tracce e POI compaiono nelle pivot: nome del model del progetto e del package. */
+    private const TRACK_AND_POI_MORPH_TYPES = [
+        'App\\Models\\EcTrack',
+        'Wm\\WmPackage\\Models\\EcTrack',
+        'App\\Models\\EcPoi',
+        'Wm\\WmPackage\\Models\\EcPoi',
+    ];
 
     /**
      * Se le anomalie vadano ricalcolate dato l'esito del batch di import.
@@ -66,16 +84,36 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Import POIs and Tracks from Sardegna Sentieri API';
+    protected $description = 'Import POIs and Tracks from Sardegna Sentieri (copia del DB Drupal)';
 
     /**
      * Execute the console command.
      */
     public function handle(
-        SardegnaSentieriClient $client,
+        SardegnaSentieriSource $source,
         SardegnaSentieriImportService $importService
     ): int {
         $runId = strtoupper(Str::random(8));
+
+        // Prima di tutto, anche del `--reset`: una copia a metà ricarica
+        // sembra una fonte con pochi nodi (oc:8900).
+        if (DrupalDumpLock::isHeld()) {
+            $since = DrupalDumpLock::heldSince()?->format('Y-m-d H:i:s') ?? '?';
+
+            // Una ricarica dura minuti: un lock più vecchio è di una ricarica
+            // fallita, e l'import resterebbe fermo per sempre in silenzio.
+            if (DrupalDumpLock::heldSince()?->lt(now()->subHours(self::STALE_LOCK_HOURS))) {
+                $this->error("Copia del DB Drupal bloccata dal {$since} (ricarica fallita?): import saltato. Vedi docs/howto/copia-database-drupal.md.");
+                Log::channel('import')->error("[sardegnasentieri:{$runId}] Copia del DB Drupal bloccata dal {$since} (ricarica fallita?): import saltato.");
+
+                return self::FAILURE;
+            }
+
+            $this->warn("Copia del DB Drupal in ricarica dal {$since}: import saltato.");
+            Log::channel('import')->warning("[sardegnasentieri:{$runId}] Copia del DB Drupal in ricarica dal {$since}: import saltato.");
+
+            return self::SUCCESS;
+        }
 
         if (! $this->ensurePrerequisites()) {
             Log::channel('import')->error("[sardegnasentieri:{$runId}] Prerequisites not met, import aborted.");
@@ -83,13 +121,16 @@ class ImportSardegnaSentieriCommand extends Command
             return self::FAILURE;
         }
 
+        // Anche nell'import orario: le liste di una copia vuota farebbero
+        // marcare ogni record come sparito alla fonte (oc:8900).
+        if (! $this->sourceIsReachable($source, $runId)) {
+            return self::FAILURE;
+        }
+
         if ($this->option('reset')) {
-            // Due controlli PRIMA del troncamento, non dopo: `--reset`
-            // cancella e solo allora scarica, quindi ogni imprevisto dopo la
+            // Il backup PRIMA del troncamento, non dopo: `--reset` cancella e
+            // solo allora scarica, quindi ogni imprevisto dopo la
             // cancellazione lascia la piattaforma vuota.
-            if (! $this->sourceIsReachable($client, $runId)) {
-                return self::FAILURE;
-            }
 
             if (! $this->backupBeforeReset($runId)) {
                 return self::FAILURE;
@@ -104,6 +145,10 @@ class ImportSardegnaSentieriCommand extends Command
         $importService->importAll();
         $this->info('Taxonomies imported.');
 
+        // Gli enti sempre, anche con `--only`: i job di POI e sentieri
+        // collegano solo enti gia' importati (oc:8513).
+        [$entiDispatched, $entiRemoved, $enteJobs] = $this->importEnti($source);
+
         $only = $this->option('only');
         $poisDispatched = [];
         $tracksDispatched = [];
@@ -113,18 +158,22 @@ class ImportSardegnaSentieriCommand extends Command
 
         // Import POIs
         if (! $only || $only === 'pois') {
-            [$poisDispatched, $poisRemoved, $poiJobs] = $this->importPois($client);
+            [$poisDispatched, $poisRemoved, $poiJobs] = $this->importPois($source);
             $jobs = [...$jobs, ...$poiJobs];
         }
 
         // Import Tracks
         if (! $only || $only === 'tracks') {
-            [$tracksDispatched, $tracksRemoved, $trackJobs] = $this->importTracks($client);
+            [$tracksDispatched, $tracksRemoved, $trackJobs] = $this->importTracks($source);
             $jobs = [...$jobs, ...$trackJobs];
         }
 
         if ($jobs === []) {
             $this->info('Nessun job da importare.');
+
+            if ($enteJobs !== []) {
+                $this->entiBatch($enteJobs)->dispatch();
+            }
 
             // Nell'import orario (niente `--reset`, niente `--only`) il
             // registro catastale si riallinea a ogni giro, anche quando da
@@ -144,18 +193,20 @@ class ImportSardegnaSentieriCommand extends Command
             // raggruppati come nel ramo `--reset`. `withNormalize` qui
             // significa solo «non e' un `--only` parziale»: il normalize
             // vero e proprio resta escluso dal ramo `! $reset` piu' sotto.
-            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only === null, reset: false);
+            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only === null, reset: false, enteJobs: $enteJobs);
         } else {
             // Con `--only=pois` i tracciati sono stati troncati e non
             // reimportati: l'archivio e' vuoto per volonta' di chi ha lanciato
             // il comando, non per un guasto, e ricalcolare le anomalie li'
             // dentro scriverebbe «catasto vuoto» come stato legittimo.
-            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only !== 'pois', reset: true);
+            $this->dispatchImportBatch($jobs, $runId, withNormalize: $only !== 'pois', reset: true, enteJobs: $enteJobs);
         }
 
         $this->info('Import completed.');
 
         Log::channel('import')->info("[sardegnasentieri:{$runId}] Run completed.", [
+            'enti_dispatched' => count($entiDispatched),
+            'enti_removed' => $entiRemoved,
             'pois_dispatched' => count($poisDispatched),
             'poi_ids' => $poisDispatched,
             'pois_removed' => $poisRemoved,
@@ -196,15 +247,21 @@ class ImportSardegnaSentieriCommand extends Command
      * `SyncEcTaxonomyWhereAction`, seguito in catena dal reindex
      * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`.
      *
+     * Con enti da importare il batch di POI e sentieri parte in catena dopo
+     * il loro: dopo un `--reset` un sentiero il cui gestore non e' ancora
+     * importato perderebbe il collegamento, e al giro dopo, non cambiato,
+     * non verrebbe riletto (oc:8513).
+     *
      * @param  list<ImportSardegnaSentieriPoiJob|ImportSardegnaSentieriTrackJob>  $jobs
+     * @param  list<ImportSardegnaSentieriEnteJob>  $enteJobs
      */
-    private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize, bool $reset): void
+    private function dispatchImportBatch(array $jobs, string $runId, bool $withNormalize, bool $reset, array $enteJobs = []): void
     {
         // `Bus::batch()` riassegna la coda a ogni job che raggruppa: quella
         // dichiarata nel loro costruttore viene sovrascritta con `null`, cioe'
         // `default`, e l'isolamento della coda di import sparirebbe proprio
         // nel caso — il reset — per cui serve (oc:8607).
-        Bus::batch($jobs)
+        $batch = Bus::batch($jobs)
             ->name('sardegnasentieri import')
             ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
             ->allowFailures()
@@ -214,12 +271,16 @@ class ImportSardegnaSentieriCommand extends Command
                 // archivio incompleto — le guardie servono ad anomalie e
                 // registro. Sulla coda dell'import, perche' su `default`
                 // finirebbe dietro le conversioni immagine (oc:8607).
+                // Il ricalcolo dei layer sta fra sync e reindex: scrive
+                // `properties.layers` in modo sincrono, e il reindex deve
+                // leggere le tracce gia' aggiornate (oc:8827).
                 Bus::chain([
                     new SyncTaxonomyWhereJob,
+                    new RecalculateSardegnaSentieriLayersJob,
                     new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
                 ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
 
-                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali e reindex accodati.");
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e reindex accodati.");
 
                 if (! $withNormalize) {
                     Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");
@@ -256,10 +317,111 @@ class ImportSardegnaSentieriCommand extends Command
                 );
 
                 ImportRegistroCatastaleJob::dispatch();
-            })
-            ->dispatch();
+            });
+
+        if ($enteJobs === []) {
+            $batch->dispatch();
+        } else {
+            Bus::chain([$this->entiBatch($enteJobs), $batch])
+                ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
+                ->dispatch();
+        }
 
         $this->info('Dispatched '.count($jobs).' import jobs in un batch.');
+    }
+
+    /**
+     * Il batch degli enti, sulla coda dell'import come quello di POI e
+     * sentieri (oc:8607). I fallimenti non fermano la catena: un ente
+     * mancante costa solo il suo collegamento.
+     *
+     * @param  list<ImportSardegnaSentieriEnteJob>  $enteJobs
+     */
+    private function entiBatch(array $enteJobs): PendingBatch
+    {
+        $this->info('Dispatched '.count($enteJobs).' ente jobs in un batch.');
+
+        return Bus::batch($enteJobs)
+            ->name('sardegnasentieri enti')
+            ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)
+            ->allowFailures();
+    }
+
+    /**
+     * Gli enti nuovi o cambiati, come per POI e sentieri: il confronto e' sul
+     * `changed` di Drupal salvato in `properties.forestas.updated_at`
+     * (oc:8513). Un ente marcato sparito e tornato in Drupal si riaccoda
+     * anche con lo stesso `changed`, o resterebbe marcato per sempre.
+     *
+     * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriEnteJob>}
+     */
+    private function importEnti(SardegnaSentieriSource $source): array
+    {
+        $this->info('Fetching ente list...');
+        $enteList = $source->getEnteList();
+        $this->info('Found '.count($enteList).' enti.');
+
+        $force = $this->option('force') || $this->option('reset');
+        $local = Ente::query()->get(['sardegnasentieri_id', 'properties'])
+            ->mapWithKeys(fn (Ente $ente) => [(string) $ente->sardegnasentieri_id => $ente->properties['forestas'] ?? []]);
+
+        $dispatched = [];
+        $jobs = [];
+        foreach ($enteList as $id => $changed) {
+            $saved = $local[(string) $id] ?? null;
+            $unchanged = $saved !== null
+                && ($saved['updated_at'] ?? null) === $changed
+                && ($saved['deleted_from_source'] ?? false) !== true;
+
+            if (! $force && $unchanged) {
+                continue;
+            }
+
+            $jobs[] = new ImportSardegnaSentieriEnteJob((int) $id, $changed);
+            $dispatched[] = (int) $id;
+        }
+
+        $this->info('Prepared '.count($dispatched).' ente import jobs.');
+
+        $removed = $this->markRemovedEnti(array_map('strval', array_keys($enteList)));
+
+        return [$dispatched, $removed, $jobs];
+    }
+
+    /**
+     * Gli enti non piu' in Drupal si marcano, non si cancellano, come POI e
+     * sentieri (oc:8513).
+     *
+     * @param  list<string>  $sourceIds
+     */
+    private function markRemovedEnti(array $sourceIds): int
+    {
+        // Una lista vuota con sentieri e POI presenti (il controllo iniziale li
+        // ha gia' chiesti) e' una copia a meta' o una query rotta, non tutti
+        // gli enti spariti insieme: `whereNotIn` con [] li marcherebbe tutti.
+        if ($sourceIds === []) {
+            $this->warn('Lista degli enti vuota: nessun ente marcato come sparito.');
+
+            return 0;
+        }
+
+        $removed = Ente::query()
+            ->whereNotIn('sardegnasentieri_id', $sourceIds)
+            ->whereRaw("(properties->'forestas'->>'deleted_from_source') IS DISTINCT FROM 'true'")
+            ->get();
+
+        foreach ($removed as $ente) {
+            $properties = is_array($ente->properties) ? $ente->properties : [];
+            $properties['forestas']['deleted_from_source'] = true;
+            $ente->properties = $properties;
+            $ente->saveQuietly();
+        }
+
+        if ($removed->count() > 0) {
+            $this->warn("Marked {$removed->count()} enti as deleted_from_source.");
+        }
+
+        return $removed->count();
     }
 
     /**
@@ -270,10 +432,10 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriPoiJob>}
      */
-    private function importPois(SardegnaSentieriClient $client): array
+    private function importPois(SardegnaSentieriSource $source): array
     {
         $this->info('Fetching POI list...');
-        $poiList = $client->getPoiList();
+        $poiList = $source->getPoiList();
         $this->info('Found '.count($poiList).' POIs.');
 
         $force = $this->option('force') || $this->option('reset');
@@ -289,10 +451,13 @@ class ImportSardegnaSentieriCommand extends Command
                         "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
                         [(string) $id, (string) $id]
                     )
-                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at")
-                    ->value('forestas_updated_at');
+                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at, properties->'forestas'->>'enti_mancanti' as enti_mancanti")
+                    ->toBase()
+                    ->first();
 
-                if ($existing === $apiTimestamp) {
+                // Un nodo che ha saltato un ente mancante si rilegge anche
+                // con lo stesso changed (oc:8513).
+                if ($existing !== null && $existing->forestas_updated_at === $apiTimestamp && $existing->enti_mancanti !== 'true') {
                     continue;
                 }
             }
@@ -359,10 +524,10 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriTrackJob>}
      */
-    private function importTracks(SardegnaSentieriClient $client): array
+    private function importTracks(SardegnaSentieriSource $source): array
     {
         $this->info('Fetching track list...');
-        $trackList = $client->getTrackList();
+        $trackList = $source->getTrackList();
         $this->info('Found '.count($trackList).' tracks.');
 
         $force = $this->option('force') || $this->option('reset');
@@ -375,10 +540,13 @@ class ImportSardegnaSentieriCommand extends Command
                 $existing = EcTrack::query()
                     ->where('app_id', $appId)
                     ->whereRaw("properties->>'sardegnasentieri_id' = ?", [$id])
-                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at")
-                    ->value('forestas_updated_at');
+                    ->selectRaw("properties->'forestas'->>'updated_at' as forestas_updated_at, properties->'forestas'->>'enti_mancanti' as enti_mancanti")
+                    ->toBase()
+                    ->first();
 
-                if ($existing === $apiTimestamp) {
+                // Un nodo che ha saltato un ente mancante si rilegge anche
+                // con lo stesso changed (oc:8513).
+                if ($existing !== null && $existing->forestas_updated_at === $apiTimestamp && $existing->enti_mancanti !== 'true') {
                     continue;
                 }
             }
@@ -576,21 +744,21 @@ class ImportSardegnaSentieriCommand extends Command
      * cancellati e non riscaricabili, recuperati copiandoli da un altro
      * ambiente. Questo controllo costa una chiamata e lo impedisce.
      */
-    private function sourceIsReachable(SardegnaSentieriClient $client, string $runId): bool
+    private function sourceIsReachable(SardegnaSentieriSource $source, string $runId): bool
     {
         $this->info('Checking source availability...');
 
-        if ($client->isReachable()) {
+        if ($source->isAvailable()) {
             $this->info('Source is reachable.');
 
             return true;
         }
 
-        $this->error('La sorgente non risponde: import annullato, nessun dato e\' stato cancellato.');
-        $this->line('Riprovare quando sardegnasentieri.it torna disponibile.');
+        $this->error('La copia del DB Drupal non risponde o è vuota: import annullato, nessun dato e\' stato cancellato.');
+        $this->line('Riprovare quando la copia è accesa e caricata (docs/howto/copia-database-drupal.md).');
 
         Log::channel('import')->error(
-            "[sardegnasentieri:{$runId}] Source unreachable, --reset aborted before truncate."
+            "[sardegnasentieri:{$runId}] Source unreachable or empty, import aborted before any change."
         );
 
         return false;
@@ -648,8 +816,29 @@ class ImportSardegnaSentieriCommand extends Command
         DB::statement('TRUNCATE TABLE taxonomy_poi_types RESTART IDENTITY CASCADE');
         $this->info('Truncated taxonomy_poi_types.');
 
-        DB::statement('TRUNCATE TABLE taxonomy_activities RESTART IDENTITY CASCADE');
-        $this->info('Truncated taxonomy_activities.');
+        // Le attività non si troncano più: i layer sono configurati per
+        // attività, e il TRUNCATE ... CASCADE portava via anche i loro legami
+        // in taxonomy_activityables, lasciando i filtri di EC Tracce vuoti
+        // ogni mattina. L'import le ritrova per `identifier` (oc:8827).
+        // Le due pivot (legami con attività e con layer) non hanno chiavi
+        // esterne verso tracce e POI, quindi il CASCADE non le raggiunge: dopo
+        // RESTART IDENTITY le righe vecchie punterebbero ai record nuovi con lo
+        // stesso id. Si cancellano a mano solo le righe di tracce e POI; quelle
+        // dei layer restano.
+        DB::table('taxonomy_activityables')
+            ->whereIn('taxonomy_activityable_type', self::TRACK_AND_POI_MORPH_TYPES)
+            ->delete();
+        DB::table('layerables')
+            ->whereIn('layerable_type', self::TRACK_AND_POI_MORPH_TYPES)
+            ->delete();
+        $this->info('Cleared track and POI links from taxonomy_activityables and layerables.');
+
+        // I collegamenti agli enti non hanno chiavi esterne verso POI e
+        // sentieri: il CASCADE non li raggiunge, e dopo RESTART IDENTITY le
+        // righe vecchie punterebbero ai sentieri nuovi con lo stesso id. Gli
+        // enti invece restano: il reset li riscrive tutti (oc:8513).
+        DB::statement('TRUNCATE TABLE enteables RESTART IDENTITY');
+        $this->info('Truncated enteables.');
     }
 
     private function ensurePrerequisites(): bool

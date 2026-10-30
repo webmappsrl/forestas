@@ -16,6 +16,18 @@ impiega cinque (misura locale, 21/09/2026).
 un batch (`Bus::batch`, nome `sardegnasentieri import`) e il ricalcolo delle anomalie parte dalla
 callback del batch, cioè quando l'ultimo job ha finito di scrivere.
 
+**Prima gli enti, poi POI e tracciati.** Gli enti (gestori, manutentori, rilevatori, operatori,
+complessi forestali) hanno un batch loro, `sardegnasentieri enti`, e il batch di POI e tracciati
+parte in catena dopo (`Bus::chain`), anche con `--only`. I job di POI e tracciati collegano solo
+enti già importati: con i due batch in parallelo, dopo un `--reset` un tracciato il cui gestore non
+c'era ancora perdeva il collegamento, e al giro dopo, non cambiato, non veniva riletto (oc:8513).
+Un ente mancante, perché il suo job è fallito, fa saltare il suo collegamento (avviso nel log
+`import`) e marca il POI o il tracciato con `properties.forestas.enti_mancanti`: il comando lo
+rimette in coda al giro dopo anche se in Drupal non è cambiato, e il segno si toglie quando trova
+tutti i suoi enti. Senza il segno, in produzione il collegamento tornerebbe solo al prossimo cambio
+del nodo in Drupal. Senza enti cambiati il batch di POI e tracciati parte da
+solo.
+
 **Il ricalcolo tollera una quota di job falliti.** La decisione sta in
 `ImportSardegnaSentieriCommand::shouldNormalize()`: sotto il 2% di job caduti le anomalie si
 ricalcolano, sopra no. Sotto soglia si accetta un archivio quasi completo; sopra ci si ferma, perché le anomalie

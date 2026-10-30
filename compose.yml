@@ -1,7 +1,10 @@
 # Servizi WordPress dello shard (oc:8711): wordpress-${APP_NAME} e mariadb-${APP_NAME}.
 # La configurazione di WordPress sta in wp-forestas/.env, non in questo .env.
+# Copia del DB Drupal di Sardegna Sentieri, da cui legge l'import (oc:8900). Solo qui: in locale
+# resta a parte (container acceso a mano o tunnel verso UAT), vedi docs/howto/copia-database-drupal.md.
 include:
   - wp-forestas/compose.yml
+  - sardegnasentieri-dump.compose.yml
 
 services:
   php:

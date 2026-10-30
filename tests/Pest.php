@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Clients\SardegnaSentieriClient;
+use App\Services\Import\Source\SardegnaSentieriSource;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -11,8 +17,8 @@
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -44,4 +50,37 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Un solo mock per la fonte dei dati e per il client dei file di Sardegna
+ * Sentieri: i test dell'import mockano letture e download GPX sullo stesso
+ * oggetto, e il service lo riceve in entrambi i ruoli (oc:8900).
+ */
+function fonteSardegnaSentieriMock(): SardegnaSentieriClient&SardegnaSentieriSource&MockInterface
+{
+    return Mockery::mock(
+        SardegnaSentieriClient::class.', '.SardegnaSentieriSource::class
+    );
+}
+
+/**
+ * Sostituisce la copia del DB Drupal con una fonte finta che risponde con gli
+ * elenchi dati: per i test del comando, che guardano cosa accoda e non cosa
+ * legge (oc:8900).
+ *
+ * @param  array<int|string, string>  $tracks  nid ⇒ changed
+ * @param  array<int|string, string>  $pois  nid ⇒ changed
+ * @param  array<int|string, string>  $enti  nid ⇒ changed
+ */
+function fonteSardegnaSentieriFinta(array $tracks = [], array $pois = [], bool $available = true, array $enti = []): void
+{
+    $source = Mockery::mock(SardegnaSentieriSource::class);
+    $source->shouldReceive('isAvailable')->andReturn($available);
+    $source->shouldReceive('getTrackList')->andReturn($tracks);
+    $source->shouldReceive('getPoiList')->andReturn($pois);
+    $source->shouldReceive('getEnteList')->andReturn($enti);
+    $source->shouldReceive('getTaxonomy', 'getTaxonomyWarnings')->andReturn([]);
+
+    app()->instance(SardegnaSentieriSource::class, $source);
 }

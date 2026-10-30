@@ -123,11 +123,48 @@ pkill -f "3307:127.0.0.1:3307"
 docker start mysql-sardegnasentieri-dump
 ```
 
+Anche Laravel, dentro `php-forestas`, può leggere la copia di UAT: nel `.env` locale
+
+```bash
+DB_SARDEGNASENTIERI_HOST=host.docker.internal
+DB_SARDEGNASENTIERI_PORT=3307
+```
+
+Su Mac `host.docker.internal` è l'host; su UAT e in produzione le due variabili restano vuote e
+Laravel raggiunge la copia per nome sulla rete Docker.
+
 Il tunnel passa dall'SSH di UAT: serve la propria chiave autorizzata su `uat.forestas` e il proprio
 IP fra quelli ammessi in entrata dal firewall Hetzner. Da internet la copia resta irraggiungibile.
 
 Con PHP 7.4 PDO non segnala gli errori se non glielo si chiede: negli script va sempre
 `PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION`, altrimenti una query rifiutata sembra riuscita.
+
+## Confrontare l'import con le API
+
+> ⚠️ Superato (oc:8827): il confronto serviva a provare in locale il passaggio dalle API alla copia
+> prima della produzione (oc:8900) e non va più fatto dopo ogni modifica alle query. Il comando
+> resta, per un controllo occasionale; sui campi che le API non esponevano (per esempio
+> `field_tipologia_itinerario`) segnala differenze attese.
+
+Con la copia raggiungibile da Laravel:
+
+```bash
+docker exec php-forestas php artisan sardegnasentieri:compare-source
+docker exec php-forestas php artisan sardegnasentieri:compare-source --only=tracks --ids=164,3636
+```
+
+Esce con 0 se non ci sono differenze sui campi che l'import usa. Le risposte delle API restano in
+`storage/app/sardegnasentieri-compare-cache/`: `--refresh-api` le riscarica. I nodi modificati dopo
+il dump vengono saltati e contati.
+
+## Se l'import resta fermo dopo una ricarica
+
+Durante la ricarica lo script tiene `storage/drupal-dump/reload.lock`, e l'import salta il giro
+scrivendo «Copia del DB Drupal in ricarica dal …» nel log `import`. Se il lock ha più di due ore il
+comando esce in errore con «Copia del DB Drupal bloccata dal … (ricarica fallita?)». Se la ricarica
+fallisce il lock resta, apposta: prima si guarda perché è fallita (log del sync), poi si rilancia
+`scripts/drupal-dump-reload.sh`, che lo toglie a ricarica riuscita. Cancellarlo a mano con la copia
+a metà fa leggere all'import un database incompleto.
 
 ## Scaricare il codice Drupal di riferimento
 

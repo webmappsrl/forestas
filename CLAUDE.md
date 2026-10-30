@@ -82,9 +82,9 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | Valori tecnici dei sentieri | l'import non scrive `manual_data` né calcola il DEM, e perché | [docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md](docs/knowledge/8641-import-sardegna-sentieri-non-scrive-manual-data.md) |
 | Registro catastale | come si legge il foglio Google, come le righe si agganciano ai codici, quali anomalie produce | [docs/knowledge/registro-catastale.md](docs/knowledge/registro-catastale.md) |
 | Messa in sicurezza PHP2Shell | Dockerfile sorgente dell'immagine PHP dello shard e cosa è specifico di forestas rispetto alla procedura del package | [docs/knowledge/8833-messa-in-sicurezza-php2shell.md](docs/knowledge/8833-messa-in-sicurezza-php2shell.md) |
-| Copia del DB Drupal | va accesa a mano; come si interroga, schema Drupal, da dove viene nella copia ogni campo delle API | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
+| Copia del DB Drupal | fonte dell'import; accesa dal compose su UAT, a mano in locale; come si interroga, schema Drupal, il record completo che l'import legge, come replica le API, da dove viene ogni campo | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
 | WordPress nello shard | submodule `wp-forestas`, include nei compose, i due `.env`, aggiornare e azzerare WordPress | [docs/knowledge/wordpress-nello-shard.md](docs/knowledge/wordpress-nello-shard.md) |
-| Filtri della lista EC Tracce | layer con le tracce associate (regola a quattro passi), aree catastali come multiselect, reset notturno e `layerables` | [docs/knowledge/8806-filtro-ec-tracce.md](docs/knowledge/8806-filtro-ec-tracce.md) |
+| Filtri della lista EC Tracce | layer con le tracce associate (regola a quattro passi), come l'import mette le tracce nei layer, aree catastali come multiselect, reset notturno e `layerables` | [docs/knowledge/8806-filtro-ec-tracce.md](docs/knowledge/8806-filtro-ec-tracce.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
 package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la

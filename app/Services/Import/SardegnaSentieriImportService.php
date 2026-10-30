@@ -16,6 +16,7 @@ use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Models\TaxonomyWarning;
 use App\Models\User;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,7 @@ use Illuminate\Support\Str;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\TaxonomyActivity;
+use Wm\WmPackage\Models\TaxonomyActivityable;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
@@ -34,6 +36,17 @@ class SardegnaSentieriImportService
 {
     /** Forestas: una sola app nel progetto; tutti gli import usano questo id. */
     public const IMPORT_APP_ID = 1;
+
+    /** Identifier dell'attività che raggruppa i cammini (oc:8827). */
+    public const CAMMINO_ACTIVITY_IDENTIFIER = 'sardegnasentieri:cammino';
+
+    /** Prefisso dell'`identifier` delle attività che nascono dal tipo del tracciato (`sentiero`, `itinerario`). */
+    public const TYPE_ACTIVITY_PREFIX = 'sardegnasentieri:type:';
+
+    public const CAMMINO_ACTIVITY_NAME = 'Cammini di Sardegna';
+
+    /** Termine «Cammini di Sardegna» di `field_tipologia_itinerario` in Drupal (oc:8827). */
+    public const CAMMINI_TERM_ID = '4728';
 
     private const POI_VOCABULARIES = [
         'tipologia_poi',
@@ -60,6 +73,11 @@ class SardegnaSentieriImportService
     /** @var array<string, int|null> */
     private array $enteCache = [];
 
+    /**
+     * Se il POI o il sentiero in import ha saltato un ente mancante.
+     */
+    private bool $entiMancanti = false;
+
     /** @var array<string, array<string, array<string, mixed>>> */
     private array $taxonomyTermsCache = [];
 
@@ -67,6 +85,7 @@ class SardegnaSentieriImportService
     private ?array $iconNamesCache = null;
 
     public function __construct(
+        private readonly SardegnaSentieriSource $source,
         private readonly SardegnaSentieriClient $client,
         private readonly SardegnaSentieriMediaSyncService $mediaSync,
     ) {}
@@ -86,7 +105,7 @@ class SardegnaSentieriImportService
     private function importPoiTaxonomies(): void
     {
         foreach (self::POI_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -119,7 +138,7 @@ class SardegnaSentieriImportService
     private function importPoiActivityTaxonomies(): void
     {
         foreach (self::POI_ACTIVITY_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -152,7 +171,7 @@ class SardegnaSentieriImportService
     private function importTrackTaxonomies(): void
     {
         foreach (self::TRACK_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -184,7 +203,7 @@ class SardegnaSentieriImportService
 
     private function importWarningTaxonomies(): void
     {
-        $terms = $this->client->getTaxonomyWarnings();
+        $terms = $this->source->getTaxonomyWarnings();
 
         foreach ($terms as $apiId => $term) {
             if (! is_array($term)) {
@@ -317,7 +336,7 @@ class SardegnaSentieriImportService
 
     public function importPoi(int $externalId): EcPoi
     {
-        return $this->importPoiFromResponse($externalId, $this->client->getPoiDetail($externalId));
+        return $this->importPoiFromResponse($externalId, $this->source->getPoiDetail($externalId));
     }
 
     public function importPoiFromResponse(int $externalId, ApiPoiResponse $response): EcPoi
@@ -381,7 +400,7 @@ class SardegnaSentieriImportService
 
     public function importTrack(int $externalId): EcTrack
     {
-        return $this->importTrackFromResponse($externalId, $this->client->getTrackDetail($externalId));
+        return $this->importTrackFromResponse($externalId, $this->source->getTrackDetail($externalId));
     }
 
     public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
@@ -439,9 +458,8 @@ class SardegnaSentieriImportService
         $this->syncFromTo($ecTrack, $response);
         $this->syncEnti($ecTrack, $response);
         $this->syncRelatedPois($ecTrack, $response);
-        $this->syncTrackTaxonomies($ecTrack, $response);
+        $this->syncTrackActivities($ecTrack, $response);
         $this->syncTrackWarnings($ecTrack, $response);
-        $this->syncTrackType($ecTrack, $response);
 
         $this->registerTrailRegistryCode($ecTrack);
 
@@ -689,33 +707,41 @@ class SardegnaSentieriImportService
         $ecTrack->ecPois()->sync($poiIds);
     }
 
-    private function syncTrackTaxonomies(EcTrack $ecTrack, ApiTrackResponse $response): void
+    /**
+     * Scrive tutte le attività della traccia con un solo `sync()`: termini
+     * `tipologia_sentieri`, attività derivata dal tipo, attività dei cammini.
+     *
+     * Il `sync()` gira senza eventi: l'observer del pivot accoda un job di
+     * ricalcolo dei layer per ogni riga aggiunta o tolta, migliaia a ogni
+     * import. I layer li ricalcola il job di fine batch (oc:8827).
+     * `withoutEvents` spegne il dispatcher di tutti i modelli per la durata
+     * della closure: dentro ci va solo il `sync()`.
+     */
+    private function syncTrackActivities(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $tipologiaIds = collect($response->taxonomies->tipologia_sentieri)
+        // Gli id delle attività `accessible-trails` ecc. vengono dal `field_geohub_identifier` del termine Drupal.
+        $ids = collect($response->taxonomies->tipologia_sentieri)
             ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'tipologia_sentieri'))
             ->filter()
-            ->values()
-            ->toArray();
+            ->all();
 
-        $ecTrack->taxonomyActivities()->sync($tipologiaIds);
-    }
-
-    private function syncTrackType(EcTrack $ecTrack, ApiTrackResponse $response): void
-    {
-        if ($response->type === null || $response->type === '') {
-            return;
+        if ($response->type !== null && $response->type !== '') {
+            $ids[] = $this->resolveActivityByIdentifier(
+                self::TYPE_ACTIVITY_PREFIX.$response->type,
+                ucfirst($response->type)
+            )->id;
         }
 
-        $identifier = 'sardegnasentieri:type:'.$response->type;
+        if (in_array(self::CAMMINI_TERM_ID, $response->taxonomies->tipologia_itinerari, true)) {
+            $ids[] = $this->resolveActivityByIdentifier(
+                self::CAMMINO_ACTIVITY_IDENTIFIER,
+                self::CAMMINO_ACTIVITY_NAME
+            )->id;
+        }
 
-        $activity = $this->resolveActivityByIdentifier(
-            $identifier,
-            ucfirst($response->type)
-        );
+        $ids = array_values(array_unique($ids));
 
-        $currentIds = $ecTrack->taxonomyActivities()->pluck('taxonomy_activities.id')->toArray();
-        $allIds = array_unique(array_merge($currentIds, [$activity->id]));
-        $ecTrack->taxonomyActivities()->sync($allIds);
+        TaxonomyActivityable::withoutEvents(fn () => $ecTrack->taxonomyActivities()->sync($ids));
     }
 
     /**
@@ -803,6 +829,7 @@ class SardegnaSentieriImportService
 
     private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
+        $this->entiMancanti = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         $pairs = [];
@@ -818,7 +845,7 @@ class SardegnaSentieriImportService
             if ($nodeId === null) {
                 continue;
             }
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
             }
@@ -829,16 +856,14 @@ class SardegnaSentieriImportService
             : [];
 
         foreach ($operatori as $nodeId) {
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
             }
         }
 
-        if (empty($pairs)) {
-            return;
-        }
-
+        // Anche senza enti: un POI a cui in Drupal li hanno tolti tutti deve
+        // perdere i collegamenti, come i sentieri (oc:8513).
         DB::table('enteables')
             ->where('enteable_id', $ecPoi->id)
             ->where('enteable_type', EcPoi::class)
@@ -852,10 +877,13 @@ class SardegnaSentieriImportService
                 'ruolo' => $pair['ruolo'],
             ]);
         }
+
+        $this->rememberEntiMancanti($ecPoi);
     }
 
     private function syncEnti(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
+        $this->entiMancanti = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         // Collect all (enteId, ruolo) pairs — same ente can have multiple roles
@@ -872,7 +900,7 @@ class SardegnaSentieriImportService
             if ($nodeId === null) {
                 continue;
             }
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => $ruolo];
             }
@@ -883,14 +911,14 @@ class SardegnaSentieriImportService
             : [];
 
         foreach ($operatori as $nodeId) {
-            $enteId = $this->resolveOrImportEnte((int) $nodeId);
+            $enteId = $this->resolveEnte((int) $nodeId);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'operatore'];
             }
         }
 
         if ($response->complesso_forestale !== null) {
-            $enteId = $this->resolveOrImportEnte((int) $response->complesso_forestale);
+            $enteId = $this->resolveEnte((int) $response->complesso_forestale);
             if ($enteId !== null) {
                 $pairs[] = ['ente_id' => $enteId, 'ruolo' => 'complesso_forestale'];
             }
@@ -910,127 +938,176 @@ class SardegnaSentieriImportService
                 'ruolo' => $pair['ruolo'],
             ]);
         }
+
+        $this->rememberEntiMancanti($ecTrack);
     }
 
-    private function resolveOrImportEnte(int $nodeId): ?int
+    /**
+     * Segna nel nodo se ha saltato un ente mancante, o toglie il segno quando
+     * li ha trovati tutti: il comando rimette in coda i nodi segnati anche
+     * con lo stesso `changed`, altrimenti il collegamento in produzione
+     * tornerebbe solo al prossimo cambio del nodo in Drupal (oc:8513).
+     */
+    private function rememberEntiMancanti(EcPoi|EcTrack $model): void
+    {
+        $properties = is_array($model->properties) ? $model->properties : [];
+        $before = $properties['forestas']['enti_mancanti'] ?? false;
+
+        if ($before === $this->entiMancanti) {
+            return;
+        }
+
+        if ($this->entiMancanti) {
+            $properties['forestas']['enti_mancanti'] = true;
+        } else {
+            unset($properties['forestas']['enti_mancanti']);
+        }
+
+        $model->properties = $properties;
+        $model->saveQuietly();
+    }
+
+    /**
+     * L'id locale dell'ente richiamato da un POI o da un sentiero.
+     *
+     * Non lo importa: gli enti hanno un batch loro, che il comando fa girare
+     * prima di quello di POI e sentieri (oc:8513). Un ente assente vuol dire
+     * che il suo job e' fallito: il collegamento si salta e il nodo si
+     * marca con `properties.forestas.enti_mancanti`, cosi' il comando lo
+     * rilegge al giro dopo anche se in Drupal non e' cambiato.
+     */
+    private function resolveEnte(int $nodeId): ?int
     {
         $cacheKey = (string) $nodeId;
 
-        if (array_key_exists($cacheKey, $this->enteCache)) {
-            return $this->enteCache[$cacheKey];
+        if (! array_key_exists($cacheKey, $this->enteCache)) {
+            $this->enteCache[$cacheKey] = Ente::where('sardegnasentieri_id', $cacheKey)->value('id');
+
+            if ($this->enteCache[$cacheKey] === null) {
+                Log::channel('import')->warning("Ente {$nodeId} non ancora importato: collegamento saltato.");
+            }
         }
 
-        // Check if already imported
-        $existing = Ente::where('sardegnasentieri_id', $cacheKey)->value('id');
-
-        if ($existing !== null) {
-            $this->enteCache[$cacheKey] = $existing;
-
-            return $existing;
+        if ($this->enteCache[$cacheKey] === null) {
+            $this->entiMancanti = true;
         }
 
-        $result = $this->importOrUpdateEnte($cacheKey);
-        $this->enteCache[$cacheKey] = $result;
-
-        return $result;
+        return $this->enteCache[$cacheKey];
     }
 
-    public function importOrUpdateEnte(string $sardegnaSentieriId): ?int
+    /**
+     * Scrive l'ente com'e' in Drupal: un campo svuotato la' si svuota qui, e
+     * le modifiche fatte in Nova si perdono al primo aggiornamento, perche'
+     * finche' Drupal e' vivo la fonte e' una sola (oc:8513).
+     *
+     * Salva il `changed` di Drupal in `properties.forestas.updated_at`, come
+     * sentieri e POI, per non riscrivere al giro dopo un ente non cambiato.
+     * Un errore arriva al job, che si ritenta; un'immagine che non si scarica
+     * resta un avviso nel log, come per sentieri e POI.
+     */
+    public function importOrUpdateEnte(string $sardegnaSentieriId, string $changed): int
     {
-        try {
-            $node = $this->client->getNodeDetail((int) $sardegnaSentieriId);
-            $title = $node['title'][0]['value'] ?? null;
+        $node = $this->source->getNodeDetail((int) $sardegnaSentieriId);
+        $title = $node['title'][0]['value'] ?? null;
 
-            if (empty($title)) {
-                return null;
-            }
+        if (empty($title)) {
+            throw new \RuntimeException("Ente {$sardegnaSentieriId} senza titolo nella copia del DB Drupal");
+        }
 
-            $contattiRaw = $node['field_contatti'][0]['value'] ?? null;
-            $contatti = (is_string($contattiRaw) && $contattiRaw !== '') ? $contattiRaw : null;
+        $contattiRaw = $node['field_contatti'][0]['value'] ?? null;
+        $contatti = (is_string($contattiRaw) && $contattiRaw !== '') ? $contattiRaw : null;
 
-            $paginaWebRaw = $node['field_pagina_web'][0]['uri'] ?? null;
-            $paginaWeb = is_string($paginaWebRaw) ? $paginaWebRaw : null;
+        $paginaWebRaw = $node['field_pagina_web'][0]['uri'] ?? null;
+        $paginaWeb = is_string($paginaWebRaw) ? $paginaWebRaw : null;
 
-            $tipoEnteId = isset($node['field_tipo_ente'][0]['target_id'])
-                ? (int) $node['field_tipo_ente'][0]['target_id']
-                : null;
+        $tipoEnteId = isset($node['field_tipo_ente'][0]['target_id'])
+            ? (int) $node['field_tipo_ente'][0]['target_id']
+            : null;
 
-            /** @var TipoEnte|string|null $tipoEnteValue */
-            $tipoEnteValue = null;
-            if ($tipoEnteId !== null) {
-                $enum = TipoEnte::fromDrupalId($tipoEnteId);
-                if ($enum !== null) {
-                    $tipoEnteValue = $enum;
-                } else {
-                    try {
-                        $term = $this->client->getTaxonomyTerm($tipoEnteId);
-                        $label = $term['name'][0]['value'] ?? null;
-                        if ($label !== null) {
-                            $tipoEnteSlug = Str::slug($label);
-                            Log::warning("TipoEnte Drupal ID {$tipoEnteId} non mappato nell'enum: slug '{$tipoEnteSlug}'");
-                            $tipoEnteValue = $tipoEnteSlug;
-                        }
-                    } catch (\Exception) {
-                        Log::warning("TipoEnte Drupal ID {$tipoEnteId} non risolvibile via API");
+        /** @var TipoEnte|string|null $tipoEnteValue */
+        $tipoEnteValue = null;
+        if ($tipoEnteId !== null) {
+            $enum = TipoEnte::fromDrupalId($tipoEnteId);
+            if ($enum !== null) {
+                $tipoEnteValue = $enum;
+            } else {
+                try {
+                    $term = $this->source->getTaxonomyTerm($tipoEnteId);
+                    $label = $term['name'][0]['value'] ?? null;
+                    if ($label !== null) {
+                        $tipoEnteSlug = Str::slug($label);
+                        Log::warning("TipoEnte Drupal ID {$tipoEnteId} non mappato nell'enum: slug '{$tipoEnteSlug}'");
+                        $tipoEnteValue = $tipoEnteSlug;
                     }
+                } catch (\Exception) {
+                    Log::warning("TipoEnte Drupal ID {$tipoEnteId} non risolvibile via API");
                 }
             }
-
-            $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
-                ? (string) $node['field_immagine_principale'][0]['url']
-                : null;
-
-            $description = isset($node['body'][0]['value'])
-                ? trim(strip_tags((string) $node['body'][0]['value']))
-                : null;
-
-            $lat = isset($node['field_geolocalizzazione'][0]['lat'])
-                ? (float) $node['field_geolocalizzazione'][0]['lat']
-                : null;
-
-            $lon = isset($node['field_geolocalizzazione'][0]['lon'])
-                ? (float) $node['field_geolocalizzazione'][0]['lon']
-                : null;
-
-            $geometry = ($lat !== null && $lon !== null)
-                ? "POINT({$lon} {$lat})"
-                : null;
-
-            $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
-            $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
-            if ($contatti !== null) {
-                // Campo translatable come name e description: assegnarlo come
-                // stringa nuda popolerebbe solo la locale corrente.
-                $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
-            }
-            $ente->pagina_web = $paginaWeb;
-            if ($description !== null && $description !== '') {
-                $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
-            }
-            if ($tipoEnteValue instanceof TipoEnte) {
-                $ente->tipo_ente = $tipoEnteValue;
-            } else {
-                // Arbitrary slug (not yet in enum): bypass Eloquent enum cast
-                $rawAttrs = $ente->getAttributes();
-                $rawAttrs['tipo_ente'] = $tipoEnteValue;
-                $ente->setRawAttributes($rawAttrs, true);
-            }
-            if ($geometry !== null) {
-                $ente->geometry = $geometry;
-            }
-            $ente->properties = null;
-            $ente->saveQuietly();
-
-            if ($featureImageUrl !== null) {
-                $this->mediaSync->syncImportedImages($ente, [
-                    ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
-                ]);
-            }
-
-            return $ente->id;
-        } catch (\Exception) {
-            return null;
         }
+
+        $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
+            ? (string) $node['field_immagine_principale'][0]['url']
+            : null;
+
+        $description = isset($node['body'][0]['value'])
+            ? trim(strip_tags((string) $node['body'][0]['value']))
+            : null;
+
+        $lat = isset($node['field_geolocalizzazione'][0]['lat'])
+            ? (float) $node['field_geolocalizzazione'][0]['lat']
+            : null;
+
+        $lon = isset($node['field_geolocalizzazione'][0]['lon'])
+            ? (float) $node['field_geolocalizzazione'][0]['lon']
+            : null;
+
+        $ente = Ente::firstOrNew(['sardegnasentieri_id' => $sardegnaSentieriId]);
+        $ente->setTranslations('name', ['it' => $title, 'en' => $title]);
+        // Campi translatable come name: assegnarli come stringa nuda
+        // popolerebbe solo la locale corrente.
+        if ($contatti !== null) {
+            $ente->setTranslations('contatti', ['it' => $contatti, 'en' => $contatti]);
+        } else {
+            $this->clearTranslatable($ente, 'contatti');
+        }
+        $ente->pagina_web = $paginaWeb;
+        if ($description !== null && $description !== '') {
+            $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
+        } else {
+            $this->clearTranslatable($ente, 'description');
+        }
+        if ($tipoEnteValue instanceof TipoEnte) {
+            $ente->tipo_ente = $tipoEnteValue;
+        } else {
+            // Arbitrary slug (not yet in enum): bypass Eloquent enum cast
+            $rawAttrs = $ente->getAttributes();
+            $rawAttrs['tipo_ente'] = $tipoEnteValue;
+            $ente->setRawAttributes($rawAttrs);
+        }
+        $ente->geometry = ($lat !== null && $lon !== null) ? "POINT({$lon} {$lat})" : null;
+
+        $properties = is_array($ente->properties) ? $ente->properties : [];
+        $forestas = is_array($properties['forestas'] ?? null) ? $properties['forestas'] : [];
+        unset($forestas['deleted_from_source']);
+        $properties['forestas'] = ['updated_at' => $changed] + $forestas;
+        $ente->properties = $properties;
+        $ente->saveQuietly();
+
+        // Senza immagine in Drupal la lista vuota toglie quella importata.
+        $this->mediaSync->syncImportedImages($ente, $featureImageUrl === null ? [] : [
+            ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
+        ]);
+
+        return $ente->id;
+    }
+
+    /**
+     * Svuota un campo translatable: assegnare null passerebbe dal trait e
+     * svuoterebbe solo la locale corrente, lasciando le altre.
+     */
+    private function clearTranslatable(Ente $ente, string $field): void
+    {
+        $ente->setRawAttributes(array_merge($ente->getAttributes(), [$field => null]));
     }
 
     private function convertGeoJsonGeometryToWkt(?array $geometry): ?string
@@ -1115,7 +1192,7 @@ class SardegnaSentieriImportService
             "sardegnasentieri:taxonomy:{$vocabulary}",
             now()->addHour(),
             function () use ($vocabulary) {
-                $terms = $this->client->getTaxonomy($vocabulary);
+                $terms = $this->source->getTaxonomy($vocabulary);
 
                 $normalized = [];
                 foreach ($terms as $apiId => $term) {

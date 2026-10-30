@@ -40,8 +40,35 @@ Il filtro dei layer restituisce le tracce **del layer**, non le candidate di `on
 3. layer in automatico senza filtro ma con tracce associate → le tracce associate;
 4. altrimenti → `onLayer()`.
 
-Sui dati locali del 26/10 Sentieri e Itinerari passano dal punto 2 (614 e 165 tracce), Cammini di
-Sardegna e Sentieri accessibili dal punto 3 (50 e 2).
+Con i layer configurati (sotto) tutti e quattro i layer di tipologia passano dal punto 2.
+
+### Come le tracce finiscono nei layer (oc:8827)
+
+Un layer di tipologia è definito da un'attività:
+
+| Layer | Attività |
+|---|---|
+| Sentieri | `sardegnasentieri:type:sentiero` |
+| Itinerari | `sardegnasentieri:type:itinerario` (cammini compresi) |
+| Cammini di Sardegna | `sardegnasentieri:cammino` |
+| Sentieri Accessibili | `accessible-trails` |
+
+- **l'import scrive le attività**: tipo del nodo Drupal, termini di `field_tipologia_sentiero`
+  (da cui `accessible-trails`) e `sardegnasentieri:cammino` per gli itinerari con il termine 4728
+  di `field_tipologia_itinerario`. Le scrive con un solo `sync()` **senza eventi sul pivot**,
+  quindi gli observer del package non accodano job per traccia;
+- **i legami layer→attività li scrive `sardegnasentieri:configure-layers`**, una volta per
+  ambiente: trova i layer per nome italiano esatto fra quelli dell'app di import e si ferma senza
+  scrivere se un layer o un'attività manca o è ambiguo. Poi accoda da sé il ricalcolo dei layer e
+  il reindex: non serve lanciarli a mano;
+- **a fine batch dell'import** la catena è `SyncTaxonomyWhereJob` →
+  `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob` (reindex e file
+  AWS). Il job ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
+  `assignTracksByTaxonomy()`, POI solo sui layer delle aree, `properties.layers` allineato in modo
+  sincrono, geometria e PBF una volta per layer e solo se qualcosa è cambiato;
+- **il reset notturno** non tronca più `taxonomy_activities`: le attività restano con il loro id,
+  e con loro i legami dei layer; cancella a mano le righe di tracce e POI in
+  `taxonomy_activityables` e `layerables`, che dopo `RESTART IDENTITY` indicherebbero altri record.
 
 Il filtro per area non ricalcola la geometria: legge `properties->taxonomy_where`, scritto da
 `GeometryComputationService::syncTaxonomyWhere()` del package. Una traccia esce se nel suo
@@ -59,12 +86,14 @@ Vincoli:
   `COALESCE(osmfeatures_id, osm2cai_id, id)`, quindi una `TaxonomyWhere` osm2cai con `osm2cai_id`
   uguale all'id di un'area può prendere il posto della voce dell'area su una traccia che le
   attraversa entrambe. Il controllo della sorgente evita i falsi positivi, non questa perdita;
-- **il filtro dei layer mostra le associazioni come sono**: fra le 50 tracce locali di «Cammini
-  di Sardegna» c'è almeno un sentiero (G 126). Si correggono nel layer, in modalità manuale;
-- **il reset notturno non ripulisce `layerables`**: `TRUNCATE TABLE ec_tracks RESTART IDENTITY
-  CASCADE` non la tocca, perché non ha chiavi esterne verso `ec_tracks`, e le associazioni
-  manuali possono restare su id che ora indicano altre tracce.
-  Follow-up non ancora aperto (oc:8825);
+- **un layer di tipologia senza attività resta vuoto o vecchio**: il job salta i layer senza
+  filtro. Succede finché `configure-layers` non è stato lanciato, e dopo il comando manuale
+  `sardegnasentieri:reset`, che cancella le attività `sardegnasentieri:*` con i loro legami;
+- **l'attività dei cammini la crea solo un reimport completo**: l'import orario reimporta solo i
+  tracciati cambiati in Drupal; serve `sardegnasentieri:import --force` (o il reset notturno)
+  prima di `configure-layers`;
+- **un errore sugli effetti di un layer non si ripete da solo**: è nel log `import`; se
+  `properties.layers` è già allineato il giro dopo non riaccoda PBF e geometria;
 - **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: succede
   quando `SyncModelTaxonomyWhereJob` del package non trova aree con il calcolo locale e ripiega su
   osmfeatures, che scrive solo aree amministrative (chiavi `R…` con `_admin_level`). Dopo un import
@@ -91,12 +120,23 @@ Vincoli:
   gli `osm2cai_id` (in locale ZNUB2 ha `osm2cai_id = 81`, l'id di Area T).
 - **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806): un
   layer legato a una `TaxonomyWhere` di altra sorgente resta una tipologia.
-- **Si corregge il filtro, non la configurazione dei layer** (oc:8825): un'attività «cammino» non
-  esiste, e la configurazione andrebbe ripetuta su ogni ambiente. Per l'app le tracce di un layer
-  sono quelle associate (`LayerService::getRelatedModels()`).
-- **I layer con un filtro automatico restano su `onLayer()`** (oc:8825): per loro `layerables` è
-  una copia del filtro, aggiornata da `SyncAutoLayerAfterTrackTaxonomyChangeJob` con almeno 5
-  minuti di attesa sulla coda `default`; leggerla darebbe risultati vecchi dopo un import.
+- **Le tipologie restano attività** (oc:8827): una tassonomia dedicata «Tipologia percorso» è
+  stata proposta allo scrum del 29/10 e rimandata a un ticket a parte.
+- **Solo il termine «Cammini di Sardegna» di `tipologia_itinerari`** (oc:8827): gli altri 8
+  termini non servono a nessun layer oggi.
+- **Un cammino resta anche un itinerario** (oc:8827): è così anche in Drupal; Itinerari conta i
+  cammini.
+- **Il reset conserva le attività** (oc:8827): con il `TRUNCATE ... CASCADE` i legami
+  layer→attività sparivano ogni notte, e la configurazione dei layer andava rifatta.
+- **Ricalcolo a fine batch, non job per traccia** (oc:8827): gli observer del package, con il
+  reset, avrebbero accodato per ogni riga una catena PBF del layer intero, e per ogni traccia un
+  ricalcolo con 5 minuti di attesa sulla coda `default`. Il job sta prima del reindex perché il
+  reindex legge `properties.layers`. Deciso allo scrum del 29/10: «l'associazione la buttiamo giù e
+  se la ricrea».
+- **Configurazione con un comando idempotente** (oc:8827): gli ambienti sono tre, e il comando la
+  rende ripetibile su un database nuovo.
+- **I layer con un filtro automatico restano su `onLayer()`** (oc:8825): il filtro di Nova li
+  legge dal filtro e non da `layerables`, che si aggiorna solo a fine batch.
 - **Niente filtro App sulla lista EC Tracce** (oc:8875): forestas ha una sola app, e il filtro
   restituiva sempre tutte le tracce. Si toglie in forestas perché il package è condiviso.
 - **Niente Include/Exclude per id** (oc:8875): servivano al vecchio campo che associa le tracce ai
@@ -105,6 +145,11 @@ Vincoli:
 
 ## Come ci siamo arrivati
 
+- **Si corregge il filtro, non la configurazione dei layer** (oc:8825, superata da oc:8827):
+  un'attività «cammino» non esisteva e la configurazione andava ripetuta su ogni ambiente; Cammini
+  e Sentieri accessibili mostravano le righe di `layerables`. Su UAT il 30/10 erano righe del 9/9
+  su id che dopo i reset indicavano altre tracce: Sentieri e Cammini avevano le stesse 597. Ora
+  l'attività c'è e la configurazione la applica un comando.
 - **Filtro dei layer con `apply()` del package** (oc:8806, superato da oc:8825): `onLayer()`
   restituisce le tracce candidate per attività e aree del layer; «Cammini di Sardegna» e «Sentieri
   accessibili», senza né l'una né l'altra, davano tutte le tracce (779 in locale), anche combinati

@@ -14,14 +14,17 @@ use App\Jobs\Import\ImportSardegnaSentieriTrackMediaJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Jobs\Layer\SyncAutoLayerAfterTrackTaxonomyChangeJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
+use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 
@@ -65,7 +68,7 @@ function sardegnaSentieriUser(): User
 
 function makeService(array $clientMethods = []): SardegnaSentieriImportService
 {
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     foreach ($clientMethods as $method => $return) {
         $client->shouldReceive($method)->andReturn($return);
     }
@@ -79,12 +82,12 @@ function makeService(array $clientMethods = []): SardegnaSentieriImportService
     return makeServiceWith($client);
 }
 
-function makeServiceWith(SardegnaSentieriClient $client): SardegnaSentieriImportService
+function makeServiceWith(SardegnaSentieriClient&SardegnaSentieriSource $client): SardegnaSentieriImportService
 {
     $mediaSync = Mockery::mock(SardegnaSentieriMediaSyncService::class);
     $mediaSync->shouldIgnoreMissing();
 
-    return new SardegnaSentieriImportService($client, $mediaSync);
+    return new SardegnaSentieriImportService($client, $client, $mediaSync);
 }
 
 function minimalPoiFeature(int $id, array $overrides = []): ApiPoiResponse
@@ -257,7 +260,7 @@ it('lancia eccezione se la geometry è mancante', function () {
 it('sincronizza le TaxonomyPoiType quando presenti', function () {
     $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getPoiDetail')->andReturn(
         minimalPoiFeature(42, ['properties' => ['taxonomies' => ['tipologia_poi' => ['999'], 'zona_geografica' => []]]])
     );
@@ -276,7 +279,7 @@ it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', 
     $taxonomy = TaxonomyPoiType::withoutEvents(fn () => TaxonomyPoiType::create(['identifier' => 'rifugio', 'name' => 'Rifugio']));
 
     // Prima importazione con tassonomia
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getPoiDetail')->andReturn(
         minimalPoiFeature(42, ['properties' => ['taxonomies' => ['tipologia_poi' => ['999'], 'zona_geografica' => []]]])
     );
@@ -302,7 +305,7 @@ it('rimuove le TaxonomyPoiType quando la API restituisce lista vuota (fix P1)', 
 it('crea un nuovo EcTrack dalla API con GPX', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -321,7 +324,7 @@ it('imposta stato_validazione tramite enum', function () {
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -333,7 +336,7 @@ it('imposta stato_validazione tramite enum', function () {
 it('aggiorna un EcTrack esistente senza duplicati', function () {
     $gpxFeature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($gpxFeature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -341,7 +344,7 @@ it('aggiorna un EcTrack esistente senza duplicati', function () {
 
     // Seconda esecuzione — stesso ID, nuova lunghezza, nessun GPX (track già esiste)
     $feature2 = minimalTrackFeature(75, ['properties' => ['lunghezza' => '9999']]);
-    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2 = fonteSardegnaSentieriMock();
     $client2->shouldReceive('getTrackDetail')->andReturn($feature2);
 
     (makeServiceWith($client2))->importTrack(75);
@@ -351,7 +354,7 @@ it('aggiorna un EcTrack esistente senza duplicati', function () {
 });
 
 it('conserva il manual_data inserito da un operatore quando reimporta il sentiero (oc:8641)', function () {
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')
         ->andReturn(minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]));
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
@@ -363,7 +366,7 @@ it('conserva il manual_data inserito da un operatore quando reimporta il sentier
     $track->properties = array_merge($track->properties, ['manual_data' => $operatorManual]);
     $track->saveQuietly();
 
-    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2 = fonteSardegnaSentieriMock();
     $client2->shouldReceive('getTrackDetail')
         ->andReturn(minimalTrackFeature(75, ['properties' => ['lunghezza' => '9999', 'durata' => '60']]));
 
@@ -380,7 +383,7 @@ it('conserva il manual_data inserito da un operatore quando reimporta il sentier
 it('parsa correttamente GPX con xmlns namespace (fix P2)', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithNamespace());
 
@@ -392,7 +395,7 @@ it('parsa correttamente GPX con xmlns namespace (fix P2)', function () {
 it('parsa correttamente GPX senza namespace', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -404,7 +407,7 @@ it('parsa correttamente GPX senza namespace', function () {
 it('lancia eccezione per nuovo track se tutti i GPX falliscono', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/bad.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
 
@@ -416,7 +419,7 @@ it('aggiorna un track esistente anche se il GPX fallisce', function () {
     // Crea il track con geometry valida
     $gpxFeature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($gpxFeature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -424,7 +427,7 @@ it('aggiorna un track esistente anche se il GPX fallisce', function () {
 
     // Aggiornamento — GPX fallisce ma il track esiste già con geometry
     $feature2 = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/bad.gpx']]]);
-    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2 = fonteSardegnaSentieriMock();
     $client2->shouldReceive('getTrackDetail')->andReturn($feature2);
     $client2->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
 
@@ -442,7 +445,7 @@ it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)',
     $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create(['identifier' => 'escursionismo', 'name' => 'Escursionismo']));
 
     // Prima importazione con attività e GPX
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn(
         minimalTrackFeature(75, ['properties' => [
             'gpx' => ['http://example.com/track.gpx'],
@@ -464,16 +467,86 @@ it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)',
     expect($track->taxonomyActivities()->count())->toBe(1);
 
     // Seconda importazione senza attività (track esiste già con geometry) → deve rimuoverle
-    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2 = fonteSardegnaSentieriMock();
     $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
     (makeServiceWith($client2))->importTrack(75);
 
-    // Resta solo l'activity derivata dal `type` del track, che syncTrackType()
+    // Resta solo l'activity derivata dal `type` del track, che syncTrackActivities()
     // riaggancia sempre: quella importata dalle tassonomie deve sparire.
     $identifiers = $track->fresh()->taxonomyActivities()->pluck('identifier')->all();
     expect($identifiers)
         ->not->toContain('escursionismo')
         ->toBe(['sardegnasentieri:type:sentiero']);
+});
+
+it('scrive l attività dei cammini sugli itinerari con il termine Cammini di Sardegna (oc:8827)', function () {
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => ['4728', '4731']],
+        ]])
+    );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+
+    (makeServiceWith($client))->importTrack(75);
+
+    $identifiers = EcTrack::first()->taxonomyActivities()->pluck('identifier')->all();
+    expect($identifiers)->toHaveCount(2)
+        ->toContain('sardegnasentieri:type:itinerario')
+        ->toContain(SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER);
+});
+
+it('toglie l attività dei cammini quando il termine sparisce (oc:8827)', function () {
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => ['4728']],
+        ]])
+    );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client))->importTrack(75);
+
+    $client2 = fonteSardegnaSentieriMock();
+    $client2->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => []],
+        ]])
+    );
+    $client2->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client2->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client2))->importTrack(75);
+
+    expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
+        ->toBe(['sardegnasentieri:type:itinerario']);
+});
+
+it('non accoda job dei layer quando l import scrive le attività (oc:8827)', function () {
+    $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create([
+        'identifier' => 'sardegnasentieri:type:sentiero',
+        'name' => 'Sentiero',
+    ]));
+    $layer = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
+    $layer->taxonomyActivities()->attach($activity->id);
+
+    Bus::fake();
+
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client))->importTrack(75);
+
+    expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
+        ->toBe(['sardegnasentieri:type:sentiero']);
+    Bus::assertNotDispatched(SyncAutoLayerAfterTrackTaxonomyChangeJob::class);
 });
 
 it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)', function () {
@@ -486,7 +559,7 @@ it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)'
         'gpx' => ['http://example.com/track.gpx'],
         'partenza' => '10',
     ]]);
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
     (makeServiceWith($client))->importTrack(75);
@@ -495,7 +568,7 @@ it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)'
     expect($track->ecPois()->count())->toBe(1);
 
     // Seconda importazione senza partenza (track esiste già con geometry)
-    $client2 = Mockery::mock(SardegnaSentieriClient::class);
+    $client2 = fonteSardegnaSentieriMock();
     $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
     (makeServiceWith($client2))->importTrack(75);
 
@@ -515,10 +588,12 @@ it('il Command non marca come rimossi i POI presenti nella API', function () {
     ]);
 
     // Lega il mock al container per il Command
-    $this->instance(SardegnaSentieriClient::class, tap(
-        Mockery::mock(SardegnaSentieriClient::class),
+    $this->instance(SardegnaSentieriSource::class, tap(
+        fonteSardegnaSentieriMock(),
         function ($mock) {
+            $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getPoiList')->andReturn(['42' => '2024-01-15T10:00:00']);
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
@@ -540,10 +615,12 @@ it('il Command marca come deleted_from_source i POI non più nell\'API (fix P5)'
         'properties' => ['out_source_feature_id' => '99', 'forestas' => ['updated_at' => '2024-01-01']],
     ]);
 
-    $this->instance(SardegnaSentieriClient::class, tap(
-        Mockery::mock(SardegnaSentieriClient::class),
+    $this->instance(SardegnaSentieriSource::class, tap(
+        fonteSardegnaSentieriMock(),
         function ($mock) {
+            $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getPoiList')->andReturn([]); // API vuota
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
@@ -567,10 +644,12 @@ it('il Command marca come deleted_from_source i Track non più nell\'API (fix P5
         ],
     ]);
 
-    $this->instance(SardegnaSentieriClient::class, tap(
-        Mockery::mock(SardegnaSentieriClient::class),
+    $this->instance(SardegnaSentieriSource::class, tap(
+        fonteSardegnaSentieriMock(),
         function ($mock) {
+            $mock->shouldReceive('isAvailable')->andReturn(true);
             $mock->shouldReceive('getTrackList')->andReturn([]); // API vuota
+            $mock->shouldReceive('getEnteList')->andReturn([]);
             $mock->shouldReceive('getTaxonomy')->andReturn([]);
             $mock->shouldReceive('getTaxonomyWarnings')->andReturn([]);
         }
@@ -612,7 +691,7 @@ it('costruisce il manifest POI con principale poi galleria senza duplicare URL',
 it('ImportSardegnaSentieriPoiJob accoda ImportSardegnaSentieriPoiMediaJob con manifest', function () {
     Bus::fake();
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getPoiDetail')->with(55)->once()->andReturn(
         minimalPoiFeature(55, ['properties' => [
             'immagine_principale' => [
@@ -647,7 +726,7 @@ it('ImportSardegnaSentieriTrackJob accoda ImportSardegnaSentieriTrackMediaJob co
         ],
     ]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->with(88)->once()->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
 
@@ -678,7 +757,7 @@ function realGpxFixture(string $name): string
 it('importa un track il cui GPX reale usa <rte>/<rtept>', function () {
     $feature = minimalTrackFeature(2841, ['properties' => ['gpx' => ['http://example.com/2841.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(realGpxFixture('route-rte-2841'));
 
@@ -690,7 +769,7 @@ it('importa un track il cui GPX reale usa <rte>/<rtept>', function () {
 it('estrae dal GPX <rte> tutti i punti dell itinerario', function () {
     $feature = minimalTrackFeature(2836, ['properties' => ['gpx' => ['http://example.com/2836.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(realGpxFixture('route-rte-2836'));
 
@@ -708,7 +787,7 @@ it('estrae dal GPX <rte> tutti i punti dell itinerario', function () {
 it('continua a importare un GPX reale in forma <trk>/<trkseg>', function () {
     $feature = minimalTrackFeature(1731, ['properties' => ['gpx' => ['http://example.com/1731.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(realGpxFixture('track-trk-1731'));
 
@@ -720,7 +799,7 @@ it('continua a importare un GPX reale in forma <trk>/<trkseg>', function () {
 it('scarta un GPX con un solo punto invece di creare una linea degenere', function () {
     $feature = minimalTrackFeature(99, ['properties' => ['gpx' => ['http://example.com/one.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andReturn(
         '<?xml version="1.0"?><gpx version="1.0"><rte><rtept lat="40.6" lon="9.1"></rtept></rte></gpx>'
@@ -737,7 +816,7 @@ it('scarta un GPX con un solo punto invece di creare una linea degenere', functi
 it('distingue nel messaggio un download fallito da un GPX senza geometria', function () {
     $feature = minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/bad.gpx']]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
     $client->shouldReceive('getGpxContent')->andThrow(new RuntimeException('timeout'));
 
@@ -748,7 +827,7 @@ it('distingue nel messaggio un download fallito da un GPX senza geometria', func
 it('segnala nel messaggio quando la sorgente non pubblica alcun GPX', function () {
     $feature = minimalTrackFeature(76, ['properties' => ['gpx' => []]]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn($feature);
 
     expect(fn () => makeServiceWith($client)->importTrack(76))
@@ -781,7 +860,7 @@ it('assorbe la corsa di due job che creano insieme la stessa activity di tipo (o
         ]);
     });
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getTrackDetail')->andReturn(
         minimalTrackFeature(81, ['properties' => ['gpx' => ['http://example.com/track.gpx']]])
     );
