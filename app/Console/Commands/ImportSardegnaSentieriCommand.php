@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Http\Clients\SardegnaSentieriClient;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
+use App\Services\Import\Source\DrupalDumpLock;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Bus\Batch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -31,6 +32,11 @@ class ImportSardegnaSentieriCommand extends Command
      * Quota di job falliti oltre la quale le anomalie non si ricalcolano.
      */
     private const NORMALIZE_FAILURE_THRESHOLD = 0.02;
+
+    /**
+     * Oltre quest'età il lock della copia è di una ricarica fallita (oc:8900).
+     */
+    private const STALE_LOCK_HOURS = 2;
 
     /**
      * Se le anomalie vadano ricalcolate dato l'esito del batch di import.
@@ -66,16 +72,36 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Import POIs and Tracks from Sardegna Sentieri API';
+    protected $description = 'Import POIs and Tracks from Sardegna Sentieri (copia del DB Drupal)';
 
     /**
      * Execute the console command.
      */
     public function handle(
-        SardegnaSentieriClient $client,
+        SardegnaSentieriSource $source,
         SardegnaSentieriImportService $importService
     ): int {
         $runId = strtoupper(Str::random(8));
+
+        // Prima di tutto, anche del `--reset`: una copia a metà ricarica
+        // sembra una fonte con pochi nodi (oc:8900).
+        if (DrupalDumpLock::isHeld()) {
+            $since = DrupalDumpLock::heldSince()?->format('Y-m-d H:i:s') ?? '?';
+
+            // Una ricarica dura minuti: un lock più vecchio è di una ricarica
+            // fallita, e l'import resterebbe fermo per sempre in silenzio.
+            if (DrupalDumpLock::heldSince()?->lt(now()->subHours(self::STALE_LOCK_HOURS))) {
+                $this->error("Copia del DB Drupal bloccata dal {$since} (ricarica fallita?): import saltato. Vedi docs/howto/copia-database-drupal.md.");
+                Log::channel('import')->error("[sardegnasentieri:{$runId}] Copia del DB Drupal bloccata dal {$since} (ricarica fallita?): import saltato.");
+
+                return self::FAILURE;
+            }
+
+            $this->warn("Copia del DB Drupal in ricarica dal {$since}: import saltato.");
+            Log::channel('import')->warning("[sardegnasentieri:{$runId}] Copia del DB Drupal in ricarica dal {$since}: import saltato.");
+
+            return self::SUCCESS;
+        }
 
         if (! $this->ensurePrerequisites()) {
             Log::channel('import')->error("[sardegnasentieri:{$runId}] Prerequisites not met, import aborted.");
@@ -83,13 +109,16 @@ class ImportSardegnaSentieriCommand extends Command
             return self::FAILURE;
         }
 
+        // Anche nell'import orario: le liste di una copia vuota farebbero
+        // marcare ogni record come sparito alla fonte (oc:8900).
+        if (! $this->sourceIsReachable($source, $runId)) {
+            return self::FAILURE;
+        }
+
         if ($this->option('reset')) {
-            // Due controlli PRIMA del troncamento, non dopo: `--reset`
-            // cancella e solo allora scarica, quindi ogni imprevisto dopo la
+            // Il backup PRIMA del troncamento, non dopo: `--reset` cancella e
+            // solo allora scarica, quindi ogni imprevisto dopo la
             // cancellazione lascia la piattaforma vuota.
-            if (! $this->sourceIsReachable($client, $runId)) {
-                return self::FAILURE;
-            }
 
             if (! $this->backupBeforeReset($runId)) {
                 return self::FAILURE;
@@ -113,13 +142,13 @@ class ImportSardegnaSentieriCommand extends Command
 
         // Import POIs
         if (! $only || $only === 'pois') {
-            [$poisDispatched, $poisRemoved, $poiJobs] = $this->importPois($client);
+            [$poisDispatched, $poisRemoved, $poiJobs] = $this->importPois($source);
             $jobs = [...$jobs, ...$poiJobs];
         }
 
         // Import Tracks
         if (! $only || $only === 'tracks') {
-            [$tracksDispatched, $tracksRemoved, $trackJobs] = $this->importTracks($client);
+            [$tracksDispatched, $tracksRemoved, $trackJobs] = $this->importTracks($source);
             $jobs = [...$jobs, ...$trackJobs];
         }
 
@@ -270,10 +299,10 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriPoiJob>}
      */
-    private function importPois(SardegnaSentieriClient $client): array
+    private function importPois(SardegnaSentieriSource $source): array
     {
         $this->info('Fetching POI list...');
-        $poiList = $client->getPoiList();
+        $poiList = $source->getPoiList();
         $this->info('Found '.count($poiList).' POIs.');
 
         $force = $this->option('force') || $this->option('reset');
@@ -359,10 +388,10 @@ class ImportSardegnaSentieriCommand extends Command
      *
      * @return array{0: list<int>, 1: int, 2: list<ImportSardegnaSentieriTrackJob>}
      */
-    private function importTracks(SardegnaSentieriClient $client): array
+    private function importTracks(SardegnaSentieriSource $source): array
     {
         $this->info('Fetching track list...');
-        $trackList = $client->getTrackList();
+        $trackList = $source->getTrackList();
         $this->info('Found '.count($trackList).' tracks.');
 
         $force = $this->option('force') || $this->option('reset');
@@ -576,21 +605,21 @@ class ImportSardegnaSentieriCommand extends Command
      * cancellati e non riscaricabili, recuperati copiandoli da un altro
      * ambiente. Questo controllo costa una chiamata e lo impedisce.
      */
-    private function sourceIsReachable(SardegnaSentieriClient $client, string $runId): bool
+    private function sourceIsReachable(SardegnaSentieriSource $source, string $runId): bool
     {
         $this->info('Checking source availability...');
 
-        if ($client->isReachable()) {
+        if ($source->isAvailable()) {
             $this->info('Source is reachable.');
 
             return true;
         }
 
-        $this->error('La sorgente non risponde: import annullato, nessun dato e\' stato cancellato.');
-        $this->line('Riprovare quando sardegnasentieri.it torna disponibile.');
+        $this->error('La copia del DB Drupal non risponde o è vuota: import annullato, nessun dato e\' stato cancellato.');
+        $this->line('Riprovare quando la copia è accesa e caricata (docs/howto/copia-database-drupal.md).');
 
         Log::channel('import')->error(
-            "[sardegnasentieri:{$runId}] Source unreachable, --reset aborted before truncate."
+            "[sardegnasentieri:{$runId}] Source unreachable or empty, import aborted before any change."
         );
 
         return false;

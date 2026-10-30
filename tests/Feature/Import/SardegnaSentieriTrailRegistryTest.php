@@ -8,6 +8,7 @@ use App\Models\EcTrack;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -55,12 +56,12 @@ function trailRegistrySardegnaSentieriUser(): User
     return $user;
 }
 
-function trailRegistryMakeService(SardegnaSentieriClient $client): SardegnaSentieriImportService
+function trailRegistryMakeService(SardegnaSentieriClient&SardegnaSentieriSource $client): SardegnaSentieriImportService
 {
     $mediaSync = Mockery::mock(SardegnaSentieriMediaSyncService::class);
     $mediaSync->shouldIgnoreMissing();
 
-    return new SardegnaSentieriImportService($client, $mediaSync);
+    return new SardegnaSentieriImportService($client, $client, $mediaSync);
 }
 
 function trailRegistryMinimalTrackFeature(int $id, array $overrides = []): ApiTrackResponse
@@ -162,7 +163,7 @@ it('registra nel registro il codice di un sentiero appena importato', function (
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $track = trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -184,7 +185,7 @@ it('non crea un secondo codice quando la stessa traccia viene reimportata', func
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $service = trailRegistryMakeService($client);
@@ -205,7 +206,7 @@ it('importa comunque la traccia se la registrazione del codice fallisce', functi
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $track = trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -225,7 +226,7 @@ it('non registra nulla per un tracciato senza ref', function () {
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -246,7 +247,7 @@ it('non tocca il registro quando il dominio e spento', function () {
         ],
     ]);
 
-    $client = Mockery::mock(SardegnaSentieriClient::class);
+    $client = fonteSardegnaSentieriMock();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);

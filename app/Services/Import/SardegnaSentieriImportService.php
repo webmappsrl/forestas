@@ -16,6 +16,7 @@ use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Models\TaxonomyWarning;
 use App\Models\User;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -67,6 +68,7 @@ class SardegnaSentieriImportService
     private ?array $iconNamesCache = null;
 
     public function __construct(
+        private readonly SardegnaSentieriSource $source,
         private readonly SardegnaSentieriClient $client,
         private readonly SardegnaSentieriMediaSyncService $mediaSync,
     ) {}
@@ -86,7 +88,7 @@ class SardegnaSentieriImportService
     private function importPoiTaxonomies(): void
     {
         foreach (self::POI_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -119,7 +121,7 @@ class SardegnaSentieriImportService
     private function importPoiActivityTaxonomies(): void
     {
         foreach (self::POI_ACTIVITY_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -152,7 +154,7 @@ class SardegnaSentieriImportService
     private function importTrackTaxonomies(): void
     {
         foreach (self::TRACK_VOCABULARIES as $vocabulary) {
-            $terms = $this->client->getTaxonomy($vocabulary);
+            $terms = $this->source->getTaxonomy($vocabulary);
 
             foreach ($terms as $apiId => $term) {
                 $data = $this->buildTaxonomyData($term);
@@ -184,7 +186,7 @@ class SardegnaSentieriImportService
 
     private function importWarningTaxonomies(): void
     {
-        $terms = $this->client->getTaxonomyWarnings();
+        $terms = $this->source->getTaxonomyWarnings();
 
         foreach ($terms as $apiId => $term) {
             if (! is_array($term)) {
@@ -317,7 +319,7 @@ class SardegnaSentieriImportService
 
     public function importPoi(int $externalId): EcPoi
     {
-        return $this->importPoiFromResponse($externalId, $this->client->getPoiDetail($externalId));
+        return $this->importPoiFromResponse($externalId, $this->source->getPoiDetail($externalId));
     }
 
     public function importPoiFromResponse(int $externalId, ApiPoiResponse $response): EcPoi
@@ -381,7 +383,7 @@ class SardegnaSentieriImportService
 
     public function importTrack(int $externalId): EcTrack
     {
-        return $this->importTrackFromResponse($externalId, $this->client->getTrackDetail($externalId));
+        return $this->importTrackFromResponse($externalId, $this->source->getTrackDetail($externalId));
     }
 
     public function importTrackFromResponse(int $externalId, ApiTrackResponse $response): EcTrack
@@ -938,7 +940,7 @@ class SardegnaSentieriImportService
     public function importOrUpdateEnte(string $sardegnaSentieriId): ?int
     {
         try {
-            $node = $this->client->getNodeDetail((int) $sardegnaSentieriId);
+            $node = $this->source->getNodeDetail((int) $sardegnaSentieriId);
             $title = $node['title'][0]['value'] ?? null;
 
             if (empty($title)) {
@@ -963,7 +965,7 @@ class SardegnaSentieriImportService
                     $tipoEnteValue = $enum;
                 } else {
                     try {
-                        $term = $this->client->getTaxonomyTerm($tipoEnteId);
+                        $term = $this->source->getTaxonomyTerm($tipoEnteId);
                         $label = $term['name'][0]['value'] ?? null;
                         if ($label !== null) {
                             $tipoEnteSlug = Str::slug($label);
@@ -1115,7 +1117,7 @@ class SardegnaSentieriImportService
             "sardegnasentieri:taxonomy:{$vocabulary}",
             now()->addHour(),
             function () use ($vocabulary) {
-                $terms = $this->client->getTaxonomy($vocabulary);
+                $terms = $this->source->getTaxonomy($vocabulary);
 
                 $normalized = [];
                 foreach ($terms as $apiId => $term) {

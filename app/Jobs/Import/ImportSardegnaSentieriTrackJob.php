@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Jobs\Import;
 
 use App\Dto\Import\SardegnaSentieriImageManifest;
-use App\Http\Clients\SardegnaSentieriClient;
 use App\Services\Import\SardegnaSentieriImportService;
+use App\Services\Import\Source\DrupalDumpLock;
+use App\Services\Import\Source\SardegnaSentieriSource;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -74,9 +75,18 @@ class ImportSardegnaSentieriTrackJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(SardegnaSentieriClient $client, SardegnaSentieriImportService $service): void
+    public function handle(SardegnaSentieriSource $source, SardegnaSentieriImportService $service): void
     {
-        $response = $client->getTrackDetail($this->externalId);
+        // La copia si sta ricaricando: si riprova fra dieci minuti. Il
+        // rilascio conta come tentativo, quindi un lock rimasto da una
+        // ricarica fallita fa fallire il job dopo cinque giri (oc:8900).
+        if (DrupalDumpLock::isHeld()) {
+            $this->release(600);
+
+            return;
+        }
+
+        $response = $source->getTrackDetail($this->externalId);
         $track = $service->importTrackFromResponse($this->externalId, $response);
 
         ImportSardegnaSentieriTrackMediaJob::dispatch(

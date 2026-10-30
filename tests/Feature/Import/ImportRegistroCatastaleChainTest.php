@@ -8,7 +8,6 @@ use App\Services\RegistroCatastale\RegistroCatastaleImporter;
 use App\Services\RegistroCatastale\RegistroCatastaleImportResult;
 use App\Services\RegistroCatastale\RegistroCatastaleReadException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -58,12 +57,7 @@ beforeEach(function () {
     // Un elemento per tipo basta a produrre qualche job: qui interessa solo
     // l'aggancio del batch, non la scrittura reale (stesso pattern di
     // ImportResetNormalizeTest).
-    Http::fake([
-        '*/tassonomia/*' => Http::response([], 200),
-        '*/list-tracks/*' => Http::response(['1' => '2026-01-01T00:00:00'], 200),
-        '*/listpoi/*' => Http::response(['2' => '2026-01-01T00:00:00'], 200),
-        '*sardegnasentieri.it*' => Http::response([], 200),
-    ]);
+    fonteSardegnaSentieriFinta(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
 
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
 });
@@ -137,26 +131,9 @@ it('nell import orario i job sono raggruppati in un batch e il registro parte al
     Bus::assertDispatched(ImportRegistroCatastaleJob::class);
 });
 
-/**
- * Rifà da capo i fake HTTP con elenchi vuoti: i fake del beforeEach restano
- * registrati e vincono sui successivi (il primo che corrisponde risponde),
- * quindi serve una factory nuova.
- */
-function fakeSorgenteSenzaNovita(): void
-{
-    Http::swap(new HttpFactory);
-    Http::preventStrayRequests();
-    Http::fake([
-        '*/tassonomia/*' => Http::response([], 200),
-        '*/list-tracks/*' => Http::response([], 200),
-        '*/listpoi/*' => Http::response([], 200),
-        '*sardegnasentieri.it*' => Http::response([], 200),
-    ]);
-}
-
 it('nell import orario senza job il registro parte comunque', function () {
     Bus::fake();
-    fakeSorgenteSenzaNovita();
+    fonteSardegnaSentieriFinta();
 
     $this->artisan('sardegnasentieri:import')
         ->expectsOutputToContain('Nessun job da importare.')
@@ -168,7 +145,7 @@ it('nell import orario senza job il registro parte comunque', function () {
 
 it('con --reset e nessun job il registro non parte', function () {
     Bus::fake();
-    fakeSorgenteSenzaNovita();
+    fonteSardegnaSentieriFinta();
 
     $this->artisan('sardegnasentieri:import', ['--reset' => true])
         ->expectsOutputToContain('Nessun job da importare.')
@@ -180,7 +157,7 @@ it('con --reset e nessun job il registro non parte', function () {
 
 it('con --only e nessun job il registro non parte', function () {
     Bus::fake();
-    fakeSorgenteSenzaNovita();
+    fonteSardegnaSentieriFinta();
 
     $this->artisan('sardegnasentieri:import', ['--only' => 'tracks'])
         ->expectsOutputToContain('Nessun job da importare.')
