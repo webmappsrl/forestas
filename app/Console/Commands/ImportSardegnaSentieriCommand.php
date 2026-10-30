@@ -8,6 +8,7 @@ use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
+use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
 use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
@@ -40,6 +41,14 @@ class ImportSardegnaSentieriCommand extends Command
      * Oltre quest'età il lock della copia è di una ricarica fallita (oc:8900).
      */
     private const STALE_LOCK_HOURS = 2;
+
+    /** Tipi morph con cui tracce e POI compaiono nelle pivot: nome del model del progetto e del package. */
+    private const TRACK_AND_POI_MORPH_TYPES = [
+        'App\\Models\\EcTrack',
+        'Wm\\WmPackage\\Models\\EcTrack',
+        'App\\Models\\EcPoi',
+        'Wm\\WmPackage\\Models\\EcPoi',
+    ];
 
     /**
      * Se le anomalie vadano ricalcolate dato l'esito del batch di import.
@@ -262,12 +271,16 @@ class ImportSardegnaSentieriCommand extends Command
                 // archivio incompleto — le guardie servono ad anomalie e
                 // registro. Sulla coda dell'import, perche' su `default`
                 // finirebbe dietro le conversioni immagine (oc:8607).
+                // Il ricalcolo dei layer sta fra sync e reindex: scrive
+                // `properties.layers` in modo sincrono, e il reindex deve
+                // leggere le tracce gia' aggiornate (oc:8827).
                 Bus::chain([
                     new SyncTaxonomyWhereJob,
+                    new RecalculateSardegnaSentieriLayersJob,
                     new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
                 ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
 
-                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali e reindex accodati.");
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e reindex accodati.");
 
                 if (! $withNormalize) {
                     Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");
@@ -803,8 +816,22 @@ class ImportSardegnaSentieriCommand extends Command
         DB::statement('TRUNCATE TABLE taxonomy_poi_types RESTART IDENTITY CASCADE');
         $this->info('Truncated taxonomy_poi_types.');
 
-        DB::statement('TRUNCATE TABLE taxonomy_activities RESTART IDENTITY CASCADE');
-        $this->info('Truncated taxonomy_activities.');
+        // Le attività non si troncano più: i layer sono configurati per
+        // attività, e il TRUNCATE ... CASCADE portava via anche i loro legami
+        // in taxonomy_activityables, lasciando i filtri di EC Tracce vuoti
+        // ogni mattina. L'import le ritrova per `identifier` (oc:8827).
+        // Le due pivot (legami con attività e con layer) non hanno chiavi
+        // esterne verso tracce e POI, quindi il CASCADE non le raggiunge: dopo
+        // RESTART IDENTITY le righe vecchie punterebbero ai record nuovi con lo
+        // stesso id. Si cancellano a mano solo le righe di tracce e POI; quelle
+        // dei layer restano.
+        DB::table('taxonomy_activityables')
+            ->whereIn('taxonomy_activityable_type', self::TRACK_AND_POI_MORPH_TYPES)
+            ->delete();
+        DB::table('layerables')
+            ->whereIn('layerable_type', self::TRACK_AND_POI_MORPH_TYPES)
+            ->delete();
+        $this->info('Cleared track and POI links from taxonomy_activityables and layerables.');
 
         // I collegamenti agli enti non hanno chiavi esterne verso POI e
         // sentieri: il CASCADE non li raggiunge, e dopo RESTART IDENTITY le

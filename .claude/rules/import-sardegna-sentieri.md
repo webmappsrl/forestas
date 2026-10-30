@@ -18,10 +18,21 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **Il flusso GeoHub del package (`ImportTaxonomyActivityJob`, `ImportTaxonomyJob`,
   `wm-geohub-import.php`) non è usato qui**: indagando un bug su tassonomie, POI o track si perde
   tempo a leggerlo — la causa sta in `SardegnaSentieriImportService` (oc:8489)
-- **`--reset` fa `TRUNCATE ... RESTART IDENTITY CASCADE` globale** su `ec_tracks`, `ec_pois` e le
-  tassonomie, non una cancellazione selettiva per `app_id`: su Forestas è innocuo perché l'app è
+- **`--reset` fa `TRUNCATE ... RESTART IDENTITY CASCADE` globale** su `ec_tracks`, `ec_pois` e i tipi
+  di POI, non una cancellazione selettiva per `app_id`: su Forestas è innocuo perché l'app è
   una sola (`SardegnaSentieriImportService::IMPORT_APP_ID` = 1), diventerebbe un problema con più
-  app nello stesso database (oc:8489)
+  app nello stesso database (oc:8489). **Le attività invece non si troncano**: si cancellano a mano
+  solo le righe di tracce e POI in `taxonomy_activityables` e `layerables`, e i legami dei layer
+  restano (oc:8827)
+- **L'import scrive le attività delle tracce senza eventi sul pivot**: i layer li ricalcola solo
+  `RecalculateSardegnaSentieriLayersJob` nella catena di fine batch, prima del reindex. Un nuovo
+  percorso che scrive attività sulle tracce fuori da quel batch deve accodarlo, altrimenti layer e
+  `properties.layers` restano vecchi — vedi
+  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
+- **Un layer di tipologia senza attività viene saltato dal ricalcolo**: `sardegnasentieri:configure-layers`
+  va lanciato una volta su ogni ambiente e di nuovo dopo `sardegnasentieri:reset`, sempre dopo un
+  `sardegnasentieri:import --force` (o il reset notturno) e la fine dei suoi job — vedi
+  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
 - **Il troncamento notturno porta via anche ciò che non viene da Drupal**, per vincolo a cascata: la
   storia dei cambi di stato dei codici e le istanze di accatastamento. Oggi è **deliberato**:
   `--reset` tronca esplicitamente anche `trail_applications`, che altrimenti sopravvivrebbe ai
@@ -101,6 +112,3 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   (`SardegnaSentieriDatabaseSource::record()`), non con una query nuova: `DrupalRecordReader` legge
   già tutti i campi del tipo e le entità richiamate — vedi
   [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)
-- **Dopo ogni modifica a `SardegnaSentieriDatabaseSource`, `sardegnasentieri:compare-source`**
-  finché le API esistono: le regole del modulo Drupal replicate non sono deducibili dallo schema —
-  vedi [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)

@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\TaxonomyActivity;
+use Wm\WmPackage\Models\TaxonomyActivityable;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
@@ -35,6 +36,17 @@ class SardegnaSentieriImportService
 {
     /** Forestas: una sola app nel progetto; tutti gli import usano questo id. */
     public const IMPORT_APP_ID = 1;
+
+    /** Identifier dell'attività che raggruppa i cammini (oc:8827). */
+    public const CAMMINO_ACTIVITY_IDENTIFIER = 'sardegnasentieri:cammino';
+
+    /** Prefisso dell'`identifier` delle attività che nascono dal tipo del tracciato (`sentiero`, `itinerario`). */
+    public const TYPE_ACTIVITY_PREFIX = 'sardegnasentieri:type:';
+
+    public const CAMMINO_ACTIVITY_NAME = 'Cammini di Sardegna';
+
+    /** Termine «Cammini di Sardegna» di `field_tipologia_itinerario` in Drupal (oc:8827). */
+    public const CAMMINI_TERM_ID = '4728';
 
     private const POI_VOCABULARIES = [
         'tipologia_poi',
@@ -446,9 +458,8 @@ class SardegnaSentieriImportService
         $this->syncFromTo($ecTrack, $response);
         $this->syncEnti($ecTrack, $response);
         $this->syncRelatedPois($ecTrack, $response);
-        $this->syncTrackTaxonomies($ecTrack, $response);
+        $this->syncTrackActivities($ecTrack, $response);
         $this->syncTrackWarnings($ecTrack, $response);
-        $this->syncTrackType($ecTrack, $response);
 
         $this->registerTrailRegistryCode($ecTrack);
 
@@ -696,33 +707,41 @@ class SardegnaSentieriImportService
         $ecTrack->ecPois()->sync($poiIds);
     }
 
-    private function syncTrackTaxonomies(EcTrack $ecTrack, ApiTrackResponse $response): void
+    /**
+     * Scrive tutte le attività della traccia con un solo `sync()`: termini
+     * `tipologia_sentieri`, attività derivata dal tipo, attività dei cammini.
+     *
+     * Il `sync()` gira senza eventi: l'observer del pivot accoda un job di
+     * ricalcolo dei layer per ogni riga aggiunta o tolta, migliaia a ogni
+     * import. I layer li ricalcola il job di fine batch (oc:8827).
+     * `withoutEvents` spegne il dispatcher di tutti i modelli per la durata
+     * della closure: dentro ci va solo il `sync()`.
+     */
+    private function syncTrackActivities(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $tipologiaIds = collect($response->taxonomies->tipologia_sentieri)
+        // Gli id delle attività `accessible-trails` ecc. vengono dal `field_geohub_identifier` del termine Drupal.
+        $ids = collect($response->taxonomies->tipologia_sentieri)
             ->flatMap(fn ($apiId) => $this->resolveActivityIdsForVocabulary((string) $apiId, 'tipologia_sentieri'))
             ->filter()
-            ->values()
-            ->toArray();
+            ->all();
 
-        $ecTrack->taxonomyActivities()->sync($tipologiaIds);
-    }
-
-    private function syncTrackType(EcTrack $ecTrack, ApiTrackResponse $response): void
-    {
-        if ($response->type === null || $response->type === '') {
-            return;
+        if ($response->type !== null && $response->type !== '') {
+            $ids[] = $this->resolveActivityByIdentifier(
+                self::TYPE_ACTIVITY_PREFIX.$response->type,
+                ucfirst($response->type)
+            )->id;
         }
 
-        $identifier = 'sardegnasentieri:type:'.$response->type;
+        if (in_array(self::CAMMINI_TERM_ID, $response->taxonomies->tipologia_itinerari, true)) {
+            $ids[] = $this->resolveActivityByIdentifier(
+                self::CAMMINO_ACTIVITY_IDENTIFIER,
+                self::CAMMINO_ACTIVITY_NAME
+            )->id;
+        }
 
-        $activity = $this->resolveActivityByIdentifier(
-            $identifier,
-            ucfirst($response->type)
-        );
+        $ids = array_values(array_unique($ids));
 
-        $currentIds = $ecTrack->taxonomyActivities()->pluck('taxonomy_activities.id')->toArray();
-        $allIds = array_unique(array_merge($currentIds, [$activity->id]));
-        $ecTrack->taxonomyActivities()->sync($allIds);
+        TaxonomyActivityable::withoutEvents(fn () => $ecTrack->taxonomyActivities()->sync($ids));
     }
 
     /**
