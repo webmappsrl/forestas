@@ -78,6 +78,7 @@ it('il comando legge la copia quando non c\'è il lock', function () {
     $source->shouldReceive('getTaxonomy', 'getTaxonomyWarnings')->andReturn([]);
     $source->shouldReceive('getPoiList')->once()->andReturn([]);
     $source->shouldReceive('getTrackList')->once()->andReturn([]);
+    $source->shouldReceive('getEnteList')->once()->andReturn([]);
     $this->instance(SardegnaSentieriSource::class, $source);
 
     $this->artisan('sardegnasentieri:import')->assertExitCode(0);

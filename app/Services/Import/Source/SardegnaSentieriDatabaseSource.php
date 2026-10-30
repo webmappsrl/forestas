@@ -32,6 +32,8 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
 
     private const TRACK_TYPES = ['sentiero', 'itinerario'];
 
+    private const ENTE_TYPE = 'ente_istituzione_societa';
+
     /**
      * Gli enti collegati a un sentiero, con la chiave sotto cui le API li
      * mettevano in `ente_istituzione_societa`. I soggetti sono singoli, gli
@@ -71,6 +73,11 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     public function getTrackList(): array
     {
         return $this->changedList(self::TRACK_TYPES);
+    }
+
+    public function getEnteList(): array
+    {
+        return $this->changedList([self::ENTE_TYPE]);
     }
 
     public function getTrackDetail(int $id): ApiTrackResponse
