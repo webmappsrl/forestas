@@ -2,14 +2,29 @@
 
 ## Come funziona oggi
 
-Forestas importa da Sardegna Sentieri (Drupal) attraverso le API pubbliche (`SardegnaSentieriClient`,
-`https://www.sardegnasentieri.it/ss`). Accanto alle API c'è una **copia SQL del database Drupal**, in
-un container MySQL 8 a parte, da cui si leggono anche i dati che le API non espongono. Drupal verrà
-dismesso: l'ultima copia resterà la fonte del dato.
+Forestas importa da Sardegna Sentieri leggendo una **copia SQL del database Drupal**, in un
+container MySQL 8 a parte (oc:8900): `SardegnaSentieriDatabaseSource`, dietro l'interfaccia
+`SardegnaSentieriSource`. Per ogni nodo legge il **record completo** con `DrupalRecordReader`
+(«Il record completo», sotto), poi ne ricostruisce le stesse strutture che davano le API del modulo
+`api_webmapp`, quindi l'import scrive ciò che scriveva prima, salvo le eccezioni elencate in «Come
+l'import replica le API»; dalle API restano solo i file (GPX e immagini), scaricati dal sito pubblico con l'URL ricavato dalla copia. Drupal verrà
+dismesso: l'ultima copia resterà la fonte del dato. Anche WordPress legge dalla copia.
+
+Le API restano raggiungibili da `SardegnaSentieriApiSource`, usata solo da
+`sardegnasentieri:compare-source`: il confronto fra le due fonti, da rilanciare dopo ogni modifica
+alle query (le risposte delle API restano in cache, `--ids` limita ai nodi indicati). Alla
+dismissione di Drupal si tolgono entrambi.
+
+Mentre `scripts/drupal-dump-reload.sh` ricarica la copia, il lock `storage/drupal-dump/reload.lock`
+ferma l'import: il comando salta il giro, i job si rimettono in coda dopo dieci minuti. Il lock si
+toglie solo a ricarica riuscita; oltre le due ore il comando esce in errore, perché un import fermo
+in silenzio non lo noterebbe nessuno. Anche nell'import orario il comando controlla prima che la
+copia abbia sentieri e POI: con liste vuote marcherebbe ogni record come sparito alla fonte.
 
 ### Dove sta
 
-La copia **non c'è per forza**: esiste solo dove qualcuno ha acceso il container
+Su UAT e in produzione la accende il `compose.yml` dello shard, e l'import ne dipende. In locale
+**non c'è per forza**: esiste solo dove qualcuno ha acceso il container
 `mysql-sardegnasentieri-dump` e ci ha caricato un dump. Come accenderla, caricarla, scaricare il
 dump da produzione, come si aggiorna da sola su UAT, come raggiungere quella di UAT e scaricare il
 codice Drupal:
@@ -72,7 +87,9 @@ Colonne del valore secondo il tipo di campo:
 
 **Come si ricava il valore corrente di un campo**
 
-1. Si parte da `node_field_data` filtrando `type`, `status = 1` e la lingua.
+1. Si parte da `node_field_data` filtrando `type`, `status = 1` e la lingua. `status = 1` vale per
+   chi mostra solo il pubblicato, come WordPress: **l'import non filtra**, perché replica le API,
+   che esponevano anche le bozze.
 2. Join su `node__<campo>` con `entity_id = nid AND deleted = 0`, e in più:
    - campo **traducibile** → `AND langcode = node_field_data.langcode`;
    - campo **non traducibile** → nessun filtro sulla lingua: c'è una sola riga, nella lingua
@@ -234,7 +251,7 @@ senza corrispondenza va scartato.
 
 ### Corrispondenza con le API usate dall'import
 
-Per ogni chiamata di `app/Http/Clients/SardegnaSentieriClient.php`, da dove arriva nella copia ogni
+Per ogni chiamata di `app/Services/Import/Source/SardegnaSentieriApiSource.php`, da dove arriva nella copia ogni
 campo che Forestas legge davvero (DTO in `app/Dto/Api/`, service
 `app/Services/Import/SardegnaSentieriImportService.php`). «Nodo» sta per `node_field_data`.
 Gli endpoint `/ss/*` sono nel modulo Drupal `api_webmapp`.
@@ -284,9 +301,9 @@ Gli endpoint `/ss/*` sono nel modulo Drupal `api_webmapp`.
 | `codice` | `node__field_codice` | traducibile: l'API dà quello della traduzione caricata |
 | `addr_locality` | `node__field_localita` | |
 | `come_arrivare` | `node__field_come_arrivare`, per lingua | HTML |
-| `collegamenti` | `node__field_collegamenti._uri`, `._title` | l'API li appiattisce in stringa |
+| `collegamenti` | `node__field_collegamenti._uri`, `._title` | l'API li appiattisce in una lista, titolo spezzato su «, » |
 | `coordinates` | `node__field_posizione._lon`, `._lat` | l'API li ricava dal WKT di `_value` |
-| `immaginePrincipale`, `galleria`, `allegati`, `video` | catene media come per il sentiero | |
+| `immaginePrincipale`, `galleria`, `allegati`, `video` | catene media come per il sentiero | l'API dà `allegati` sempre vuoto |
 | `poi_correlati` | `node__field_poi_correlati` | |
 | `ente_istituzione_societa` | `node__field_riferimento_operatori_guid` | |
 | `taxonomies.tipologia_poi`, `.servizi`, `.zona_geografica` | `node__field_tipologia_poi`, `node__field_servizi`, `node__field_zona_geografica` | tid |
@@ -319,6 +336,56 @@ Gli endpoint `/ss/*` sono nel modulo Drupal `api_webmapp`.
 
 **URL del GPX** — non ha un equivalente nel database: dalla copia si ricava l'URL
 (`field_gpx_media` → `file_managed.uri`), il contenuto si scarica via HTTP.
+
+### Il record completo
+
+`DrupalRecordReader` legge di un nodo tutto ciò che Drupal ha, non solo i campi delle API: l'import
+ne usa oggi la parte che usava prima, il resto è lì per quando servirà un altro dato, senza query
+nuove (direttiva dello scrum del 30/10/2026, oc:8900). `SardegnaSentieriDatabaseSource::record()` lo
+restituisce; dal record si costruisce anche la forma delle API, quindi una query sola per tutto.
+
+```text
+entity_type, id, bundle, langcode (della traduzione originale)
+translations  langcode => riga di node_field_data (prima l'originale, poi per lingua)
+aliases       righe di path_alias del nodo, per id
+fields        campo => langcode => delta => {colonne senza il prefisso del campo}
+              + entity, se il valore richiama un'altra entità
+```
+
+- **I campi vengono dalla configurazione di Drupal** (`config`, `field.field.<entità>.<tipo>.*`, e
+  `field.storage.*` per l'entità richiamata), non da una lista nel codice: un campo aggiunto in
+  Drupal entra nel record da solo. Commenti e layout di pagina restano fuori.
+- **Riferimenti risolti**: file e immagini → la riga di `file_managed` con `url`; termini e media →
+  il loro record completo (alt, autore e credits dei media; icona, colore, identificativo GeoHub dei
+  termini), i cui termini e media restano id; nodi → un riassunto (`nid`, `type`, `title`,
+  `status`, `langcode`), perché il record intero lo legge l'import del nodo collegato.
+- **Costo**: una query per tabella di campo, non per valore — circa 90 per un sentiero con galleria.
+  Attraverso il tunnel sono ~13 secondi a nodo, su UAT la rete è locale.
+
+### Come l'import replica le API
+
+Regole non documentate del modulo `api_webmapp`, ricavate confrontando le risposte vere con la copia
+(oc:8900) e replicate da `SardegnaSentieriDatabaseSource`:
+
+- **La chiave `it` è la traduzione originale**, anche quando è `en` o `und`; le altre traduzioni
+  compaiono con la propria lingua, tranne l'italiana di un nodo nato in inglese, che le API
+  ignoravano (sentiero 3636: `name.it` è il titolo inglese).
+- **Testi multipli tradotti accumulati** (`info_utili`, `roadbook`, `come_arrivare`): la seconda
+  lingua riporta i valori della prima seguiti dai propri, anche quando non ne ha (sentiero 164).
+- **Riferimenti dalla lingua originale**: negli itinerari `zona_geografica` e
+  `riferimento_operatori_guid` sono tradotti, e le API leggevano solo l'originale.
+- **`field_percorso` è una `FeatureCollection`**: le API davano la geometria della prima feature.
+- **URL del nodo**: l'alias italiano, altrimenti quello della lingua originale, altrimenti
+  `/node/{nid}`, codificato segmento per segmento (`san-nicol%C3%B2-…`).
+- **Date**: `changed`, `created` e `field_data_rilievo` in `Y-m-d H:i:s` nell'ora italiana,
+  convertite in PHP (`DrupalValues`): `FROM_UNIXTIME` userebbe il fuso della sessione MySQL.
+- **`arrivo: ""`** su due sentieri senza arrivo nella copia: per l'import equivale a nessun valore.
+- **Titoli dei `collegamenti` spezzati su «, »**: «Comune di Oliena, servizi turistici» diventava
+  due voci della lista (POI 1046); gli altri spazi restano, anche iniziali e finali (POI 142, 2746).
+- **Gli allegati dei POI non c'erano**: le API davano `allegati` vuoto anche ai dodici POI che in
+  Drupal ne hanno uno (POI 176, 544); quelli dei sentieri invece sì.
+- **Geolocalizzazione vuota degli enti omessa**: Drupal tiene la riga con `lat` e `lon` `NULL`, le
+  API non davano il campo (enti 568, 954, 1044).
 
 ### Cosa le API non espongono
 
@@ -470,7 +537,7 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
 - **Mai join su `revision_id`**: il valore corrente si prende su `entity_id` e `deleted = 0`.
 - **`status` è per traduzione** e le API non lo espongono: sia gli elenchi `/ss/list-tracks/` e
   `/ss/listpoi/` sia i dettagli restituiscono anche i nodi non pubblicati. Dalla copia si possono
-  escludere con `status = 1`.
+  escludere con `status = 1`, ma l'import oggi non lo fa (oc:8900).
 - **Riferimenti verso nodi cancellati** in `sentieri_collegati`, `itinerari_correlati`,
   `field_sentiero` e `poi_correlati`: il join va fatto sul nodo di destinazione.
 - **Liste di riferimenti diverse fra `it` ed `en`**: `field_sentieri_collegati` e l'immagine
@@ -504,11 +571,24 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
 
 - **Copia SQL accanto alle API** (oc:8705): le API non espongono tutti i dati (news, campi propri
   degli itinerari, relazioni) e spariranno con la dismissione di Drupal.
-- **Import attuali ancora sulle API** (oc:8705): finché il sync non aggiorna la copia ogni giorno,
-  le API sono più fresche della copia. Si passa all'SQL un import alla volta, con il confronto
-  campo per campo nel ticket che lo sposta. Un argomento in più per passare all'SQL: le API non
-  espongono lo stato pubblicato e restituiscono anche le bozze, quindi un import via API non può
-  escluderle; dalla copia basta `status = 1` (oc:8705).
+- **L'import legge dalla copia, cambiando solo la fonte** (oc:8900): uniforma gli import con
+  WordPress, non carica Drupal di richieste e dà accesso ai dati che le API non espongono. Il primo
+  passo replica le API alla lettera, stranezze comprese, perché il confronto possa dimostrare che
+  il risultato non cambia; i dati nuovi vengono in un ticket successivo.
+- **Bozze ancora importate** (oc:8900): le API le esponevano (3 sentieri, 1 itinerario e 23 POI
+  sulla copia di UAT al 29/10/2026); filtrarle è una decisione a parte, che il confronto non
+  potrebbe distinguere da un errore delle query.
+- **Nessun interruttore fra API e copia** (oc:8900): Drupal chiude entro fine anno, una seconda
+  fonte mantenuta diventerebbe codice morto. Il rollback è il revert.
+- **Lock durante la ricarica, senza `trap`** (oc:8900): la ricarica lascia per minuti tabelle a
+  metà con l'utente `readonly` ancora valido, e l'import cancellerebbe le immagini dei nodi letti
+  senza media. Dopo una ricarica fallita il lock resta, e un import fermo è meglio di uno su una
+  copia a metà.
+- **Copia nel `compose.yml` e non negli altri compose** (oc:8900): su UAT e nella futura
+  produzione serve sempre; in locale è un'opzione, e un container sempre acceso occuperebbe la
+  porta 3307 del tunnel verso UAT.
+- **Ritardo di un giorno accettato** (oc:8900): finché Drupal è vivo una modifica fatta lì arriva
+  dopo il dump giornaliero e non entro un'ora; su UAT l'import gira già una volta al giorno.
 - **Caricamento solo dallo script** (oc:8705): una strada sola, che crea anche `readonly` con il
   solo `SELECT`; la copia è una fonte da leggere, e una query sbagliata non deve poterla
   modificare.
@@ -541,6 +621,11 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
   dalle sessioni di lavoro, invece di perdersi fra i log di Laravel.
 
 ## Come ci siamo arrivati
+
+- **Import sulle API e copia accanto** (oc:8705, superata in oc:8900): le API erano più fresche
+  della copia finché il sync non la aggiornava ogni giorno. Con il dump giornaliero su UAT il
+  vantaggio è caduto, e restavano i limiti: dati mancanti, bozze non distinguibili, carico su
+  Drupal.
 
 - **Dump montato su `/docker-entrypoint-initdb.d` con `MYSQL_USER`** (commit `f0af59d`, superata in
   oc:8705): caricava tutti i dump della cartella a ogni volume nuovo e dava `ALL PRIVILEGES` a
