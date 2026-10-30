@@ -21,6 +21,8 @@ readonly class ApiTaxonomiesData
         public array $servizi = [],
         /** @var list<string> */
         public array $tipologia_di_avvertenze = [],
+        /** @var list<string> */
+        public array $tipologia_itinerari = [],
     ) {}
 
     public static function fromArray(array $taxonomies): self
@@ -33,6 +35,7 @@ readonly class ApiTaxonomiesData
             zona_geografica: self::normalizeIdList($taxonomies['zona_geografica'] ?? null),
             servizi: self::normalizeIdList($taxonomies['servizi'] ?? null),
             tipologia_di_avvertenze: self::normalizeIdList($taxonomies['tipologia_di_avvertenze'] ?? null),
+            tipologia_itinerari: self::normalizeIdList($taxonomies['tipologia_itinerari'] ?? null),
         );
     }
 

@@ -17,8 +17,9 @@ use Illuminate\Support\Facades\DB;
  * ricostruisce le stesse strutture che davano le API del modulo Drupal
  * `api_webmapp`, comprese le loro stranezze, perché l'import non cambi
  * risultato. Il resto del record è a disposizione con record(). La corrispondenza campo per campo è in
- * docs/knowledge/copia-database-drupal.md; la verifica è
- * `sardegnasentieri:compare-source`.
+ * docs/knowledge/copia-database-drupal.md. Il confronto con le API
+ * (`sardegnasentieri:compare-source`) è servito al passaggio dalle
+ * API alla copia e non va più rilanciato (oc:8827).
  *
  * Due regole valgono ovunque:
  * - nessun filtro su `status`: le API esponevano anche le bozze;
@@ -114,6 +115,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
                 'categorie_fruibilita_sentieri' => $this->references($record, 'field_frubilita'),
                 'stato_di_validazione' => $this->single($record, 'field_stato_di_validazione', 'target_id'),
                 'zona_geografica' => $this->references($record, 'field_zona_geografica'),
+                'tipologia_itinerari' => $this->references($record, 'field_tipologia_itinerario'),
             ], fn ($v) => $v !== null && $v !== []),
             'url' => $this->url($record),
         ];

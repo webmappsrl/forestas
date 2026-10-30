@@ -141,8 +141,12 @@ Con PHP 7.4 PDO non segnala gli errori se non glielo si chiede: negli script va 
 
 ## Confrontare l'import con le API
 
-Finché Drupal è vivo, ogni modifica alle query di `SardegnaSentieriDatabaseSource` si verifica
-contro le API (oc:8900), con la copia raggiungibile da Laravel:
+> ⚠️ Superato (oc:8827): il confronto serviva a provare in locale il passaggio dalle API alla copia
+> prima della produzione (oc:8900) e non va più fatto dopo ogni modifica alle query. Il comando
+> resta, per un controllo occasionale; sui campi che le API non esponevano (per esempio
+> `field_tipologia_itinerario`) segnala differenze attese.
+
+Con la copia raggiungibile da Laravel:
 
 ```bash
 docker exec php-forestas php artisan sardegnasentieri:compare-source

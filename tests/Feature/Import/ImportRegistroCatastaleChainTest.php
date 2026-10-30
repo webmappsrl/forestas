@@ -2,6 +2,7 @@
 
 use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
+use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\RegistroCatastale\RegistroCatastaleImporter;
@@ -238,7 +239,7 @@ it('un giro che trova il lock occupato non esegue l importer', function () {
 });
 
 /**
- * La catena delle aree (oc:8880): sync di taxonomy_where e poi reindex,
+ * La catena delle aree (oc:8880, oc:8827): sync di taxonomy_where, ricalcolo dei layer e poi reindex,
  * sulla coda dell'import, per l'app di Sardegna Sentieri. Parte su tutte le
  * strade del `finally`, anche quelle che saltano anomalie e registro.
  */
@@ -246,13 +247,14 @@ function assertCatenaAree(): void
 {
     Bus::assertChained([
         SyncTaxonomyWhereJob::class,
+        RecalculateSardegnaSentieriLayersJob::class,
         RegenerateTaxonomyWhereOutputsJob::class,
     ]);
 
     Bus::assertDispatched(SyncTaxonomyWhereJob::class, function ($job) {
         return $job->queue === ImportSardegnaSentieriTrackJob::QUEUE
             && $job->chainQueue === ImportSardegnaSentieriTrackJob::QUEUE
-            && unserialize($job->chained[0])->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
+            && unserialize($job->chained[1])->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
     });
 }
 

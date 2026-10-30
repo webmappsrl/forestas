@@ -20,9 +20,11 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Jobs\Layer\SyncAutoLayerAfterTrackTaxonomyChangeJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
+use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 
@@ -469,12 +471,82 @@ it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)',
     $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
     (makeServiceWith($client2))->importTrack(75);
 
-    // Resta solo l'activity derivata dal `type` del track, che syncTrackType()
+    // Resta solo l'activity derivata dal `type` del track, che syncTrackActivities()
     // riaggancia sempre: quella importata dalle tassonomie deve sparire.
     $identifiers = $track->fresh()->taxonomyActivities()->pluck('identifier')->all();
     expect($identifiers)
         ->not->toContain('escursionismo')
         ->toBe(['sardegnasentieri:type:sentiero']);
+});
+
+it('scrive l attività dei cammini sugli itinerari con il termine Cammini di Sardegna (oc:8827)', function () {
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => ['4728', '4731']],
+        ]])
+    );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+
+    (makeServiceWith($client))->importTrack(75);
+
+    $identifiers = EcTrack::first()->taxonomyActivities()->pluck('identifier')->all();
+    expect($identifiers)->toHaveCount(2)
+        ->toContain('sardegnasentieri:type:itinerario')
+        ->toContain(SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER);
+});
+
+it('toglie l attività dei cammini quando il termine sparisce (oc:8827)', function () {
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => ['4728']],
+        ]])
+    );
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client))->importTrack(75);
+
+    $client2 = fonteSardegnaSentieriMock();
+    $client2->shouldReceive('getTrackDetail')->andReturn(
+        minimalTrackFeature(75, ['properties' => [
+            'gpx' => ['http://example.com/track.gpx'],
+            'type' => 'itinerario',
+            'taxonomies' => ['tipologia_itinerari' => []],
+        ]])
+    );
+    $client2->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client2->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client2))->importTrack(75);
+
+    expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
+        ->toBe(['sardegnasentieri:type:itinerario']);
+});
+
+it('non accoda job dei layer quando l import scrive le attività (oc:8827)', function () {
+    $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create([
+        'identifier' => 'sardegnasentieri:type:sentiero',
+        'name' => 'Sentiero',
+    ]));
+    $layer = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
+    $layer->taxonomyActivities()->attach($activity->id);
+
+    Bus::fake();
+
+    $client = fonteSardegnaSentieriMock();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => ['gpx' => ['http://example.com/track.gpx']]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    $client->shouldReceive('getTaxonomy')->andReturn([]);
+    (makeServiceWith($client))->importTrack(75);
+
+    expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
+        ->toBe(['sardegnasentieri:type:sentiero']);
+    Bus::assertNotDispatched(SyncAutoLayerAfterTrackTaxonomyChangeJob::class);
 });
 
 it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)', function () {

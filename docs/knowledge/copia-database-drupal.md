@@ -11,9 +11,12 @@ l'import replica le API»; dalle API restano solo i file (GPX e immagini), scari
 dismesso: l'ultima copia resterà la fonte del dato. Anche WordPress legge dalla copia.
 
 Le API restano raggiungibili da `SardegnaSentieriApiSource`, usata solo da
-`sardegnasentieri:compare-source`: il confronto fra le due fonti, da rilanciare dopo ogni modifica
-alle query (le risposte delle API restano in cache, `--ids` limita ai nodi indicati). Alla
-dismissione di Drupal si tolgono entrambi.
+`sardegnasentieri:compare-source`: il confronto fra le due fonti (le risposte delle API restano in
+cache, `--ids` limita ai nodi indicati). Alla dismissione di Drupal si tolgono entrambi. ~~Da
+rilanciare dopo ogni modifica alle query~~ — superato (oc:8827): serviva a provare in locale il
+passaggio dalle API alla copia prima della produzione, e non va più fatto. La copia legge già
+campi che le API non hanno mai esposto (`field_tipologia_itinerario`), quindi il confronto su
+quei campi segnala differenze attese.
 
 Mentre `scripts/drupal-dump-reload.sh` ricarica la copia, il lock `storage/drupal-dump/reload.lock`
 ferma l'import: il comando salta il giro, i job si rimettono in coda dopo dieci minuti. Il lock si
