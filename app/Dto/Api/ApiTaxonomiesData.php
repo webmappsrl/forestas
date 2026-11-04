@@ -23,6 +23,14 @@ readonly class ApiTaxonomiesData
         public array $tipologia_di_avvertenze = [],
         /** @var list<string> */
         public array $tipologia_itinerari = [],
+        /**
+         * Padre di ogni tid di `categorie_fruibilita_sentieri` nella gerarchia del vocabolario: tid => tid del
+         * padre, `'0'` per una radice. Lo dà solo la copia del DB Drupal (le API non lo esponevano): senza,
+         * l'import non scrive i legami dei termini (oc:8910).
+         *
+         * @var array<string, string>
+         */
+        public array $fruibilita_padri = [],
     ) {}
 
     public static function fromArray(array $taxonomies): self
@@ -36,7 +44,25 @@ readonly class ApiTaxonomiesData
             servizi: self::normalizeIdList($taxonomies['servizi'] ?? null),
             tipologia_di_avvertenze: self::normalizeIdList($taxonomies['tipologia_di_avvertenze'] ?? null),
             tipologia_itinerari: self::normalizeIdList($taxonomies['tipologia_itinerari'] ?? null),
+            fruibilita_padri: self::normalizeParents($taxonomies['fruibilita_padri'] ?? null),
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function normalizeParents(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $parents = [];
+        foreach ($value as $tid => $parent) {
+            $parents[(string) $tid] = (string) $parent;
+        }
+
+        return $parents;
     }
 
     /**

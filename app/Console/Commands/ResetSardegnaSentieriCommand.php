@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Ente;
-use App\Models\TaxonomyWarning;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Console\Command;
+use Illuminate\Redis\Connections\PhpRedisConnection;
+use Illuminate\Redis\Connections\PredisConnection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Wm\WmPackage\Models\App;
@@ -15,6 +16,7 @@ use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
+use Wm\WmPackage\Models\TaxonomyTerm;
 
 class ResetSardegnaSentieriCommand extends Command
 {
@@ -97,10 +99,14 @@ class ResetSardegnaSentieriCommand extends Command
         TaxonomyActivity::whereIn('id', $activityIds)->delete();
         $this->info("Eliminati {$activityCount} TaxonomyActivity.");
 
-        $warningCount = TaxonomyWarning::whereNotNull('properties->source_id')->count();
-        DB::table('taxonomy_warningables')->whereIn('taxonomy_warning_id', TaxonomyWarning::whereNotNull('properties->source_id')->pluck('id'))->delete();
-        TaxonomyWarning::whereNotNull('properties->source_id')->delete();
-        $this->info("Eliminati {$warningCount} TaxonomyWarning.");
+        // Le avvertenze sono termini del tassonomia `warnings` (oc:8910): si cancellano quelle
+        // che vengono da Drupal, non il tassonomia, che la ricrea il comando dei termini.
+        $warningIds = TaxonomyTerm::query()
+            ->where('identifier', 'like', SardegnaSentieriImportService::WARNING_TERM_PREFIX.'%')
+            ->pluck('id');
+        DB::table('taxonomy_termables')->whereIn('taxonomy_term_id', $warningIds)->delete();
+        TaxonomyTerm::whereIn('id', $warningIds)->delete();
+        $this->info('Eliminate '.$warningIds->count().' avvertenze.');
 
         // 4. Delete Enti (and enteables via cascade)
         DB::table('enteables')->delete();
@@ -116,7 +122,7 @@ class ResetSardegnaSentieriCommand extends Command
         // Il tipo concreto dipende da REDIS_CLIENT (predis in locale, phpredis
         // in deploy): con predis scan() passa da __call e il cursore torna come
         // stringa, da cui il cast a int nella condizione del ciclo.
-        /** @var \Illuminate\Redis\Connections\PhpRedisConnection|\Illuminate\Redis\Connections\PredisConnection $redis */
+        /** @var PhpRedisConnection|PredisConnection $redis */
         $redis = Redis::connection();
         $cursor = 0;
         $deleted = 0;

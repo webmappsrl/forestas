@@ -66,4 +66,28 @@ return [
         'compare_cache_path' => storage_path('app/sardegnasentieri-compare-cache'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Classi di inclusività A1-A6 (oc:8910)
+    |--------------------------------------------------------------------------
+    |
+    | Intervalli del punteggio (somma dei tre valori, da 12 a 100), estremi compresi.
+    | Il Tavolo Tecnico Regionale può cambiarli ogni anno. Le classi già scritte
+    | nell'indice Elasticsearch non si aggiornano da sole: dopo una modifica serve
+    | un reindex (basta quello normale, il mapping non cambia).
+    |
+    | ATTENZIONE: solo A1 e A2 vengono dalla call; le soglie di A3-A6 sono
+    | provvisorie, da sostituire con quelle del regolamento regionale.
+    |
+    */
+
+    'inclusivity_classes' => [
+        'A1' => ['min' => 80, 'max' => 100],
+        'A2' => ['min' => 57, 'max' => 79],
+        'A3' => ['min' => 43, 'max' => 56],
+        'A4' => ['min' => 29, 'max' => 42],
+        'A5' => ['min' => 15, 'max' => 28],
+        'A6' => ['min' => 0, 'max' => 14],
+    ],
+
 ];

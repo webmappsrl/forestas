@@ -44,30 +44,37 @@ Con i layer configurati (sotto) tutti e quattro i layer di tipologia passano dal
 
 ### Come le tracce finiscono nei layer (oc:8827)
 
-Un layer di tipologia è definito da un'attività:
+Un layer di tipologia è definito dai termini che gli danno il contenuto. Fino a oc:8827 erano
+attività; dal modello unico delle classificazioni (oc:8910) sono termini di `taxonomy_terms`:
 
-| Layer | Attività |
+| Layer | Termini |
 |---|---|
-| Sentieri | `sardegnasentieri:type:sentiero` |
-| Itinerari | `sardegnasentieri:type:itinerario` (cammini compresi) |
-| Cammini di Sardegna | `sardegnasentieri:cammino` |
-| Sentieri Accessibili | `accessible-trails` |
+| Sentieri | `route-type-trail` |
+| Itinerari | `route-type-itinerary` |
+| Cammini di Sardegna | `route-type-walk` |
+| Sentieri Accessibili | `inclusivity-difficulty-at`, `-ae`, `-aee` |
+
+Dentro una stessa tassonomia i termini sono in OR, fra tassonomie diverse in AND: per questo il
+layer dei percorsi accessibili prende tutta la scala, e vale come «ha una difficoltà di
+accessibilità, qualunque sia». «Accessibile» non è un'attività né un campo a sé.
 
 - **l'import scrive le attività**: tipo del nodo Drupal, termini di `field_tipologia_sentiero`
   (da cui `accessible-trails`) e `sardegnasentieri:cammino` per gli itinerari con il termine 4728
   di `field_tipologia_itinerario`. Le scrive con un solo `sync()` **senza eventi sul pivot**,
   quindi gli observer del package non accodano job per traccia;
-- **i legami layer→attività li scrive `sardegnasentieri:configure-layers`**, una volta per
-  ambiente: trova i layer per nome italiano esatto fra quelli dell'app di import e si ferma senza
-  scrivere se un layer o un'attività manca o è ambiguo. Poi accoda da sé il ricalcolo dei layer e
-  il reindex: non serve lanciarli a mano;
+- **le relazioni layer→termine le scrive `sardegnasentieri:configure-layers`**: trova i layer per nome
+  italiano esatto fra quelli dell'app di import, salta con un avvertimento quelli che su
+  quell'ambiente non esistono, e fallisce senza scrivere nulla solo se mancano i termini. Poi
+  accoda da sé il ricalcolo dei layer e il reindex, salvo `--no-recalc`. **Lo chiama l'import con
+  `--reset`**, prima del batch: dove il reset notturno è attivo non va lanciato a mano, altrove
+  una volta dopo il deploy (oc:8910);
 - **a fine batch dell'import** la catena è `SyncTaxonomyWhereJob` →
   `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob` (reindex e file
   AWS). Il job ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
   `assignTracksByTaxonomy()`, POI solo sui layer delle aree, `properties.layers` allineato in modo
   sincrono, geometria e PBF una volta per layer e solo se qualcosa è cambiato;
 - **il reset notturno** non tronca più `taxonomy_activities`: le attività restano con il loro id,
-  e con loro i legami dei layer; cancella a mano le righe di tracce e POI in
+  e con loro le relazioni dei layer; cancella a mano le righe di tracce e POI in
   `taxonomy_activityables` e `layerables`, che dopo `RESTART IDENTITY` indicherebbero altri record.
 
 Il filtro per area non ricalcola la geometria: legge `properties->taxonomy_where`, scritto da
@@ -86,12 +93,13 @@ Vincoli:
   `COALESCE(osmfeatures_id, osm2cai_id, id)`, quindi una `TaxonomyWhere` osm2cai con `osm2cai_id`
   uguale all'id di un'area può prendere il posto della voce dell'area su una traccia che le
   attraversa entrambe. Il controllo della sorgente evita i falsi positivi, non questa perdita;
-- **un layer di tipologia senza attività resta vuoto o vecchio**: il job salta i layer senza
+- **un layer di tipologia senza termini resta vuoto o vecchio**: il job salta i layer senza
   filtro. Succede finché `configure-layers` non è stato lanciato, e dopo il comando manuale
-  `sardegnasentieri:reset`, che cancella le attività `sardegnasentieri:*` con i loro legami;
-- **l'attività dei cammini la crea solo un reimport completo**: l'import orario reimporta solo i
-  tracciati cambiati in Drupal; serve `sardegnasentieri:import --force` (o il reset notturno)
-  prima di `configure-layers`;
+  `sardegnasentieri:reset`;
+- **svuotare `taxonomy_terms` svuota anche i layer**: il pivot `taxonomy_termables` ha
+  `cascadeOnDelete` sul termine, quindi un `configure-taxonomy-terms --fresh` porta via relazioni
+  che con i termini ricreati non tornano, perché gli id sono nuovi. Per questo l'import non passa
+  più `--fresh`: era il motivo per cui ogni notte le mappe dei layer si svuotavano (oc:8910);
 - **un errore sugli effetti di un layer non si ripete da solo**: è nel log `import`; se
   `properties.layers` è già allineato il giro dopo non riaccoda PBF e geometria;
 - **una traccia senza aree catastali nel suo `taxonomy_where` non esce dal filtro per area**: succede
@@ -120,13 +128,17 @@ Vincoli:
   gli `osm2cai_id` (in locale ZNUB2 ha `osm2cai_id = 81`, l'id di Area T).
 - **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806): un
   layer legato a una `TaxonomyWhere` di altra sorgente resta una tipologia.
-- **Le tipologie restano attività** (oc:8827): una tassonomia dedicata «Tipologia percorso» è
-  stata proposta allo scrum del 29/10 e rimandata a un ticket a parte.
+- **Le tipologie restano attività** (oc:8827, **superata da oc:8910**): la tassonomia dedicata era
+  stata proposta allo scrum del 29/10 e rimandata a un ticket a parte, che è oc:8910. Oggi
+  «Tipo percorso» esiste e i layer si legano ai suoi termini.
+- **Il reset riconfigura i layer da sé** (oc:8910): è l'import con `--reset` a chiamare
+  `configure-layers`, prima del batch. Il passo manuale dopo il reset notturno non c'è più, ed era
+  l'unico modo di rimediare ai layer rimasti senza filtri.
 - **Solo il termine «Cammini di Sardegna» di `tipologia_itinerari`** (oc:8827): gli altri 8
   termini non servono a nessun layer oggi.
 - **Un cammino resta anche un itinerario** (oc:8827): è così anche in Drupal; Itinerari conta i
   cammini.
-- **Il reset conserva le attività** (oc:8827): con il `TRUNCATE ... CASCADE` i legami
+- **Il reset conserva le attività** (oc:8827): con il `TRUNCATE ... CASCADE` le relazioni
   layer→attività sparivano ogni notte, e la configurazione dei layer andava rifatta.
 - **Ricalcolo a fine batch, non job per traccia** (oc:8827): gli observer del package, con il
   reset, avrebbero accodato per ogni riga una catena PBF del layer intero, e per ogni traccia un

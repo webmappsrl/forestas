@@ -113,6 +113,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
                 'tipologia_sentieri' => $this->references($record, 'field_tipologia_sentiero'),
                 'tipologia_di_avvertenze' => $this->references($record, 'field_avvertenze_e_pericoli'),
                 'categorie_fruibilita_sentieri' => $this->references($record, 'field_frubilita'),
+                'fruibilita_padri' => $this->parents($record, 'field_frubilita'),
                 'stato_di_validazione' => $this->single($record, 'field_stato_di_validazione', 'target_id'),
                 'zona_geografica' => $this->references($record, 'field_zona_geografica'),
                 'tipologia_itinerari' => $this->references($record, 'field_tipologia_itinerario'),
@@ -451,6 +452,40 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     private function references(array $record, string $field): array
     {
         return array_map(fn ($item) => (string) $item['target_id'], $this->items($record, $field));
+    }
+
+    /**
+     * Il padre di ogni termine richiamato da un campo, nella gerarchia del
+     * vocabolario: tid => tid del padre, `'0'` per una radice (oc:8910).
+     *
+     * Viene dal record completo: `DrupalRecordReader` porta con ogni
+     * riferimento il record del termine, e quello include `parent`
+     * (`taxonomy_term__parent`). Un termine che la copia non ha più non ha
+     * voce: l'import lo segnala, non gli inventa un padre.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, string>
+     */
+    private function parents(array $record, string $field): array
+    {
+        $parents = [];
+
+        foreach ($this->items($record, $field) as $item) {
+            $term = $item['entity'] ?? null;
+            if (! is_array($term)) {
+                continue;
+            }
+
+            $byLanguage = $term['fields']['parent'] ?? [];
+            $items = $byLanguage[$term['langcode'] ?? ''] ?? (reset($byLanguage) ?: []);
+            ksort($items);
+
+            // Un termine senza riga in `taxonomy_term__parent` è una radice,
+            // come uno con padre 0.
+            $parents[(string) $item['target_id']] = (string) (reset($items)['target_id'] ?? 0);
+        }
+
+        return $parents;
     }
 
     /**

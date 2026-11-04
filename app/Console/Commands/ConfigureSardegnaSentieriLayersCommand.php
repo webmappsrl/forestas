@@ -11,81 +11,107 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Bus;
 use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Models\Layer;
-use Wm\WmPackage\Models\TaxonomyActivity;
-use Wm\WmPackage\Models\TaxonomyActivityable;
+use Wm\WmPackage\Models\TaxonomyTerm;
 
 /**
- * Lega ogni layer di tipologia dell'app di import alla sua attività (oc:8827).
+ * Lega ogni layer di tipologia dell'app di import ai termini che lo definiscono (oc:8910).
  *
- * Si lancia una volta per ambiente. L'attività `sardegnasentieri:cammino` nasce solo quando un
- * tracciato viene reimportato, e l'import orario reimporta solo quelli cambiati in Drupal: la
- * sequenza è deploy, riavvio di Horizon, `sardegnasentieri:import --force` (o il reset notturno
- * dove è attivo), attesa della fine dei job di import, poi questo comando.
+ * Prima legava i layer alle attività storiche (`sardegnasentieri:type:*`), che il modello unico
+ * ha sostituito: oggi «Sentiero», «Itinerario» e «Cammino» sono termini di «Tipo percorso», e
+ * «accessibile» non è un'attività ma la conseguenza di avere una difficoltà di accessibilità —
+ * per questo il layer dei percorsi accessibili prende tutti e tre i termini della scala: dentro
+ * la stessa tassonomia il filtro è in OR (oc:8910).
  *
- * Risolve prima tutti i layer e tutte le attività: se qualcosa manca o è ambiguo non scrive
- * nulla. Il nome del layer si confronta in PHP: la colonna `name` non è jsonb.
+ * Lo chiama l'import con `--reset`, quindi su collaudo gira ogni notte da solo: è idempotente e
+ * non va più lanciato a mano dopo il reset.
  *
- * I legami si scrivono con `sync()` dentro `TaxonomyActivityable::withoutEvents()`: l'observer
- * del package, su un Layer, farebbe un ricalcolo sincrono e scritture su S3. Il ricalcolo si
- * accoda una volta sola, come a fine import.
+ * Un layer che non esiste su questo ambiente è un avvertimento, non un errore: in locale ce ne
+ * sono due dei quattro, e far fallire tutto per i mancanti lascerebbe senza filtri anche quelli
+ * che ci sono. Si esce in errore solo se non si è potuto scrivere nemmeno una relazione.
+ *
+ * Le relazioni si scrivono con gli eventi accesi, al contrario di come si faceva con le attività:
+ * è l'evento `saving` di `TaxonomyTermable` a copiare la tassonomia su `parent_id`, e senza di
+ * lui le righe resterebbero orfane della loro famiglia. L'observer che reindicizza non costa
+ * nulla qui, perché un Layer non è Searchable ed esce subito. Il ricalcolo si accoda una volta
+ * sola alla fine — con `--no-recalc` nemmeno quello, perché chi chiama (l'import) ha già la sua
+ * catena di fine batch.
  */
 class ConfigureSardegnaSentieriLayersCommand extends Command
 {
-    /** Nome italiano del layer => identifier dell'attività a cui va legato. */
-    public const LAYER_ACTIVITIES = [
-        'Sentieri' => SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero',
-        'Itinerari' => SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'itinerario',
-        'Cammini di Sardegna' => SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER,
-        'Sentieri Accessibili' => 'accessible-trails',
+    /** Nome italiano del layer => identifier dei termini che lo definiscono (in OR fra loro). */
+    public const LAYER_TERMS = [
+        'Sentieri' => ['route-type-trail'],
+        'Itinerari' => ['route-type-itinerary'],
+        'Cammini di Sardegna' => ['route-type-walk'],
+        'Sentieri Accessibili' => [
+            'inclusivity-difficulty-at',
+            'inclusivity-difficulty-ae',
+            'inclusivity-difficulty-aee',
+        ],
     ];
 
-    protected $signature = 'sardegnasentieri:configure-layers';
+    protected $signature = 'sardegnasentieri:configure-layers
+        {--no-recalc : Non accodare ricalcolo dei layer e reindex}';
 
-    protected $description = 'Associa ogni layer di tipologia di Sardegna Sentieri alla sua attività e accoda il ricalcolo';
+    protected $description = 'Associa ogni layer di tipologia di Sardegna Sentieri ai suoi termini e accoda il ricalcolo';
 
     public function handle(): int
     {
-        $errori = [];
         $risolti = [];
+        $mancanti = 0;
 
-        foreach (self::LAYER_ACTIVITIES as $nome => $identifier) {
+        foreach (self::LAYER_TERMS as $nome => $identifiers) {
+            // Il nome del layer si confronta in PHP: la colonna `name` non è jsonb.
             $layers = Layer::query()
                 ->where('app_id', SardegnaSentieriImportService::IMPORT_APP_ID)
                 ->get()
                 ->filter(fn (Layer $layer) => $layer->getTranslation('name', 'it', false) === $nome)
                 ->values();
-            $attivita = TaxonomyActivity::query()->where('identifier', $identifier)->get();
 
             if ($layers->count() !== 1) {
-                $errori[] = "Layer «{$nome}»: trovati {$layers->count()}, ne serve esattamente uno.";
+                $this->warn("Layer «{$nome}»: trovati {$layers->count()}, ne serve esattamente uno. Lo salto.");
+                $mancanti++;
+
+                continue;
             }
-            if ($attivita->count() !== 1) {
-                $errori[] = "Attività «{$identifier}»: trovate {$attivita->count()}, ne serve esattamente una."
-                    .' Se manca, lancia prima `sardegnasentieri:import --force` e aspetta la fine dei job.';
+
+            $termini = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->get();
+
+            if ($termini->count() !== count($identifiers)) {
+                $trovati = $termini->pluck('identifier')->all();
+                $assenti = implode(', ', array_diff($identifiers, $trovati));
+                $this->error("Layer «{$nome}»: termini mancanti ({$assenti})."
+                    .' Lancia prima `sardegnasentieri:configure-taxonomy-terms`.');
+                $this->error('Nessuna relazione scritta.');
+
+                return self::FAILURE;
             }
-            if ($layers->count() === 1 && $attivita->count() === 1) {
-                $risolti[$nome] = [$layers->first(), $attivita->first()];
-            }
+
+            $risolti[$nome] = [$layers->first(), $termini];
         }
 
-        if ($errori !== []) {
-            foreach ($errori as $errore) {
-                $this->error($errore);
-            }
-            $this->error('Nessun legame scritto.');
+        if ($risolti === []) {
+            $this->error('Nessun layer di tipologia trovato su questo ambiente: nessuna relazione scritta.');
 
             return self::FAILURE;
         }
 
-        TaxonomyActivityable::withoutEvents(function () use ($risolti) {
-            foreach ($risolti as $nome => [$layer, $attivita]) {
-                $esito = $layer->taxonomyActivities()->sync([$attivita->id]);
-                $cambiati = count($esito['attached']) + count($esito['detached']);
-                $this->line($cambiati > 0
-                    ? "Layer «{$nome}»: legato a {$attivita->identifier} (aggiunte ".count($esito['attached']).', rimosse '.count($esito['detached']).').'
-                    : "Layer «{$nome}»: già a posto.");
-            }
-        });
+        foreach ($risolti as $nome => [$layer, $termini]) {
+            $esito = $layer->taxonomyTerms()->sync($termini->pluck('id')->all());
+            $cambiati = count($esito['attached']) + count($esito['detached']);
+            $elenco = $termini->pluck('identifier')->implode(', ');
+            $this->line($cambiati > 0
+                ? "Layer «{$nome}»: legato a {$elenco} (aggiunti ".count($esito['attached']).', rimossi '.count($esito['detached']).').'
+                : "Layer «{$nome}»: già a posto.");
+        }
+
+        if ($mancanti > 0) {
+            $this->warn("Layer saltati perché assenti su questo ambiente: {$mancanti}.");
+        }
+
+        if ($this->option('no-recalc')) {
+            return self::SUCCESS;
+        }
 
         Bus::chain([
             new RecalculateSardegnaSentieriLayersJob,

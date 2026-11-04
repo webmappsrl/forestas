@@ -1,15 +1,22 @@
 <?php
 
+use App\Console\Commands\ImportSardegnaSentieriCommand;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\Source\SardegnaSentieriApiSource;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
+use Wm\WmPackage\Models\Layer;
+use Wm\WmPackage\Models\TaxonomyTerm;
 
 /**
  * `--reset` cancella e SOLO DOPO scarica: qualunque cosa vada storta in mezzo
@@ -114,4 +121,101 @@ it('non si fida della home: interroga un endpoint dei dati', function () {
     ]);
 
     expect(app(SardegnaSentieriApiSource::class)->isAvailable())->toBeFalse();
+});
+
+it('il reset cancella le relazioni dei termini di tracce e POI e ricrea la tassonomia', function () {
+    fonteSardegnaSentieriFinta();
+    Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
+    Bus::fake();
+
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+    $term = TaxonomyTerm::query()->where('identifier', 'mtb-difficulty')->first()->children->first();
+    $track = EcTrack::factory()->createQuietly();
+    DB::table('taxonomy_termables')->insert([
+        'taxonomy_term_id' => $term->id,
+        'termable_type' => EcTrack::class,
+        'termable_id' => $track->id,
+    ]);
+
+    Artisan::call('sardegnasentieri:import', ['--reset' => true]);
+
+    expect(DB::table('taxonomy_termables')->where('termable_type', EcTrack::class)->count())->toBe(0)
+        ->and(TaxonomyTerm::taxonomies()->count())->toBe(11)
+        ->and(TaxonomyTerm::count())->toBe(49);
+});
+
+it('il reset non cancella le relazioni dei termini di altri modelli', function () {
+    fonteSardegnaSentieriFinta();
+    Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
+    Bus::fake();
+
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+    $term = TaxonomyTerm::query()->where('identifier', 'mtb-difficulty')->first()->children->first();
+    $layerId = 1;
+
+    // Gli altri termables (es. layer) non sono tracce o POI: il filtro li lascia.
+    // Si verifica sul DELETE di resetData, non sul --fresh, che passa dal CASCADE.
+    $method = new ReflectionMethod(ImportSardegnaSentieriCommand::class, 'resetData');
+    $command = app(ImportSardegnaSentieriCommand::class);
+    $command->setLaravel(app());
+    $command->setOutput(new OutputStyle(new ArrayInput([]), new NullOutput));
+    DB::table('taxonomy_termables')->insert([
+        ['taxonomy_term_id' => $term->id, 'termable_type' => Layer::class, 'termable_id' => $layerId],
+    ]);
+
+    $method->invoke($command);
+
+    expect(DB::table('taxonomy_termables')->where('termable_type', Layer::class)->count())->toBe(1)
+        ->and(TaxonomyTerm::count())->toBe(49);
+});
+
+it('l import orario allinea i termini senza azzerarli', function () {
+    fonteSardegnaSentieriFinta();
+    Bus::fake();
+
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+    $term = TaxonomyTerm::query()->where('identifier', 'mtb-difficulty')->first()->children->first();
+    $track = EcTrack::factory()->createQuietly();
+    DB::table('taxonomy_termables')->insert([
+        'taxonomy_term_id' => $term->id,
+        'termable_type' => EcTrack::class,
+        'termable_id' => $track->id,
+    ]);
+    $idPrima = $term->id;
+
+    Artisan::call('sardegnasentieri:import');
+
+    expect(DB::table('taxonomy_termables')->where('termable_type', EcTrack::class)->count())->toBe(1)
+        ->and(TaxonomyTerm::find($idPrima))->not->toBeNull();
+});
+
+it('l import orario crea il tassonomia se manca', function () {
+    fonteSardegnaSentieriFinta();
+    Bus::fake();
+
+    Artisan::call('sardegnasentieri:import');
+
+    expect(TaxonomyTerm::taxonomies()->count())->toBe(11);
+});
+
+it('il reset non porta via le relazioni dei layer: niente da rifare a mano dopo l import notturno', function () {
+    // Il reset notturno chiamava il comando dei termini con `--fresh`, che svuota
+    // `taxonomy_terms`: il pivot cade in cascata e ogni notte i layer restavano senza filtri,
+    // con le mappe vuote fino a un `sardegnasentieri:configure-layers` lanciato a mano (oc:8910).
+    fonteSardegnaSentieriFinta();
+    Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
+    Bus::fake();
+
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+    $termine = TaxonomyTerm::query()->where('identifier', 'route-type-trail')->firstOrFail();
+    $layer = Layer::factory()->createQuietly([
+        'name' => ['it' => 'Sentieri'],
+        'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
+    ]);
+    $layer->taxonomyTerms()->attach($termine->id);
+
+    Artisan::call('sardegnasentieri:import', ['--reset' => true]);
+
+    expect(TaxonomyTerm::query()->where('identifier', 'route-type-trail')->value('id'))->toBe($termine->id)
+        ->and($layer->fresh()->taxonomyTerms()->pluck('identifier')->all())->toBe(['route-type-trail']);
 });

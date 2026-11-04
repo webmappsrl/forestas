@@ -225,7 +225,8 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
     }
 
     /**
-     * Layer dell'app di import, propri o associati, in `track_mode` auto e con almeno un filtro:
+     * Layer dell'app di import, propri o associati, in `track_mode` auto e con almeno un filtro
+     * — attività, zona o termine di classificazione:
      * un layer auto senza filtro verrebbe svuotato da `assignTracksByTaxonomy()`.
      *
      * @return iterable<Layer>
@@ -244,7 +245,9 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
             })
             ->where(function (Builder $query) {
                 $query->whereHas('taxonomyActivities')
-                    ->orWhereHas('taxonomyWheres');
+                    ->orWhereHas('taxonomyWheres')
+                    // Anche i termini di classificazione sono un filtro del layer (oc:8910).
+                    ->orWhereHas('taxonomyTerms');
             })
             ->orderBy('id')
             ->get()
