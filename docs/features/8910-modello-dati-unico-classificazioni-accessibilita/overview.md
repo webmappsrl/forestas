@@ -414,3 +414,53 @@ opzioni su maphub (~490): è caduta, perché il campo filtra man mano che si scr
       **oc:8920**, «TaxonomyWhere per UGC ed EC su `taxonomy_whereables` invece che in
       `properties.taxonomy_where`». È un ticket diverso da quello delle `access_*` citato in
       «Out of scope», che resta da aprire.
+
+---
+
+## Aggiornamento del 4 novembre, sera — cosa è cambiato rispetto a sopra
+
+Le righe qui sotto **prevalgono** su quelle sopra dove le contraddicono. La parte generale — la
+sezione composta dal package, l'ambito per contenuto, il reindex al cambio delle accensioni — è
+nell'overview del package, in coda.
+
+### Le tassonomie di Forestas valgono sulle sole EC Track
+
+- [x] L'accensione per app dice dove una tassonomia esiste, non a cosa si applica: l'app di
+      Forestas è una sola, quindi senza l'ambito le due select dell'inclusività sarebbero finite
+      sulla scheda di ogni POI.
+- [x] `ConfigureTaxonomyTermsCommand` le accende con
+      `App::enableTaxonomiesForModel('EcTrack', …)`, che scrive `models` sul pivot
+      `app_taxonomy_term`. Accende **solo ciò che manca**: un ambito scelto dalla scheda dell'app
+      non viene riscritto da un allineamento, e c'è un test che lo tiene fermo. Non sopravvive
+      invece al reset notturno, che ricrea tutto: una scelta che deve durare va messa nel comando.
+- [x] La scheda dell'App ha due elenchi, «Tassonomie EC Track» e «Tassonomie EC Poi». Se un
+      giorno una tassonomia dovrà valere anche per i POI, si aggiunge `EcPoi` nel comando.
+- [x] La sezione delle tassonomie non la inserisce più `app/Nova/EcTrack.php`: arriva dal
+      package già nel punto giusto. `EcTrack` e `EcPoi` usano `keepOnlyTaxonomySection()` per non
+      buttarla via quando ricompongono i campi ereditati — prima avevano lo stesso filtro
+      duplicato.
+
+### L'icona di «Difficoltà mobilità dolce»
+
+- [x] Era `txn-bike`, che nomina un'attività già rappresentata dalla scala della mountain bike:
+      due icone di bici per due cose diverse. Ora è `txn-family`, scelta in call. Va cambiata nel
+      comando e non in Nova, perché l'allineamento riscrive le properties.
+
+### Test
+
+- [x] Ogni Resource di Forestas toccata dal ticket ha un test che la salva dall'endpoint vero di
+      Nova: EcTrack, EcPoi, le attività, i tipi di POI e la vista delle avvertenze. Quelle del
+      package — `TaxonomyTerm`, `Layer`, `App` — hanno il loro nel package, perché un test che le
+      protegge da un solo shard lascia scoperti gli altri.
+- [x] Tre cose che i test hanno insegnato, annotate dove servono: `EcPoi` vuole `properties` come
+      array (la colonna ha campi traducibili per path), i Layer vogliono il `map_bbox` sull'App, e
+      i job unici prendono il lock su Redis — in test serve `database.redis.client` su predis.
+
+### Cosa resta aperto
+
+- **Dieci test di `wm-package/tests` rossi quando girano da qui**: S3 non configurato nel
+  `.env.testing`, `App::first()` null, autorizzazione di `config_detail`. Nessuno tocca le
+  tassonomie, ma non è stato verificato se fossero rossi anche prima del branch: servirebbe
+  arretrare anche lo shard, perché il suo codice dipende dal package nuovo.
+- **Al rilascio su UAT**: `migrate` e `scout:import` per il mapping. Il resto lo fa il reset
+  delle 06:00.
