@@ -1,6 +1,8 @@
 <?php
 
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
 
@@ -107,15 +109,33 @@ it('dà alle attività il nome italiano, senza toccare quelle che ne hanno già 
         ->and($custom->fresh()->getTranslation('name', 'it', false))->toBe('La mia bici');
 });
 
-it('dichiara che le tassonomie di Forestas classificano i sentieri, non i POI (oc:8910)', function () {
-    // L'accensione per app dice dove una tassonomia esiste, non a cosa si applica: senza
-    // `models` le select dell'inclusività comparirebbero anche sulla scheda di un POI.
+it('accende le tassonomie sulle sole EC Track, non sui POI (oc:8910)', function () {
+    // L'accensione per app dice dove una tassonomia esiste, l'ambito a cosa si applica: senza,
+    // le select dell'inclusività comparirebbero anche sulla scheda di un POI.
+    $app = App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
+
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertExitCode(0);
 
-    $senzaModels = TaxonomyTerm::query()->taxonomies()->get()
-        ->filter(fn ($t) => data_get($t->properties, 'models') !== ['EcTrack'])
-        ->pluck('identifier')
-        ->all();
+    $ambiti = $app->fresh()->taxonomies()->get()
+        ->mapWithKeys(fn ($t) => [$t->identifier => json_decode((string) $t->pivot->models, true)]);
 
-    expect($senzaModels)->toBe([]);
+    expect($ambiti)->toHaveCount(11)
+        ->and($ambiti->unique()->values()->all())->toBe([['EcTrack']]);
+});
+
+it('non riscrive l\'ambito scelto dalla scheda dell\'app (oc:8910)', function () {
+    $app = App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+
+    // Qualcuno decide dalla scheda che le avvertenze valgono anche sugli EC Poi.
+    $warnings = TaxonomyTerm::where('identifier', 'warnings')->value('id');
+    $app->syncTaxonomiesForModel('EcPoi', [$warnings]);
+
+    // Un allineamento successivo accende solo ciò che manca: la scelta resta.
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+
+    $models = $app->fresh()->taxonomies()->get()
+        ->firstWhere('identifier', 'warnings')->pivot->models;
+
+    expect($models)->toBeNull();
 });

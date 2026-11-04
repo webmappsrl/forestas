@@ -137,14 +137,18 @@ Le colonne che Forestas aggiunge a una tabella del package portano il prefisso `
 `forestas_inclusivity_*`): se il package aggiungesse una colonna omonima, il suo `ALTER TABLE`
 fallirebbe al deploy.
 
-## Le tassonomie di Forestas classificano i sentieri
+## Le tassonomie di Forestas valgono sulle EC Track, non sui POI
 
-Tutte e undici dichiarano `properties->models = ["EcTrack"]`, scritto da
-`ConfigureTaxonomyTermsCommand`. Senza quella chiave una tassonomia accesa sull'app compare su
-ogni contenuto, POI compresi: l'accensione per app dice dove esiste, non a cosa si applica. Su
+`ConfigureTaxonomyTermsCommand` le accende sull'app con
+`App::syncTaxonomiesForModel('EcTrack', …)`, quindi il pivot `app_taxonomy_term` porta
+`models = ["EcTrack"]` per tutte e undici. Senza, una tassonomia accesa comparirebbe su ogni
+contenuto dell'app, POI compresi: l'accensione dice dove esiste, non a cosa si applica. Su
 Forestas l'app è una sola, quindi le due select dell'inclusività sarebbero finite sulla scheda di
 ogni POI.
 
-Il meccanismo è del package — `BuildsTaxonomyFields::taxonomyAppliesHere()` — e non vale sui
-Layer, dove le tassonomie sono filtri che scelgono i contenuti. Se un giorno una tassonomia dovrà
-valere anche per i POI, si aggiunge `"EcPoi"` all'elenco nel comando: non serve altro (oc:8910).
+Il meccanismo è del package e si cambia dalla scheda dell'App, tab «Tassonomie», che ha due
+elenchi: «Tassonomie EC Track» e «Tassonomie EC Poi». Una modifica fatta lì **sopravvive** agli
+allineamenti: il comando usa `enableTaxonomiesForModel()`, che accende solo ciò che manca e non
+tocca l'ambito di ciò che c'è già. Non sopravvive invece al reset notturno su UAT, che ricrea
+tutto da zero: una scelta che deve durare va messa nel comando. Sui Layer l'ambito non si
+applica, perché lì le tassonomie sono filtri che scelgono i contenuti (oc:8910).

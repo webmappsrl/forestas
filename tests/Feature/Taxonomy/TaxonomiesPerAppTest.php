@@ -93,23 +93,23 @@ it('l\'indice Elasticsearch non porta i termini di una tassonomia spenta', funct
     expect($track->fresh()->toSearchableArray()['terms'])->not->toHaveKey('hiking-difficulty');
 });
 
-it('si accende e si spegne dalla scheda dell\'app', function () {
+it('si accende e si spegne dalla scheda dell\'app, per tipo di contenuto', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
     $resource = new Wm\WmPackage\Nova\App($this->app1);
 
-    // Il metodo è protected come gli altri tab della Resource App.
+    // Due campi, uno per tipo di contenuto: la stessa tassonomia può valere sulle EC Track di
+    // un'app e sugli EC Poi di un'altra (oc:8910).
     $method = new ReflectionMethod($resource, 'taxonomies_tab');
     $method->setAccessible(true);
-    $field = collect($method->invoke($resource))->first();
-    expect($field->attribute)->toBe('taxonomies');
+    $fields = collect($method->invoke($resource));
+    expect($fields->pluck('attribute')->all())->toBe(['taxonomies_ec_track', 'taxonomies_ec_poi']);
 
-    // Il form manda gli id scelti: resta acceso solo ciò che è selezionato.
+    // Il form manda gli id scelti: resta accesa solo la tassonomia selezionata.
     $warnings = TaxonomyTerm::where('identifier', 'warnings')->value('id');
     $request = NovaRequest::create('/nova-api/apps/'.$this->app1->id, 'PUT', [
-        'taxonomies' => json_encode([$warnings]),
+        'taxonomies_ec_track' => json_encode([$warnings]),
     ]);
-    $callback = $field->fill($request, $this->app1);
-    $callback();
+    ($fields->first()->fill($request, $this->app1))();
 
-    expect($this->app1->taxonomies()->pluck('identifier')->all())->toBe(['warnings']);
+    expect($this->app1->fresh()->taxonomies()->pluck('identifier')->all())->toBe(['warnings']);
 });

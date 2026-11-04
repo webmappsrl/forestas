@@ -4,10 +4,12 @@ use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Nova\EcPoi as EcPoiResource;
 use App\Nova\EcTrack as EcTrackResource;
+use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
+use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\TaxonomyTerm;
 
 uses(RefreshDatabase::class);
@@ -57,7 +59,13 @@ function novaTabField($resource, string $tab, string $attribute, bool $formOnly 
     return null;
 }
 
-beforeEach(fn () => $this->artisan('sardegnasentieri:configure-taxonomy-terms'));
+beforeEach(function () {
+    // L'app serve prima del comando: è lei che riceve le tassonomie, e con loro l'ambito che
+    // dice su quali contenuti valgono. Senza, una tassonomia non accesa da nessuna parte resta
+    // visibile ovunque, POI compresi (oc:8910).
+    App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+});
 
 it('mostra il blocco Inclusivity sulle tracce e non sui POI', function () {
     $trackTabs = novaTabNames(new EcTrackResource(new EcTrack));

@@ -45,39 +45,39 @@ class ConfigureTaxonomyTermsCommand extends Command
         $d = fn (int $tid): string => self::DRUPAL.$tid;
 
         return [
-            ['identifier' => 'hiking-difficulty', 'icon' => 'txn-trekking', 'name' => 'Difficoltà escursionistica', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
+            ['identifier' => 'hiking-difficulty', 'icon' => 'txn-trekking', 'name' => 'Difficoltà escursionistica', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
                 ['T', $d(4066), 0], ['E', $d(4067), 1], ['EE', $d(4068), 2], ['EEA', $d(4069), 3],
             ]],
-            ['identifier' => 'mtb-difficulty', 'icon' => 'txn-mtb', 'name' => 'Difficoltà mountain bike', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['mtb']]], 'terms' => [
+            ['identifier' => 'mtb-difficulty', 'icon' => 'txn-mtb', 'name' => 'Difficoltà mountain bike', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['mtb']]], 'terms' => [
                 ['TC', $d(4908), 0], ['MC', $d(4909), 1], ['BC', $d(4910), 2], ['OC', $d(4911), 3], ['EC', $d(4912), 4],
             ]],
-            ['identifier' => 'horse-difficulty', 'icon' => 'txn-horse-riding', 'name' => 'Difficoltà ippovia', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['horse']]], 'terms' => [
+            ['identifier' => 'horse-difficulty', 'icon' => 'txn-horse-riding', 'name' => 'Difficoltà ippovia', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['horse']]], 'terms' => [
                 ['Facile', $d(4902), 0], ['Medio', $d(4903), 1], ['Difficile', $d(4904), 2],
             ]],
-            ['identifier' => 'nordic-walking-difficulty', 'icon' => 'txn-nordic-walking', 'name' => 'Difficoltà Nordic Walking', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['nordic-walking']]], 'terms' => [
+            ['identifier' => 'nordic-walking-difficulty', 'icon' => 'txn-nordic-walking', 'name' => 'Difficoltà Nordic Walking', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['nordic-walking']]], 'terms' => [
                 ['Facile', $d(4905), 0], ['Medio', $d(4906), 1], ['Impegnativo', $d(4907), 2],
             ]],
-            ['identifier' => 'soft-mobility-difficulty', 'icon' => 'txn-family', 'name' => 'Difficoltà mobilità dolce', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
+            ['identifier' => 'soft-mobility-difficulty', 'icon' => 'txn-family', 'name' => 'Difficoltà mobilità dolce', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
                 ['Facile', $d(4916), 0], ['Medio', $d(4917), 1], ['Difficile', $d(4918), 2],
             ]],
-            ['identifier' => 'educational-trails-difficulty', 'icon' => 'txn-environmental-education', 'name' => 'Difficoltà sentiero didattico', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['educational-trails']]], 'terms' => [
+            ['identifier' => 'educational-trails-difficulty', 'icon' => 'txn-environmental-education', 'name' => 'Difficoltà sentiero didattico', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['educational-trails']]], 'terms' => [
                 ['Facile', 'educational-trails-difficulty-easy', 0],
                 ['Medio', 'educational-trails-difficulty-medium', 1],
                 ['Impegnativo', 'educational-trails-difficulty-hard', 2],
             ]],
             // Il tab in cui la tassonomia si mostra sulla scheda di un contenuto: è un dato, non
             // un elenco di identifier nel codice della Resource (oc:8910).
-            ['identifier' => 'inclusivity-difficulty', 'icon' => 'txn-wheelchair', 'name' => 'Difficoltà di accessibilità', 'single_choice' => true, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Inclusivity'], 'terms' => [
+            ['identifier' => 'inclusivity-difficulty', 'icon' => 'txn-wheelchair', 'name' => 'Difficoltà di accessibilità', 'single_choice' => true, 'properties' => ['tab' => 'Inclusivity'], 'terms' => [
                 ['AT', 'inclusivity-difficulty-at', 0],
                 ['AE', 'inclusivity-difficulty-ae', 1],
                 ['AEE', 'inclusivity-difficulty-aee', 2],
             ]],
-            ['identifier' => 'inclusivity-disabilities', 'icon' => 'txn-mobility-disability', 'name' => 'Disabilità accolte', 'single_choice' => false, 'properties' => ['models' => ['EcTrack'], 'tab' => 'Inclusivity'], 'terms' => [
+            ['identifier' => 'inclusivity-disabilities', 'icon' => 'txn-mobility-disability', 'name' => 'Disabilità accolte', 'single_choice' => false, 'properties' => ['tab' => 'Inclusivity'], 'terms' => [
                 ['Fisica e motoria', 'inclusivity-disabilities-physical', 0, 'txn-mobility-disability'],
                 ['Sensoriale', 'inclusivity-disabilities-sensory', 1, null],
                 ['Cognitiva e psichica', 'inclusivity-disabilities-cognitive', 2, 'txn-cognitive-disability'],
             ]],
-            ['identifier' => 'route-type', 'name' => 'Tipo percorso', 'single_choice' => true, 'properties' => ['models' => ['EcTrack']], 'terms' => [
+            ['identifier' => 'route-type', 'name' => 'Tipo percorso', 'single_choice' => true, 'terms' => [
                 ['Sentiero', 'route-type-trail', 0],
                 ['Itinerario', 'route-type-itinerary', 1],
                 ['Cammino', 'route-type-walk', 2],
@@ -90,7 +90,6 @@ class ConfigureTaxonomyTermsCommand extends Command
             // applica il package: prima era codice in app/Nova/EcTrack.php (oc:8910).
             // Il cammino c'è perché 42 dei 53 cammini hanno anche una tipologia di itinerario.
             ['identifier' => 'itinerary-type', 'name' => 'Tipologia itinerario', 'single_choice' => false, 'properties' => [
-                'models' => ['EcTrack'],
                 'depends_on' => ['taxonomy' => 'route-type', 'terms' => ['route-type-itinerary', 'route-type-walk']],
             ], 'terms' => [
                 ['Itinerari escursionistici di lunga percorrenza (a tappe)', $d(4725), 0],
@@ -104,7 +103,7 @@ class ConfigureTaxonomyTermsCommand extends Command
             ]],
             // Avvertenze: la tassonomia nasce qui, i termini li porta l'import da Drupal
             // (`sardegnasentieri:warning:<tid>`) e cambiano con la sorgente (oc:8910).
-            ['identifier' => 'warnings', 'icon' => 'txn-alert', 'name' => 'Avvertenze', 'single_choice' => false, 'properties' => ['models' => ['EcTrack']], 'terms' => []],
+            ['identifier' => 'warnings', 'icon' => 'txn-alert', 'name' => 'Avvertenze', 'single_choice' => false, 'terms' => []],
         ];
     }
 
@@ -327,7 +326,11 @@ class ConfigureTaxonomyTermsCommand extends Command
             $this->line(($dry ? '[dry-run] ' : '').'Accendo '.count($missing)." tassonomie nell'app {$app->id}");
             $enabled += count($missing);
             if (! $dry) {
-                $app->taxonomies()->syncWithoutDetaching($taxonomyIds);
+                // Sulle EC Track e non sugli EC Poi: sono scale di difficoltà, avvertenze e
+                // tipi di percorso, e su un POI non vogliono dire niente. Si accende solo ciò
+                // che manca: un ambito scelto dalla scheda dell'app non va riscritto da un
+                // allineamento (oc:8910).
+                $app->enableTaxonomiesForModel('EcTrack', $missing);
             }
         }
 
