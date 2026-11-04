@@ -2,12 +2,10 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\EcTrack;
-use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Models\TaxonomyTerm;
@@ -22,7 +20,9 @@ use Wm\WmPackage\Services\RolesAndPermissionsService;
  * passava quei test e rompeva ogni salvataggio dalla scheda. Qui si fa la richiesta che fa il
  * browser, una per Resource, e dove il ticket ha aggiunto qualcosa si verifica anche l'effetto.
  *
- * Per il dettaglio delle tassonomie sulla scheda del termine c'è `TaxonomyTermSaveTest`.
+ * Qui stanno solo le Resource di Forestas. Quelle del package — `TaxonomyTerm`, `Layer`, `App` —
+ * hanno il loro test nel package (`wm-package/tests/Feature/Nova/PackageResourceSaveTest.php`),
+ * che gira da uno shard ma protegge tutti.
  */
 uses(RefreshDatabase::class);
 
@@ -61,12 +61,6 @@ beforeEach(function () {
     // Le tassonomie si vedono solo se accese sull'app del contenuto.
     $this->app1->taxonomies()->sync([$this->routeType->id]);
 });
-
-/** Il morph type con cui il package scrive il pivot: l'alias del morphMap, non la classe. */
-function morphOf(object $model): string
-{
-    return $model->getMorphClass();
-}
 
 it('salva il tipo percorso sulla scheda di un sentiero', function () {
     $track = EcTrack::factory()->createQuietly([
@@ -126,60 +120,6 @@ it('salva la scheda di un POI', function () {
         ->assertOk();
 
     expect($poi->fresh()->getTranslation('name', 'it'))->toBe('Fonte vecchia');
-});
-
-it('salva i filtri per termine sulla scheda di un Layer', function () {
-    $layer = Layer::factory()->createQuietly(['app_id' => $this->app1->id]);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/layers/{$layer->id}", [
-            'app' => $this->app1->id,
-            'appOwner' => $this->app1->id,
-            'translations_name_it' => 'Sentieri',
-            // Su un layer la scelta è sempre multipla, anche per una tassonomia a scelta
-            // singola: «sentieri o cammini» deve essere possibile.
-            'taxonomy_route_type' => $this->trail->id.','.$this->walk->id,
-        ])
-        ->assertOk();
-
-    expect($layer->fresh()->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
-        ->toBe(['route-type-trail', 'route-type-walk']);
-});
-
-it('scrive la tassonomia sulla relazione del Layer, cosi il filtro per famiglia funziona', function () {
-    $layer = Layer::factory()->createQuietly(['app_id' => $this->app1->id]);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/layers/{$layer->id}", [
-            'app' => $this->app1->id,
-            'appOwner' => $this->app1->id,
-            'translations_name_it' => 'Sentieri',
-            'taxonomy_route_type' => (string) $this->trail->id,
-        ])
-        ->assertOk();
-
-    expect(DB::table('taxonomy_termables')
-        ->where('termable_type', morphOf($layer))
-        ->where('termable_id', $layer->id)
-        ->value('parent_id'))->toBe($this->routeType->id);
-});
-
-it('accende e spegne le tassonomie dalla scheda di un App', function () {
-    $other = TaxonomyTerm::create(['identifier' => 'surface-type', 'name' => ['it' => 'Fondo']]);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/apps/{$this->app1->id}", [
-            'sku' => $this->app1->sku,
-            'name' => 'App di prova',
-            'default_language' => 'it',
-            'start_end_icons_min_zoom' => 10,
-            'ref_on_track_min_zoom' => 10,
-            'taxonomies' => json_encode([$other->id]),
-        ])
-        ->assertOk();
-
-    expect($this->app1->fresh()->taxonomies()->pluck('identifier')->all())
-        ->toBe(['surface-type']);
 });
 
 it('salva la scheda di un\'attività, di un tipo di POI e di un\'avvertenza', function () {
