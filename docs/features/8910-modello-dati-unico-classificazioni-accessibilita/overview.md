@@ -49,13 +49,13 @@ esistono nemmeno come chiave nel JSON. Tutto quel contenuto oggi si perde nell'i
       Si scrive con `insertOrIgnore` e rilettura, non con `firstOrCreate` né catturando
       l'eccezione: sotto transazione PostgreSQL una violazione di unicità aborta la transazione
       (oc:8607). Un seeder di una riga lo invoca, così `db:seed` continua a funzionare in locale
-      e l'elenco dele tassonomie vive in un posto solo.
+      e l'elenco delle tassonomie vive in un posto solo.
 - [ ] **Il comando lo lancia l'import**, così nessuno deve ricordarsene: l'import con `--reset`
       lo chiama con `--fresh`, l'import orario senza. I due import non convivono — sono i due rami
       di `routes/console.php:34-44`, scelti da `SARDEGNASENTIERI_DAILY_RESET` — ma sul ramo orario
       azzerare i termini romperebbe le relazioni dei sentieri non reimportati, che sono la maggior
       parte: lì si allinea e basta.
-- [ ] Il reset svuota il **relazione** e non la tassonomia: `taxonomy_termables` per le righe di
+- [ ] Il reset svuota le **relazioni** e non la tassonomia: `taxonomy_termables` per le righe di
       tracce e POI va cancellata a mano in `ImportSardegnaSentieriCommand::resetData()`, accanto a
       `taxonomy_activityables`, `layerables` ed `enteables`, perché il pivot polimorfo non ha
       chiave esterna verso `ec_tracks` e il `CASCADE` non lo raggiunge; dopo `RESTART IDENTITY` le
@@ -77,7 +77,7 @@ esistono nemmeno come chiave nel JSON. Tutto quel contenuto oggi si perde nell'i
       | `mtb-difficulty` | Difficoltà mountain bike | TC · MC · BC · OC · EC |
       | `horse-difficulty` | Difficoltà ippovia | facile · medio · difficile |
       | `nordic-walking-difficulty` | Difficoltà Nordic Walking | facile · medio · impegnativo |
-      | `educational-trail-difficulty` | Difficoltà sentiero didattico | facile · medio · impegnativo |
+      | `educational-trails-difficulty` | Difficoltà sentiero didattico | facile · medio · impegnativo |
       | `soft-mobility-difficulty` | Difficoltà mobilità dolce | facile · medio · difficile |
       | `inclusivity-difficulty` | Difficoltà di accessibilità | AT · AE · AEE |
       | `inclusivity-disabilities` | Disabilità accolte | fisica e motoria · sensoriale · cognitiva e psichica |
@@ -106,7 +106,7 @@ esistono nemmeno come chiave nel JSON. Tutto quel contenuto oggi si perde nell'i
       di difficoltà da `field_frubilita` (759 righe su 614 sentieri), il grado di accessibilità e
       le disabilità accolte dalle tre scale `Accessibili dis. *`, gli itinerari e cammini da
       `field_tipologia_itinerario` sui nodi itinerario, la zona geografica da
-      `field_zona_geografica` (665 sentieri). Un sentiero reimportato non accumula doppioni: i
+      `field_zona_geografica` (665 sentieri). Un sentiero reimportato non accumula doppioni: le
       relazioni di una tassonomia si sostituiscono, non si aggiungono.
 - [ ] **I tre interi dell'inclusività e i due testi liberi non vengono da Drupal**, che non ha
       nessun campo per loro: restano in inserimento manuale da Nova, e l'import non li tocca mai —
@@ -127,7 +127,7 @@ esistono nemmeno come chiave nel JSON. Tutto quel contenuto oggi si perde nell'i
       di un sentiero vengono da `field_tipologia_sentiero`, un campo suo che l'import legge già
       (`SardegnaSentieriDatabaseSource.php:113`). Dedurle dalla difficoltà ne attribuirebbe di
       inesistenti.
-- [ ] I due sentieri Drupal che hanno due gradi nella stesso tassonomia vengono segnalati come
+- [ ] I due sentieri Drupal che hanno due gradi nella stessa tassonomia vengono segnalati come
       anomalia, non scartati in silenzio.
 - [ ] «Mobilità dolce» **non** viene aggiunta come attività: le sue difficoltà si importano (sono
       circa 55 relazioni, tutti figli con grado), ma se debba esistere come *attività* è una
@@ -211,7 +211,7 @@ senza perdere niente.
       file di migration che le creano si cancellano e al loro posto ne arriva una sola che fa
       `dropIfExists`: su UAT e in locale le tabelle esistono e vanno tolte, su un'installazione
       nuova la migration non trova niente e non fa danni.
-- [ ] **I dati non si migrano: li riscrive l'import.** Le 13 avvertenze e gli 818 relazioni vengono
+- [ ] **I dati non si migrano: li riscrive l'import.** Le 13 avvertenze e le 818 relazioni vengono
       tutti da Drupal e l'import li ricrea a ogni giro; su UAT il reset notturno li rifà comunque
       ogni mattina. Copiarli con una migration sarebbe codice usa e getta per un dato che si
       rigenera da solo. Il prezzo: fra la migration e il primo import, le avvertenze non ci sono.
@@ -245,7 +245,7 @@ senza perdere niente.
   avesse gradi diversi per categorie diverse. Misurato sulla copia di UAT: le relazioni di
   accessibilità in Drupal sono **due in tutto**, sui nodi 1330 e 3901, che sono sentieri diversi.
   Oggi il caso non esiste.
-- **`educational-trail-difficulty` nasce e nessun dato la riempie**: in Drupal «Sentiero
+- **`educational-trails-difficulty` nasce e nessun dato la riempie**: in Drupal «Sentiero
   didattico» non ha figli, e le 2 righe che lo puntano sono l'attività senza grado. La tassonomia
   resta vuota finché Forestas non comincia a compilarla.
 - **Fra la migration che droppa le due tabelle e il primo import, le avvertenze non esistono.**
@@ -353,3 +353,64 @@ filtri sui Layer — è nell'overview del package, in coda.
 | `app/Console/Commands/ConfigureTaxonomyTermsCommand.php` | undici tassonomie, `RENAMED`, `RETIRED`, `ACTIVITY_NAMES`, accensione per App, `properties.tab` e `depends_on` |
 | `app/Jobs/Import/RecalculateSardegnaSentieriLayersJob.php` | considera anche i layer che filtrano per termine |
 | `app/Nova/Filters/TaxonomyVocabularyFilter.php` | etichetta «Vocabolario di origine»: qui «vocabolario» è quello di Drupal |
+
+---
+
+## Aggiornamento del 4 novembre — cosa è cambiato rispetto a sopra
+
+Le righe qui sotto **prevalgono** su quelle sopra dove le contraddicono.
+
+### Mai `--fresh` dall'import: il requisito era sbagliato
+
+Sopra, fra i requisiti, c'era scritto che «l'import con `--reset` lo chiama con `--fresh`». È il
+contrario di quello che deve succedere, ed è il guasto trovato il 3 novembre guardando perché due
+layer erano senza filtri.
+
+- [x] `sardegnasentieri:configure-taxonomy-terms --fresh` fa `DB::table('taxonomy_terms')->delete()`,
+      e `taxonomy_termables` ha `cascadeOnDelete` sul termine: la cancellazione si porta via anche
+      le relazioni dei **Layer**, che con l'import non c'entrano niente. I termini rinascono con id
+      nuovi, i layer restano senza filtri e le loro mappe vuote fino a un intervento a mano. Su UAT
+      succedeva a ogni reset notturno delle 06:00.
+- [x] **L'import non passa più `--fresh`, né con `--reset` né senza.** L'allineamento fa già tutto:
+      cerca per `identifier`, e le righe fuori elenco le tolgono `renameIdentifiers()` e
+      `removeRetired()`. Verificato in locale: dopo i due comandi il pivot è identico riga per riga,
+      gli id dei termini non cambiano.
+- [x] L'opzione `--fresh` resta sul comando, per il primo popolamento di un ambiente vuoto, ma non
+      va usata da nessun percorso automatico. È una trappola in
+      [.claude/rules/import-sardegna-sentieri.md](../../../.claude/rules/import-sardegna-sentieri.md).
+
+### I layer li riconfigura l'import, non una persona
+
+- [x] Con `--reset` l'import chiama `sardegnasentieri:configure-layers --no-recalc` subito dopo i
+      termini: con `RESTART IDENTITY` i layer rinascono senza filtri, e prima bisognava ricordarsi
+      di lanciare il comando a mano ogni mattina. `--no-recalc` perché il ricalcolo e il reindex li
+      fa già la catena di fine batch.
+- [x] `configure-layers` lega i layer ai **termini di «Tipo percorso»**, non più alle attività
+      storiche: `LAYER_TERMS` al posto di `LAYER_ACTIVITIES`. «Sentieri Accessibili» prende tutta
+      la scala `inclusivity-difficulty-at|ae|aee`.
+- [x] Un layer che su quell'ambiente non esiste viene **saltato con un avvertimento**: in locale ce
+      ne sono due dei quattro, e far fallire tutto lascerebbe senza filtri anche quelli presenti.
+      Si esce in errore solo se mancano i termini, o se nessun layer è risolvibile.
+- [x] Le relazioni si scrivono con gli **eventi accesi**, al contrario di come si faceva con le
+      attività: è il `saving` di `TaxonomyTermable` a copiare la tassonomia su `parent_id`, e senza
+      di lui le righe resterebbero orfane della loro famiglia.
+
+### La sezione si chiama «Tassonomie»
+
+- [x] L'etichetta di default era «Classifications», che sulla scheda di un sentiero non voleva dire
+      niente. Ora è «Tassonomie», tradotta nei JSON del package e dello shard.
+
+### Le zone entrano nella sezione
+
+Ribalta la riga dell'overview del package che le teneva fuori. La motivazione era il numero di
+opzioni su maphub (~490): è caduta, perché il campo filtra man mano che si scrive.
+
+- [x] Su un **Layer** le zone sono un filtro scrivibile a scelta multipla nella tab «Generale»,
+      dichiarato in `legacyTaxonomies()` come le attività, perché vivono in una tabella propria.
+- [x] Su un **contenuto** sono in **sola lettura**: non si scelgono, si calcolano dalla geometria.
+      Il campo le legge da `properties.taxonomy_where`, che è dove l'Action le scrive — il pivot
+      `taxonomy_whereables` per le EC e gli UGC oggi è di fatto vuoto.
+- [x] Che quel dato stia in un JSON denormalizzato invece che nel pivot è un debito a sé:
+      **oc:8920**, «TaxonomyWhere per UGC ed EC su `taxonomy_whereables` invece che in
+      `properties.taxonomy_where`». È un ticket diverso da quello delle `access_*` citato in
+      «Out of scope», che resta da aprire.
