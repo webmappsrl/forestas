@@ -57,7 +57,7 @@ class ConfigureTaxonomyTermsCommand extends Command
             ['identifier' => 'nordic-walking-difficulty', 'icon' => 'txn-nordic-walking', 'name' => 'Difficoltà Nordic Walking', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['nordic-walking']]], 'terms' => [
                 ['Facile', $d(4905), 0], ['Medio', $d(4906), 1], ['Impegnativo', $d(4907), 2],
             ]],
-            ['identifier' => 'soft-mobility-difficulty', 'icon' => 'txn-bike', 'name' => 'Difficoltà mobilità dolce', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
+            ['identifier' => 'soft-mobility-difficulty', 'icon' => 'txn-family', 'name' => 'Difficoltà mobilità dolce', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
                 ['Facile', $d(4916), 0], ['Medio', $d(4917), 1], ['Difficile', $d(4918), 2],
             ]],
             ['identifier' => 'educational-trails-difficulty', 'icon' => 'txn-environmental-education', 'name' => 'Difficoltà sentiero didattico', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['educational-trails']]], 'terms' => [
