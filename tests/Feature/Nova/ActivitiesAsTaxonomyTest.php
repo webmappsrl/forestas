@@ -56,7 +56,7 @@ it('mostra le attività nel loro tab, come un tassonomia', function () {
     $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
 
     expect($field)->not->toBeNull()
-        ->and($field->component)->toBe('icon-select');
+        ->and($field->component)->toBe('choice');
 
     $opzioni = collect($field->meta()['options']);
     expect($opzioni->pluck('label')->all())->toContain('Escursionismo', 'Bicicletta')
