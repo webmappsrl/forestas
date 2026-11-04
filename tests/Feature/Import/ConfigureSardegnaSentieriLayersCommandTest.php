@@ -25,33 +25,33 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Bus::fake();
     App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
-    // I termini li crea il comando dei tassonomie: è la stessa sequenza dell'import.
+    // I termini li crea il comando delle tassonomie: è la stessa sequenza dell'import.
     Artisan::call('sardegnasentieri:configure-taxonomy-terms');
 });
 
-function configLayerLayer(string $nome): Layer
+function makeTypeLayer(string $name): Layer
 {
     return Layer::factory()->createQuietly([
-        'name' => ['it' => $nome, 'en' => $nome],
+        'name' => ['it' => $name, 'en' => $name],
         'properties' => [],
         'configuration' => [],
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
     ]);
 }
 
-function configLayerScenario(): void
+function makeAllTypeLayers(): void
 {
-    foreach (array_keys(ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS) as $nome) {
-        configLayerLayer($nome);
+    foreach (array_keys(ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS) as $name) {
+        makeTypeLayer($name);
     }
 }
 
-function configLayerDaNome(string $nome): Layer
+function layerByName(string $name): Layer
 {
-    return Layer::query()->get()->first(fn ($l) => $l->getTranslation('name', 'it') === $nome);
+    return Layer::query()->get()->first(fn ($l) => $l->getTranslation('name', 'it') === $name);
 }
 
-function configLayerRelations(): array
+function layerTermRows(): array
 {
     return DB::table('taxonomy_termables')
         ->where('termable_type', (new Layer)->getMorphClass())
@@ -62,99 +62,99 @@ function configLayerRelations(): array
 }
 
 it('associa a ogni layer di tipologia solo i suoi termini (oc:8910)', function () {
-    configLayerScenario();
-    $estraneo = TaxonomyTerm::query()->where('identifier', 'route-type-walk')->firstOrFail();
-    $sentieri = configLayerDaNome('Sentieri');
-    $sentieri->taxonomyTerms()->attach($estraneo->id);
+    makeAllTypeLayers();
+    $foreign = TaxonomyTerm::query()->where('identifier', 'route-type-walk')->firstOrFail();
+    $trailsLayer = layerByName('Sentieri');
+    $trailsLayer->taxonomyTerms()->attach($foreign->id);
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    foreach (ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS as $nome => $identifiers) {
-        $attesi = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->pluck('id')->sort()->values()->all();
-        expect(configLayerDaNome($nome)->taxonomyTerms()->pluck('taxonomy_terms.id')->sort()->values()->all())
-            ->toBe($attesi);
+    foreach (ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS as $name => $identifiers) {
+        $expected = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->pluck('id')->sort()->values()->all();
+        expect(layerByName($name)->taxonomyTerms()->pluck('taxonomy_terms.id')->sort()->values()->all())
+            ->toBe($expected);
     }
 });
 
 it('il layer dei percorsi accessibili prende tutta la scala di accessibilità (oc:8910)', function () {
-    configLayerScenario();
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    expect(configLayerDaNome('Sentieri Accessibili')->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
+    expect(layerByName('Sentieri Accessibili')->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
         ->toBe(['inclusivity-difficulty-ae', 'inclusivity-difficulty-aee', 'inclusivity-difficulty-at']);
 });
 
 it('scrive la tassonomia sulla relazione, cosi il filtro per famiglia funziona (oc:8910)', function () {
-    configLayerScenario();
-    $tipoPercorso = TaxonomyTerm::query()->where('identifier', 'route-type')->firstOrFail();
+    makeAllTypeLayers();
+    $routeType = TaxonomyTerm::query()->where('identifier', 'route-type')->firstOrFail();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
     expect(DB::table('taxonomy_termables')
         ->where('termable_type', (new Layer)->getMorphClass())
-        ->where('termable_id', configLayerDaNome('Sentieri')->id)
-        ->value('parent_id'))->toBe($tipoPercorso->id);
+        ->where('termable_id', layerByName('Sentieri')->id)
+        ->value('parent_id'))->toBe($routeType->id);
 });
 
 it('rilanciato non cambia nulla (oc:8827)', function () {
-    configLayerScenario();
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
-    $prima = configLayerRelations();
+    $before = layerTermRows();
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    expect($prima)->toHaveCount(6)
-        ->and(configLayerRelations())->toBe($prima);
+    expect($before)->toHaveCount(6)
+        ->and(layerTermRows())->toBe($before);
 });
 
 it('salta i layer che su questo ambiente non esistono, senza fallire (oc:8910)', function () {
     // In locale ci sono due layer dei quattro: far fallire tutto lascerebbe senza filtri
     // anche quelli presenti.
-    configLayerLayer('Sentieri');
-    configLayerLayer('Cammini di Sardegna');
+    makeTypeLayer('Sentieri');
+    makeTypeLayer('Cammini di Sardegna');
 
     $this->artisan('sardegnasentieri:configure-layers')
         ->expectsOutputToContain('Layer saltati')
         ->assertExitCode(0);
 
-    expect(configLayerRelations())->toHaveCount(2);
+    expect(layerTermRows())->toHaveCount(2);
 });
 
 it('fallisce senza toccare nulla se mancano i termini (oc:8910)', function () {
-    configLayerScenario();
+    makeAllTypeLayers();
     TaxonomyTerm::query()->where('identifier', 'route-type-trail')->delete();
 
     $this->artisan('sardegnasentieri:configure-layers')
         ->expectsOutputToContain('configure-taxonomy-terms')
         ->assertExitCode(1);
 
-    expect(configLayerRelations())->toBe([]);
+    expect(layerTermRows())->toBe([]);
     Bus::assertNothingDispatched();
 });
 
 it('fallisce se nessun layer di tipologia esiste (oc:8910)', function () {
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(1);
 
-    expect(configLayerRelations())->toBe([]);
+    expect(layerTermRows())->toBe([]);
     Bus::assertNothingDispatched();
 });
 
 it('con un nome ambiguo salta quel layer e scrive gli altri (oc:8910)', function () {
-    configLayerScenario();
-    configLayerLayer('Sentieri');
+    makeAllTypeLayers();
+    makeTypeLayer('Sentieri');
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    expect(configLayerDaNome('Cammini di Sardegna')->taxonomyTerms()->count())->toBe(1)
-        ->and(configLayerRelations())->toHaveCount(5);
+    expect(layerByName('Cammini di Sardegna')->taxonomyTerms()->count())->toBe(1)
+        ->and(layerTermRows())->toHaveCount(5);
 });
 
 it('accoda ricalcolo e reindex, e con --no-recalc nemmeno quelli (oc:8910)', function () {
     // Con gli observer accesi il package scriverebbe le icone: senza fake il test morirebbe
     // sulla configurazione S3, non sull'asserzione dei job.
     Storage::fake('wmfe');
-    configLayerScenario();
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
@@ -172,10 +172,10 @@ it('accoda ricalcolo e reindex, e con --no-recalc nemmeno quelli (oc:8910)', fun
 
 it('con --no-recalc non accoda nulla (oc:8910)', function () {
     Storage::fake('wmfe');
-    configLayerScenario();
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers', ['--no-recalc' => true])->assertExitCode(0);
 
     Bus::assertNothingDispatched();
-    expect(configLayerRelations())->toHaveCount(6);
+    expect(layerTermRows())->toHaveCount(6);
 });

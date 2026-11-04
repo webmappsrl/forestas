@@ -22,7 +22,7 @@ use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 /**
  * Le avvertenze convergono nel modello unico (oc:8910): erano una tassonomia a sé, con le sue due
- * tabelle, e diventano il tassonomia `warnings`. I tid sono quelli veri della copia di Drupal.
+ * tabelle, e diventano la tassonomia `warnings`. I tid sono quelli veri della copia di Drupal.
  */
 uses(RefreshDatabase::class);
 
@@ -54,7 +54,7 @@ beforeEach(function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 });
 
-function serviceAvvertenze(array $avvertenzeTrack = []): array
+function warningsService(array $warningsTrack = []): array
 {
     $feature = ApiTrackResponse::fromJson([
         'type' => 'Feature',
@@ -65,7 +65,7 @@ function serviceAvvertenze(array $avvertenzeTrack = []): array
             'type' => 'sentiero',
             'updated_at' => '2026-10-01T10:00:00',
             'taxonomies' => [
-                'tipologia_di_avvertenze' => array_map('strval', $avvertenzeTrack),
+                'tipologia_di_avvertenze' => array_map('strval', $warningsTrack),
                 'categorie_fruibilita_sentieri' => [],
                 'fruibilita_padri' => [],
             ],
@@ -88,14 +88,14 @@ function warningsOf(EcTrack $track): array
     return $track->fresh()->terms('warnings')->pluck('identifier')->sort()->values()->all();
 }
 
-it('importa le avvertenze come termini del tassonomia warnings', function () {
-    [$service] = serviceAvvertenze();
+it('importa le avvertenze come termini della tassonomia warnings', function () {
+    [$service] = warningsService();
     $service->importAll();
 
-    $tassonomia = TaxonomyTerm::query()->taxonomies()->where('identifier', 'warnings')->first();
+    $taxonomy = TaxonomyTerm::query()->taxonomies()->where('identifier', 'warnings')->first();
 
-    expect($tassonomia)->not->toBeNull()
-        ->and($tassonomia->children()->pluck('identifier')->all())
+    expect($taxonomy)->not->toBeNull()
+        ->and($taxonomy->children()->pluck('identifier')->all())
         ->toBe(['sardegnasentieri:warning:4716', 'sardegnasentieri:warning:4718']);
 
     $cinghiali = TaxonomyTerm::where('identifier', 'sardegnasentieri:warning:4716')->first();
@@ -105,7 +105,7 @@ it('importa le avvertenze come termini del tassonomia warnings', function () {
 });
 
 it('non duplica i termini se l importa due volte', function () {
-    [$service] = serviceAvvertenze();
+    [$service] = warningsService();
     $service->importAll();
     $service->importAll();
 
@@ -113,7 +113,7 @@ it('non duplica i termini se l importa due volte', function () {
 });
 
 it('lega le avvertenze al sentiero e non ne accumula al reimport', function () {
-    [$service] = serviceAvvertenze([4716]);
+    [$service] = warningsService([4716]);
     $service->importAll();
 
     $track = $service->importTrack(75);
@@ -123,13 +123,13 @@ it('lega le avvertenze al sentiero e non ne accumula al reimport', function () {
 });
 
 it('toglie l avvertenza che Drupal non porta più', function () {
-    [$service] = serviceAvvertenze([4716, 4718]);
+    [$service] = warningsService([4716, 4718]);
     $service->importAll();
     $track = $service->importTrack(75);
 
     expect(warningsOf($track))->toHaveCount(2);
 
-    [$service2] = serviceAvvertenze([4718]);
+    [$service2] = warningsService([4718]);
     $service2->importTrack(75);
 
     expect(warningsOf($track))->toBe(['sardegnasentieri:warning:4718']);
@@ -141,7 +141,7 @@ it('non lascia in giro le tabelle vecchie', function () {
 });
 
 it('mostra nella vista Avvertenze solo i termini di quelil tassonomia', function () {
-    [$service] = serviceAvvertenze();
+    [$service] = warningsService();
     $service->importAll();
 
     $identifiers = TaxonomyWarningResource::indexQuery(
@@ -157,7 +157,7 @@ it('conserva l indirizzo Nova di prima', function () {
 });
 
 it('la pagina Nova delle avvertenze risponde e mostra i nomi', function () {
-    [$service] = serviceAvvertenze();
+    [$service] = warningsService();
     $service->importAll();
 
     RolesAndPermissionsService::seedDatabase();

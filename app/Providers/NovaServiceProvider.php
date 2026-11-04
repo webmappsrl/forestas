@@ -104,9 +104,9 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     MenuItem::resource(TaxonomyActivity::class),
                     MenuItem::resource(NovaTaxonomyTheme::class),
                     MenuItem::resource(TaxonomyWhere::class),
-                    // Le viste dedicate a un tassonomia di termini (Avvertenze, e quelle che
+                    // Le viste dedicate a una tassonomia di termini (Avvertenze, e quelle che
                     // verranno) le elenca il package guardando chi estende
-                    // AbstractTaxonomyTermsResource: un tassonomia nuova non richiede di tornare qui.
+                    // AbstractTaxonomyTermsResource: una tassonomia nuova non richiede di tornare qui.
                     ...TaxonomyTermsMenu::items($request),
                     MenuItem::resource(TaxonomyTerm::class),
                 ])->icon('document')

@@ -30,13 +30,13 @@ it('elenca da sé le viste per tassonomia, senza che il menu le nomini', functio
         ->and($items[0]->path)->toContain(TaxonomyWarning::uriKey());
 });
 
-it('intitola la voce con il nome italiano del tassonomia', function () {
+it('intitola la voce con il nome italiano della tassonomia', function () {
     app()->setLocale('it');
 
     expect(TaxonomyWarning::label())->toBe('Avvertenze');
 });
 
-it('genera la Resource di un tassonomia con il solo identifier', function () {
+it('genera la Resource di una tassonomia con il solo identifier', function () {
     $path = app_path('Nova/Themes.php');
     @unlink($path);
 

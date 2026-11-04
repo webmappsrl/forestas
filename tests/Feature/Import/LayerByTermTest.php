@@ -110,7 +110,7 @@ it('cambiare un filtro del layer accoda il ricalcolo: tracce, mappa e indice', f
     $request = NovaRequest::create('/nova-api/layers/'.$layer->id, 'PUT', [
         'taxonomy_route_type' => (string) $this->trail->id,
     ]);
-    $field = campoFiltroDelLayer($resource, 'taxonomy_route_type');
+    $field = layerFilterField($resource, 'taxonomy_route_type');
     ($field->fill($request, $layer))();
 
     expect($layer->fresh()->taxonomyTerms->pluck('id')->all())->toBe([$this->trail->id]);
@@ -126,14 +126,14 @@ it('non accoda niente se la scelta non è cambiata', function () {
     $request = NovaRequest::create('/nova-api/layers/'.$layer->id, 'PUT', [
         'taxonomy_route_type' => (string) $this->trail->id,
     ]);
-    $field = campoFiltroDelLayer($resource, 'taxonomy_route_type');
+    $field = layerFilterField($resource, 'taxonomy_route_type');
     ($field->fill($request, $layer->fresh()))();
 
     Bus::assertNotDispatched(SyncAutoLayerAfterTrackTaxonomyChangeJob::class);
 });
 
 /** Il campo del form con quell'attributo, dentro la sezione dei filtri del layer. */
-function campoFiltroDelLayer($resource, string $attribute)
+function layerFilterField($resource, string $attribute)
 {
     foreach ($resource->fields(NovaRequest::create('/nova-api/layers', 'GET')) as $f) {
         if (! $f instanceof TabsGroup) {

@@ -61,20 +61,20 @@ function resetGuardsApp(): App
 }
 
 it('non cancella nulla se la sorgente non risponde', function () {
-    fonteSardegnaSentieriFinta(available: false);
+    fakeSardegnaSentieriSource(available: false);
 
     EcTrack::factory()->createQuietly();
-    $prima = DB::table('ec_tracks')->count();
+    $before = DB::table('ec_tracks')->count();
 
     $exit = Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
     expect($exit)->toBe(1)
         ->and(Artisan::output())->toContain('nessun dato e\' stato cancellato')
-        ->and(DB::table('ec_tracks')->count())->toBe($prima);
+        ->and(DB::table('ec_tracks')->count())->toBe($before);
 });
 
 it('nell import orario non marca nulla come sparito se la copia è vuota', function () {
-    fonteSardegnaSentieriFinta(available: false);
+    fakeSardegnaSentieriSource(available: false);
 
     $track = EcTrack::factory()->createQuietly([
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
@@ -89,20 +89,20 @@ it('nell import orario non marca nulla come sparito se la copia è vuota', funct
 
 it('non cancella nulla se il backup fallisce', function () {
     // Sorgente raggiungibile: la guardia che deve scattare è la seconda.
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
 
     // Un backup che fallisce: il comando esiste, accetta le stesse opzioni
     // del vero, ed esce con errore.
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 1);
 
     EcTrack::factory()->createQuietly();
-    $prima = DB::table('ec_tracks')->count();
+    $before = DB::table('ec_tracks')->count();
 
     $exit = Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
     expect($exit)->toBe(1)
         ->and(Artisan::output())->toContain('Backup fallito')
-        ->and(DB::table('ec_tracks')->count())->toBe($prima);
+        ->and(DB::table('ec_tracks')->count())->toBe($before);
 });
 
 it('riconosce una sorgente raggiungibile', function () {
@@ -124,7 +124,7 @@ it('non si fida della home: interroga un endpoint dei dati', function () {
 });
 
 it('il reset cancella le relazioni dei termini di tracce e POI e ricrea la tassonomia', function () {
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
     Bus::fake();
 
@@ -145,7 +145,7 @@ it('il reset cancella le relazioni dei termini di tracce e POI e ricrea la tasso
 });
 
 it('il reset non cancella le relazioni dei termini di altri modelli', function () {
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
     Bus::fake();
 
@@ -170,7 +170,7 @@ it('il reset non cancella le relazioni dei termini di altri modelli', function (
 });
 
 it('l import orario allinea i termini senza azzerarli', function () {
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
     Bus::fake();
 
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
@@ -181,16 +181,16 @@ it('l import orario allinea i termini senza azzerarli', function () {
         'termable_type' => EcTrack::class,
         'termable_id' => $track->id,
     ]);
-    $idPrima = $term->id;
+    $idBefore = $term->id;
 
     Artisan::call('sardegnasentieri:import');
 
     expect(DB::table('taxonomy_termables')->where('termable_type', EcTrack::class)->count())->toBe(1)
-        ->and(TaxonomyTerm::find($idPrima))->not->toBeNull();
+        ->and(TaxonomyTerm::find($idBefore))->not->toBeNull();
 });
 
-it('l import orario crea il tassonomia se manca', function () {
-    fonteSardegnaSentieriFinta();
+it('l import orario crea la tassonomia se manca', function () {
+    fakeSardegnaSentieriSource();
     Bus::fake();
 
     Artisan::call('sardegnasentieri:import');
@@ -202,20 +202,20 @@ it('il reset non porta via le relazioni dei layer: niente da rifare a mano dopo 
     // Il reset notturno chiamava il comando dei termini con `--fresh`, che svuota
     // `taxonomy_terms`: il pivot cade in cascata e ogni notte i layer restavano senza filtri,
     // con le mappe vuote fino a un `sardegnasentieri:configure-layers` lanciato a mano (oc:8910).
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
     Bus::fake();
 
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
-    $termine = TaxonomyTerm::query()->where('identifier', 'route-type-trail')->firstOrFail();
+    $term = TaxonomyTerm::query()->where('identifier', 'route-type-trail')->firstOrFail();
     $layer = Layer::factory()->createQuietly([
         'name' => ['it' => 'Sentieri'],
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
     ]);
-    $layer->taxonomyTerms()->attach($termine->id);
+    $layer->taxonomyTerms()->attach($term->id);
 
     Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
-    expect(TaxonomyTerm::query()->where('identifier', 'route-type-trail')->value('id'))->toBe($termine->id)
+    expect(TaxonomyTerm::query()->where('identifier', 'route-type-trail')->value('id'))->toBe($term->id)
         ->and($layer->fresh()->taxonomyTerms()->pluck('identifier')->all())->toBe(['route-type-trail']);
 });

@@ -28,14 +28,14 @@ beforeEach(function () {
     $this->app1 = App::factory()->createQuietly();
 });
 
-it('accende i tassonomie dello shard in tutte le sue app, senza spegnerne altri', function () {
+it('accende le tassonomie dello shard in tutte le sue app, senza spegnerne altre', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 
     expect($this->app1->taxonomies()->count())->toBe(11);
 });
 
-it('un tassonomia custom nasce spento e non compare in un\'app che non lo ha acceso', function () {
-    $altra = App::factory()->createQuietly();
+it('una tassonomia custom nasce spenta e non compare in un\'app che non l\'ha accesa', function () {
+    $other = App::factory()->createQuietly();
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
 
     $custom = TaxonomyTerm::create(['identifier' => 'solo-app-uno', 'name' => ['it' => 'Solo app uno']]);
@@ -46,11 +46,11 @@ it('un tassonomia custom nasce spento e non compare in un\'app che non lo ha acc
 
     expect(TaxonomyTerm::query()->taxonomies()->forApp($this->app1->id)->pluck('identifier')->all())
         ->toContain('solo-app-uno')
-        ->and(TaxonomyTerm::query()->taxonomies()->forApp($altra->id)->pluck('identifier')->all())
+        ->and(TaxonomyTerm::query()->taxonomies()->forApp($other->id)->pluck('identifier')->all())
         ->not->toContain('solo-app-uno');
 });
 
-it('un tassonomia di sistema si accende da sé in un\'app creata dopo', function () {
+it('una tassonomia di sistema si accende da sé in un\'app creata dopo', function () {
     TaxonomyTerm::create(['identifier' => 'dal-package', 'name' => ['it' => 'Dal package'], 'is_system' => true]);
 
     // createQuietly salta gli observer (AppObserver::saved scrive la config su storage, che in
@@ -61,7 +61,7 @@ it('un tassonomia di sistema si accende da sé in un\'app creata dopo', function
     expect($new->taxonomies()->pluck('identifier')->all())->toBe(['dal-package']);
 });
 
-it('la scheda del sentiero mostra solo i tassonomie accesi nella sua app', function () {
+it('la scheda del sentiero mostra solo le tassonomie accese nella sua app', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
     $track = PackageEcTrack::factory()->createQuietly(['app_id' => $this->app1->id]);
 
@@ -80,7 +80,7 @@ it('un contenuto senza app vede tutto: in creazione il form non deve nascere vuo
     expect(taxonomiesInFields(new EcTrackResource(new EcTrack), ['warnings', 'route-type']))->toHaveCount(2);
 });
 
-it('l\'indice Elasticsearch non porta i termini di un tassonomia spento', function () {
+it('l\'indice Elasticsearch non porta i termini di una tassonomia spenta', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
     $track = PackageEcTrack::factory()->createQuietly(['app_id' => $this->app1->id]);
     $taxonomy = TaxonomyTerm::where('identifier', 'hiking-difficulty')->first();
@@ -98,9 +98,9 @@ it('si accende e si spegne dalla scheda dell\'app', function () {
     $resource = new Wm\WmPackage\Nova\App($this->app1);
 
     // Il metodo è protected come gli altri tab della Resource App.
-    $metodo = new ReflectionMethod($resource, 'vocabularies_tab');
-    $metodo->setAccessible(true);
-    $field = collect($metodo->invoke($resource))->first();
+    $method = new ReflectionMethod($resource, 'taxonomies_tab');
+    $method->setAccessible(true);
+    $field = collect($method->invoke($resource))->first();
     expect($field->attribute)->toBe('taxonomies');
 
     // Il form manda gli id scelti: resta acceso solo ciò che è selezionato.

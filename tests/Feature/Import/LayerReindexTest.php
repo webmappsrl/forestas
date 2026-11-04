@@ -32,12 +32,12 @@ it('reindicizza anche le tracce che il nuovo filtro lascia fuori', function () {
     $layer->taxonomyTerms()->attach($this->walk->id);
     // Il job rigenera i PBF, che in test toccano Redis: la parte che interessa è il pivot e
     // properties.layers, quindi si gira senza gli eventi del pivot e senza PBF.
-    eseguiSenzaPbf($layer->id);
+    runWithoutPbf($layer->id);
     expect($staysOut->fresh()->properties['layers'] ?? [])->toBe([$layer->id]);
 
     // Ora il filtro cambia: quella traccia esce.
     $layer->taxonomyTerms()->sync([$this->trail->id]);
-    eseguiSenzaPbf($layer->id);
+    runWithoutPbf($layer->id);
 
     expect($layer->fresh()->ecTracks->pluck('id')->all())->toBe([$comesIn->id])
         // Il punto: chi esce non deve restare con il layer addosso, o l'indice lo mostra lì.
@@ -46,7 +46,7 @@ it('reindicizza anche le tracce che il nuovo filtro lascia fuori', function () {
 });
 
 /** Il job con il generatore di PBF spento: in test scriverebbe su Redis e su disco. */
-function eseguiSenzaPbf(int $layerId): void
+function runWithoutPbf(int $layerId): void
 {
     $pbf = Mockery::mock(PBFGeneratorService::class);
     $pbf->shouldReceive('regeneratePbfsForLayer')->andReturnNull();

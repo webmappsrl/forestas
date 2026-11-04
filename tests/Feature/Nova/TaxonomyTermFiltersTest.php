@@ -15,12 +15,12 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     RolesAndPermissionsService::seedDatabase();
-    $this->vocabulary = TaxonomyTerm::create([
+    $this->taxonomy = TaxonomyTerm::create([
         'identifier' => 'hiking-difficulty',
         'name' => ['it' => 'Difficoltà escursionistica'],
     ]);
     $this->term = TaxonomyTerm::create([
-        'parent_id' => $this->vocabulary->id,
+        'parent_id' => $this->taxonomy->id,
         'identifier' => 'hiking-difficulty-t',
         'name' => ['it' => 'Turistico'],
     ]);
@@ -37,21 +37,21 @@ it('separa tassonomie e termini con il filtro Tipo', function () {
     $filter = new TaxonomyTermKindFilter;
     $request = NovaRequest::create('/nova-api/taxonomy-terms', 'GET');
 
-    $taxonomies = $filter->apply($request, TaxonomyTerm::query(), 'vocabularies')->pluck('identifier');
+    $taxonomies = $filter->apply($request, TaxonomyTerm::query(), 'taxonomies')->pluck('identifier');
     $terms = $filter->apply($request, TaxonomyTerm::query(), 'terms')->pluck('identifier');
 
     expect($taxonomies->all())->toBe(['hiking-difficulty'])
         ->and($terms->all())->toBe(['hiking-difficulty-t']);
 });
 
-it('elenca i tassonomie nel filtro Tassonomieo e ne mostra solo i termini', function () {
+it('elenca le tassonomie nel filtro Tipo e ne mostra solo i termini', function () {
     $filter = new TermsByTaxonomyFilter;
     $request = NovaRequest::create('/nova-api/taxonomy-terms', 'GET');
 
     expect($filter->options($request))
-        ->toBe(['Difficoltà escursionistica' => $this->vocabulary->id]);
+        ->toBe(['Difficoltà escursionistica' => $this->taxonomy->id]);
 
-    expect($filter->apply($request, TaxonomyTerm::query(), $this->vocabulary->id)->pluck('identifier')->all())
+    expect($filter->apply($request, TaxonomyTerm::query(), $this->taxonomy->id)->pluck('identifier')->all())
         ->toBe(['hiking-difficulty-t']);
 });
 
@@ -82,14 +82,14 @@ it('l\'elenco Nova mostra il nome e applica i filtri', function () {
 
     $filtered = $this->actingAs(taxonomyAdmin())
         ->getJson('/nova-api/taxonomy-terms?filters='.base64_encode(json_encode([
-            [TaxonomyTermKindFilter::class => 'vocabularies'],
+            [TaxonomyTermKindFilter::class => 'taxonomies'],
         ])))
         ->assertOk();
 
     expect(collect($filtered->json('resources'))->count())->toBe(1);
 });
 
-it('sul dettaglio di un termine elenca i contenuti collegati, non su un tassonomia', function () {
+it('sul dettaglio di un termine elenca i contenuti collegati, non su una tassonomia', function () {
     $track = EcTrack::factory()->createQuietly();
     $track->taxonomyTerms()->attach($this->term->id);
 
@@ -104,9 +104,9 @@ it('sul dettaglio di un termine elenca i contenuti collegati, non su un tassonom
 
     expect($relations->all())->toBe(['ecTracks', 'ecPois']);
 
-    // La lista dei contenuti di un tassonomia sarebbe vuota per costruzione: non va mostrata.
+    // La lista dei contenuti di una tassonomia sarebbe vuota per costruzione: non va mostrata.
     $taxonomy = $this->actingAs(taxonomyAdmin())
-        ->getJson("/nova-api/taxonomy-terms/{$this->vocabulary->id}")
+        ->getJson("/nova-api/taxonomy-terms/{$this->taxonomy->id}")
         ->assertOk();
 
     expect(collect($taxonomy->json('resource.fields'))->pluck('attribute')->intersect(['ecTracks', 'ecPois'])->all())

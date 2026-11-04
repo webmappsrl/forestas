@@ -14,7 +14,7 @@ use Wm\WmPackage\Nova\Cards\ApiLinksCard\ApiLinksCard;
 /**
  * Le avvertenze (oc:8910).
  *
- * Erano una tassonomia a sé, con `taxonomy_warnings` e il suo pivot; ora sono il tassonomia
+ * Erano una tassonomia a sé, con `taxonomy_warnings` e il suo pivot; ora sono la tassonomia
  * `warnings` del modello unico. La vista resta quella di prima — stesso indirizzo, stessa voce
  * di menu, stesso elenco — e cambia solo la tabella sotto.
  */
@@ -36,7 +36,7 @@ class TaxonomyWarning extends AbstractTaxonomyTermsResource
         return [
             ...parent::fields($request),
             Text::make('Source ID', 'properties->source_id')->readonly()->hideFromIndex(),
-            Text::make('Taxonomy', 'properties->vocabulary')->readonly()->hideFromIndex(),
+            Text::make(__('Source vocabulary'), 'properties->vocabulary')->readonly()->hideFromIndex(),
         ];
     }
 

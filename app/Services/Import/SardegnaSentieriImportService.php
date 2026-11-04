@@ -51,7 +51,7 @@ class SardegnaSentieriImportService
 
     /**
      * Le tre scale `Accessibili dis. *` di Drupal collassano in una (oc:8910): ogni tid
-     * dà il grado, nel vocabolario `inclusivity-difficulty`, e la categoria, in
+     * dà il grado, nella tassonomia `inclusivity-difficulty`, e la categoria, in
      * `inclusivity-disabilities`. Va scritta qui perché i nove tid non esistono come
      * termini nel nostro modello e dall'identifier non si derivano: «sensoriale»
      * accorpa udito e vista, che in Drupal sono scale separate.
@@ -71,9 +71,9 @@ class SardegnaSentieriImportService
     ];
 
     /**
-     * I vocabolari che l'import scrive e di cui è l'unica fonte: a ogni import
-     * i loro legami si sostituiscono con quelli di Drupal. Fuori da qui
-     * (difficoltà del sentiero didattico, tematismi, tipo percorso) i legami
+     * Le tassonomie che l'import scrive e di cui è l'unica fonte: a ogni import
+     * le loro relazioni si sostituiscono con quelle di Drupal. Fuori da qui
+     * (difficoltà del sentiero didattico, tematismi, tipo percorso) le relazioni
      * sono di Nova e l'import non li tocca mai.
      */
     private const IMPORT_OWNED_TAXONOMIES = [
@@ -91,7 +91,7 @@ class SardegnaSentieriImportService
      * I vocabolari dell'accessibilità: Drupal ne ha due righe su 614 sentieri e il
      * resto lo compila un operatore in Nova. Si sostituiscono solo se Drupal, per
      * quel sentiero, porta almeno un tid di `ACCESSIBILITY_TIDS`; altrimenti i
-     * legami esistenti non si toccano, o ogni reimport cancellerebbe il lavoro
+     * relazioni esistenti non si toccano, o ogni reimport cancellerebbe il lavoro
      * fatto a mano (oc:8910).
      */
     private const ACCESSIBILITY_FAMILIES = [
@@ -102,7 +102,7 @@ class SardegnaSentieriImportService
     /** Prefisso dell'`identifier` dei termini che vengono da `categorie_fruibilita_sentieri` (oc:8910). */
     public const DRUPAL_TERM_PREFIX = 'sardegnasentieri:tid:';
 
-    /** Il vocabolario delle avvertenze, che prima era la tassonomia `taxonomy_warnings` (oc:8910). */
+    /** La tassonomia delle avvertenze, che prima era la tabella `taxonomy_warnings` (oc:8910). */
     public const WARNINGS_TAXONOMY = 'warnings';
 
     /** Prefisso dell'`identifier` di un'avvertenza: lo stesso di quando era una tassonomia a sé. */
@@ -139,7 +139,7 @@ class SardegnaSentieriImportService
     /**
      * Se il POI o il sentiero in import ha saltato un ente mancante.
      */
-    private bool $entiMancanti = false;
+    private bool $missingEntes = false;
 
     /** @var array<string, array<string, array<string, mixed>>> */
     private array $taxonomyTermsCache = [];
@@ -147,10 +147,10 @@ class SardegnaSentieriImportService
     /** @var array<int, string>|null */
     private ?array $iconNamesCache = null;
 
-    /** @var Collection<string, TaxonomyTerm>|null Vocabolari del modello unico per identifier. */
+    /** @var Collection<string, TaxonomyTerm>|null Tassonomie del modello unico per identifier. */
     private ?Collection $termTaxonomies = null;
 
-    /** @var Collection<string, TaxonomyTerm>|null Termini del modello unico per identifier, con il vocabolario. */
+    /** @var Collection<string, TaxonomyTerm>|null Termini del modello unico per identifier, con la tassonomia. */
     private ?Collection $termsByIdentifier = null;
 
     public function __construct(
@@ -271,7 +271,7 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * Le avvertenze di Drupal diventano termini del vocabolario `warnings` (oc:8910).
+     * Le avvertenze di Drupal diventano termini della tassonomia `warnings` (oc:8910).
      *
      * Erano una tassonomia a sé, con le sue due tabelle; ora sono termini come tutti gli altri.
      * L'`identifier` resta quello di prima, `sardegnasentieri:warning:<tid>`, così l'import
@@ -286,7 +286,7 @@ class SardegnaSentieriImportService
         $vocabulary = TaxonomyTerm::query()->taxonomies()->where('identifier', self::WARNINGS_TAXONOMY)->first();
 
         if ($vocabulary === null) {
-            Log::channel('import')->warning('Vocabolario «'.self::WARNINGS_TAXONOMY.'» non trovata: avvertenze non importate.');
+            Log::channel('import')->warning('Tassonomia «'.self::WARNINGS_TAXONOMY.'» non trovata: avvertenze non importate.');
 
             return;
         }
@@ -321,8 +321,8 @@ class SardegnaSentieriImportService
                 continue;
             }
 
-            // Nome e vocabolario si riallineano: un termine rinominato in Drupal, o rimasto fuori
-            // dal vocabolario perché creato prima di lei, si rimette a posto da solo.
+            // Nome e tassonomia si riallineano: un termine rinominato in Drupal, o rimasto fuori
+            // dalla tassonomia perché creato prima di lei, si rimette a posto da solo.
             $existing->setTranslations('name', $name);
             $existing->parent_id = $vocabulary->id;
             $existing->properties = array_merge($existing->properties ?? [], $properties);
@@ -894,9 +894,9 @@ class SardegnaSentieriImportService
      *
      * Per ogni tid, col padre che la copia di Drupal dà nella gerarchia:
      * - radice → ignorata (vedi sotto);
-     * - figlio fra i nove delle scale di accessibilità → due legami: il grado in
+     * - figlio fra i nove delle scale di accessibilità → due relazioni: il grado in
      *   `inclusivity-difficulty` e la categoria in `inclusivity-disabilities`;
-     * - altro figlio → il termine `sardegnasentieri:tid:<tid>` nella sua vocabolario;
+     * - altro figlio → il termine `sardegnasentieri:tid:<tid>` nella sua tassonomia;
      * - un tid che il modello non conosce → anomalia, non eccezione.
      *
      * Le righe che puntano a una radice (Trekking, Mountain Bike, ...) non
@@ -907,7 +907,7 @@ class SardegnaSentieriImportService
      * rischierebbe di dare al sentiero un'attività che non ha. Non è una
      * dimenticanza, e nemmeno un'anomalia: la riga non ha un grado da scrivere.
      *
-     * Un vocabolario a scelta singola con due termini diversi dopo il collasso
+     * Una tassonomia a scelta singola con due termini diversi dopo il collasso
      * tiene il primo, nell'ordine di Drupal, e segnala gli altri: nessuna
      * scelta di dominio, ma nemmeno un'informazione persa in silenzio.
      *
@@ -916,7 +916,7 @@ class SardegnaSentieriImportService
      *     anomalies: list<array<string, mixed>>
      * }
      */
-    private function classifyFruibilita(ApiTrackResponse $response): array
+    private function classifyUsabilityTerm(ApiTrackResponse $response): array
     {
         $wanted = [];
         $anomalies = [];
@@ -970,15 +970,15 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * Scrive i legami dei termini del sentiero (oc:8910).
+     * Scrive le relazioni dei termini del sentiero (oc:8910).
      *
-     * I legami di ogni vocabolario dell'import si sostituiscono: dopo il
+     * Le relazioni di ogni tassonomia dell'import si sostituiscono: dopo il
      * reimport restano quelli che Drupal dice adesso, mai la somma. La
      * tabella non ha vincoli di unicità, quindi gli unici a evitare i doppioni
      * siamo noi: si aggiunge ciò che manca, si toglie ciò che non c'è più, e
      * un vocabolario che i doppioni li ha già si riscrive da zero.
      *
-     * Il resto dei legami (vocabolari di Nova, tematismi, tipo percorso) non si tocca.
+     * Il resto delle relazioni (tassonomie di Nova, tematismi, tipo percorso) non si tocca.
      *
      * `withoutSyncingToSearch`: senza, ogni riga di pivot farebbe partire un
      * reindex sincrono su Elasticsearch, e il reindex di fine batch lo fa già.
@@ -993,14 +993,14 @@ class SardegnaSentieriImportService
     {
         $vocabularies = $this->classificationTaxonomies();
 
-        // Il vocabolario lo crea `sardegnasentieri:configure-taxonomy-terms`, che lancia il comando di import.
+        // La tassonomia la crea `sardegnasentieri:configure-taxonomy-terms`, che lancia il comando di import.
         if ($vocabularies->isEmpty()) {
-            Log::channel('import')->warning("Vocabolari dei termini non trovate: legami del sentiero {$ecTrack->id} non scritti.");
+            Log::channel('import')->warning("Tassonomie dei termini non trovate: relazioni del sentiero {$ecTrack->id} non scritte.");
 
             return;
         }
 
-        $classification = $this->classifyFruibilita($response);
+        $classification = $this->classifyUsabilityTerm($response);
         $anomalies = $classification['anomalies'];
         $terms = $this->classificationTerms();
 
@@ -1009,10 +1009,10 @@ class SardegnaSentieriImportService
         }
 
         // Tipologie di itinerario: multiple, senza il 4728 che è diventato un tipo di percorso.
-        // Un sentiero non ne prende (il vocabolario si svuota comunque: è fra quelle dell'import).
+        // Un sentiero non ne prende (la tassonomia si svuota comunque: è fra quelle dell'import).
         $classification['terms']['itinerary-type'] = $this->itineraryTypeIdentifiers($response);
 
-        // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono un vocabolario come le
+        // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono una tassonomia come le
         // altre e seguono la stessa regola di sostituzione (oc:8910).
         $classification['terms'][self::WARNINGS_TAXONOMY] = array_map(
             fn ($apiId) => self::WARNING_TERM_PREFIX.$apiId,
@@ -1146,7 +1146,7 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * I vocabolari del modello unico per identifier. Lette una volta per istanza.
+     * Le tassonomie del modello unico per identifier. Lette una volta per istanza.
      *
      * @return Collection<string, TaxonomyTerm>
      */
@@ -1156,7 +1156,7 @@ class SardegnaSentieriImportService
     }
 
     /**
-     * I termini del modello unico per identifier, ciascuno con la sua vocabolario.
+     * I termini del modello unico per identifier, ciascuno con la sua tassonomia.
      *
      * @return Collection<string, TaxonomyTerm>
      */

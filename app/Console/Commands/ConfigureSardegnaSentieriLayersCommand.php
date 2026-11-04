@@ -57,56 +57,56 @@ class ConfigureSardegnaSentieriLayersCommand extends Command
 
     public function handle(): int
     {
-        $risolti = [];
-        $mancanti = 0;
+        $resolved = [];
+        $missingLayers = 0;
 
-        foreach (self::LAYER_TERMS as $nome => $identifiers) {
+        foreach (self::LAYER_TERMS as $name => $identifiers) {
             // Il nome del layer si confronta in PHP: la colonna `name` non è jsonb.
             $layers = Layer::query()
                 ->where('app_id', SardegnaSentieriImportService::IMPORT_APP_ID)
                 ->get()
-                ->filter(fn (Layer $layer) => $layer->getTranslation('name', 'it', false) === $nome)
+                ->filter(fn (Layer $layer) => $layer->getTranslation('name', 'it', false) === $name)
                 ->values();
 
             if ($layers->count() !== 1) {
-                $this->warn("Layer «{$nome}»: trovati {$layers->count()}, ne serve esattamente uno. Lo salto.");
-                $mancanti++;
+                $this->warn("Layer «{$name}»: trovati {$layers->count()}, ne serve esattamente uno. Lo salto.");
+                $missingLayers++;
 
                 continue;
             }
 
-            $termini = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->get();
+            $terms = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->get();
 
-            if ($termini->count() !== count($identifiers)) {
-                $trovati = $termini->pluck('identifier')->all();
-                $assenti = implode(', ', array_diff($identifiers, $trovati));
-                $this->error("Layer «{$nome}»: termini mancanti ({$assenti})."
+            if ($terms->count() !== count($identifiers)) {
+                $found = $terms->pluck('identifier')->all();
+                $missing = implode(', ', array_diff($identifiers, $found));
+                $this->error("Layer «{$name}»: termini missingLayers ({$missing})."
                     .' Lancia prima `sardegnasentieri:configure-taxonomy-terms`.');
                 $this->error('Nessuna relazione scritta.');
 
                 return self::FAILURE;
             }
 
-            $risolti[$nome] = [$layers->first(), $termini];
+            $resolved[$name] = [$layers->first(), $terms];
         }
 
-        if ($risolti === []) {
+        if ($resolved === []) {
             $this->error('Nessun layer di tipologia trovato su questo ambiente: nessuna relazione scritta.');
 
             return self::FAILURE;
         }
 
-        foreach ($risolti as $nome => [$layer, $termini]) {
-            $esito = $layer->taxonomyTerms()->sync($termini->pluck('id')->all());
-            $cambiati = count($esito['attached']) + count($esito['detached']);
-            $elenco = $termini->pluck('identifier')->implode(', ');
-            $this->line($cambiati > 0
-                ? "Layer «{$nome}»: legato a {$elenco} (aggiunti ".count($esito['attached']).', rimossi '.count($esito['detached']).').'
-                : "Layer «{$nome}»: già a posto.");
+        foreach ($resolved as $name => [$layer, $terms]) {
+            $outcome = $layer->taxonomyTerms()->sync($terms->pluck('id')->all());
+            $changed = count($outcome['attached']) + count($outcome['detached']);
+            $list = $terms->pluck('identifier')->implode(', ');
+            $this->line($changed > 0
+                ? "Layer «{$name}»: legato a {$list} (aggiunti ".count($outcome['attached']).', rimossi '.count($outcome['detached']).').'
+                : "Layer «{$name}»: già a posto.");
         }
 
-        if ($mancanti > 0) {
-            $this->warn("Layer saltati perché assenti su questo ambiente: {$mancanti}.");
+        if ($missingLayers > 0) {
+            $this->warn("Layer saltati perché assenti su questo ambiente: {$missingLayers}.");
         }
 
         if ($this->option('no-recalc')) {

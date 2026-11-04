@@ -27,7 +27,7 @@ beforeEach(function () {
     $this->bike = TaxonomyActivity::create(['name' => ['it' => 'Bicicletta'], 'icon' => null]);
 });
 
-function campoDelTab($resource, string $tab, string $attribute, bool $soloForm = true)
+function tabField($resource, string $tab, string $attribute, bool $formOnly = true)
 {
     foreach ($resource->fields(NovaRequest::create('/nova-api/ec-tracks', 'GET')) as $field) {
         if (! $field instanceof TabsGroup) {
@@ -39,8 +39,8 @@ function campoDelTab($resource, string $tab, string $attribute, bool $soloForm =
             }
             foreach ($t->data as $f) {
                 // onlyOnForms() spegne showOnDetail; onlyOnDetail() spegne showOnUpdate.
-                $suForm = (bool) ($f->showOnUpdate ?? false);
-                if ($f->attribute === $attribute && $suForm === $soloForm) {
+                $onForm = (bool) ($f->showOnUpdate ?? false);
+                if ($f->attribute === $attribute && $onForm === $formOnly) {
                     return $f;
                 }
             }
@@ -50,18 +50,18 @@ function campoDelTab($resource, string $tab, string $attribute, bool $soloForm =
     return null;
 }
 
-it('mostra le attività nel loro tab, come un tassonomia', function () {
+it('mostra le attività nel loro tab, come una tassonomia', function () {
     $track = PackageEcTrack::factory()->createQuietly();
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
 
     expect($field)->not->toBeNull()
         ->and($field->component)->toBe('choice');
 
-    $opzioni = collect($field->meta()['options']);
-    expect($opzioni->pluck('label')->all())->toContain('Escursionismo', 'Bicicletta')
+    $options = collect($field->meta()['options']);
+    expect($options->pluck('label')->all())->toContain('Escursionismo', 'Bicicletta')
         // L'icona c'è dove il dato ce l'ha, e manca dove non c'è: niente icona inventata.
-        ->and($opzioni->firstWhere('label', 'Bicicletta'))->not->toHaveKey('svg');
+        ->and($options->firstWhere('label', 'Bicicletta'))->not->toHaveKey('svg');
 });
 
 it('non lascia più il pannello Activities in fondo alla scheda', function () {
@@ -83,7 +83,7 @@ it('salva le attività scelte e conserva le durate del pivot', function () {
         ->where('taxonomy_activityable_id', $track->id)
         ->value('id');
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     $request = NovaRequest::create('/nova-api/ec-tracks/'.$track->id, 'PUT', [
         'legacy_taxonomy_activities' => $this->hiking->id.','.$this->bike->id,
     ]);
@@ -107,7 +107,7 @@ it('toglie un\'attività deselezionata', function () {
     $track = PackageEcTrack::factory()->createQuietly();
     $track->taxonomyActivities()->attach([$this->hiking->id, $this->bike->id]);
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     $request = NovaRequest::create('/nova-api/ec-tracks/'.$track->id, 'PUT', [
         'legacy_taxonomy_activities' => (string) $this->bike->id,
     ]);
@@ -120,7 +120,7 @@ it('il dettaglio mostra nome e icona, non gli id', function () {
     $track = PackageEcTrack::factory()->createQuietly();
     $track->taxonomyActivities()->attach($this->hiking->id);
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities', soloForm: false);
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities', formOnly: false);
     $field->resolve($track);
 
     // I path dell'icona contengono cifre: si verifica il nome, non l'assenza di un numero.
@@ -130,7 +130,7 @@ it('il dettaglio mostra nome e icona, non gli id', function () {
 it('non cambia cosa leggono le app: GeoJSON e indice restano identici', function () {
     $track = PackageEcTrack::factory()->createQuietly();
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     ($field->fill(
         NovaRequest::create('/nova-api/ec-tracks/'.$track->id, 'PUT', [
             'legacy_taxonomy_activities' => (string) $this->hiking->id,
@@ -153,7 +153,7 @@ it('apre la pagina di modifica di un sentiero con attività collegate', function
 
     // Il resolve del campo fa un join: senza qualificare la colonna, «id» è ambiguo e la
     // pagina di modifica risponde 500 (oc:8910).
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     $field->resolve($track);
 
     expect((string) $field->value)->toBe((string) $this->hiking->id);
@@ -177,18 +177,18 @@ it('la pagina di modifica risponde: Nova valuta anche le regole dei campi', func
 it('mostra una scala di difficoltà solo se la sua attività è fra quelle scelte', function () {
     $mtb = TaxonomyActivity::create(['identifier' => 'mtb', 'name' => ['it' => 'mtb']]);
     $track = PackageEcTrack::factory()->createQuietly();
-    // La traccia nasce con la sua app: i tassonomie vanno accesi lì, altrimenti il tab è vuoto.
+    // La traccia nasce con la sua app: le tassonomie vanno accese lì, altrimenti il tab è vuoto.
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'taxonomy_mtb_difficulty');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'taxonomy_mtb_difficulty');
     expect($field)->not->toBeNull();
 
-    // La dipendenza punta a una tassonomia che vive in tabella sua, non a un tassonomia.
+    // La dipendenza punta a una tassonomia che vive in tabella sua, non a una tassonomia.
     $dependencies = (new ReflectionProperty($field, 'fieldDependencies'))->getValue($field);
     expect($dependencies)->not->toBeEmpty();
 
-    $visibleWith = function ($valore) use ($field, $dependencies) {
-        $request = NovaRequest::create('/nova-api/ec-tracks/field/x', 'PATCH', ['legacy_taxonomy_activities' => $valore]);
+    $visibleWith = function ($value) use ($field, $dependencies) {
+        $request = NovaRequest::create('/nova-api/ec-tracks/field/x', 'PATCH', ['legacy_taxonomy_activities' => $value]);
         foreach ($dependencies as $d) {
             $d->handle($field, $request);
         }
@@ -217,7 +217,7 @@ it('non offre fra le attività i tipi di percorso, ma non li cancella', function
     $track = PackageEcTrack::factory()->createQuietly();
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     $labels = collect($field->meta()['options'])->pluck('label')->all();
 
     expect($labels)->toContain('Escursionismo')
@@ -228,8 +228,8 @@ it('non offre fra le attività i tipi di percorso, ma non li cancella', function
 });
 
 it('non stacca un\'attività nascosta quando si salva la scheda', function () {
-    // Il tipo percorso non compare fra le opzioni: salvando, non deve sparire dal contenuto.
-    $identifier = \App\Services\Import\SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero';
+    // Il tipo percorso non compare fra le options: salvando, non deve sparire dal contenuto.
+    $identifier = SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero';
     DB::table('taxonomy_activities')->insert([
         'identifier' => $identifier,
         'name' => json_encode(['it' => 'Sentiero']),
@@ -242,7 +242,7 @@ it('non stacca un\'attività nascosta quando si salva la scheda', function () {
     $track->taxonomyActivities()->attach([$hidden->id, $this->hiking->id]);
     $this->artisan('sardegnasentieri:configure-taxonomy-terms');
 
-    $field = campoDelTab(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
+    $field = tabField(new EcTrackResource($track), __('Activities'), 'legacy_taxonomy_activities');
     ($field->fill(
         NovaRequest::create('/nova-api/ec-tracks/'.$track->id, 'PUT', [
             'legacy_taxonomy_activities' => (string) $this->bike->id,

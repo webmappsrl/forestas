@@ -1,13 +1,13 @@
 # Classificazioni e inclusività su Forestas
 
-Il modello unico dei tassonomie e dei termini sta nel package (`wm-package/docs/features/8910-modello-dati-unico-classificazioni-accessibilita/overview.md`).
+Il modello unico delle tassonomie e dei termini sta nel package (`wm-package/docs/features/8910-modello-dati-unico-classificazioni-accessibilita/overview.md`).
 Qui resta ciò che serve sapendo di stare su Forestas: da dove nascono tassonomie e termini, come li
 scrive l'import, quali dati sono manuali e quali importati, come si calcola l'inclusività. (oc:8910)
 
 ## Come nascono tassonomie e termini
 
-- **Un tassonomia è una riga di `taxonomy_terms` senza padre; un termine è una riga con
-  `parent_id` che punta al tassonomia.** Si distinguono per `identifier`: quello del tassonomia è
+- **Una tassonomia è una riga di `taxonomy_terms` senza padre; un termine è una riga con
+  `parent_id` che punta alla tassonomia.** Si distinguono per `identifier`: quello della tassonomia è
   in inglese (`hiking-difficulty`, `inclusivity-difficulty`), quello di un termine che viene da
   Drupal è `sardegnasentieri:tid:<tid>`.
 - **La fonte dell'elenco di sistema è il comando `sardegnasentieri:configure-taxonomy-terms`**
@@ -15,20 +15,20 @@ scrive l'import, quali dati sono manuali e quali importati, come si calcola l'in
   ordine e `single_choice` di ogni tassonomia stanno lì e in nessun altro posto. Il seeder
   `TaxonomyTermSeeder` lo invoca soltanto.
 - **Senza opzioni allinea**: per ogni riga dell'elenco cerca per `identifier`, aggiunge ciò che
-  manca, riallinea nome e icona, non cambia gli id e non tocca i tassonomie create a mano da Nova.
+  manca, riallinea nome e icona, non cambia gli id e non tocca le tassonomie create a mano da Nova.
   **Con `--fresh` riparte da vuoto** (svuota `taxonomy_terms` e ricrea). **Con `--dry-run`** stampa
   cosa farebbe senza scrivere.
 - **Lo lancia l'import**, nessuno deve ricordarsene: con `--reset` lo chiama con `--fresh`,
   senza `--reset` allinea soltanto (`ImportSardegnaSentieriCommand.php:150`). Sul ramo orario
   azzerare i termini romperebbe le relazioni dei sentieri non reimportati.
 - Il reset (`resetData()`) cancella anche le relazioni di tracce e POI in `taxonomy_termables`, ma
-  non il tassonomia: il pivot polimorfo non ha chiave esterna, e con `RESTART IDENTITY` le righe
+  non la tassonomia: il pivot polimorfo non ha chiave esterna, e con `RESTART IDENTITY` le righe
   vecchie si attaccherebbero ai sentieri nuovi.
 
-## Le avvertenze sono un tassonomia come le altre
+## Le avvertenze sono una tassonomia come le altre
 
 Fino a oc:8910 le avvertenze erano una tassonomia a sé: `taxonomy_warnings`, il suo pivot
-`taxonomy_warningables`, due modelli e una Resource Nova. Oggi sono il tassonomia `warnings`, e le
+`taxonomy_warningables`, due modelli e una Resource Nova. Oggi sono la tassonomia `warnings`, e le
 due tabelle non esistono più — la migration che le toglie è
 `2026_11_03_120000_drop_taxonomy_warnings_tables.php`.
 
@@ -38,7 +38,7 @@ due tabelle non esistono più — la migration che le toglie è
   l'`identifier` che avevano prima, `sardegnasentieri:warning:<tid>`: rinominare un'avvertenza in
   Drupal non rompe il collegamento;
 - i **relazioni** seguono la stessa regola di sostituzione delle scale di difficoltà, perché
-  `warnings` è fra le `IMPORT_OWNED_VOCABULARIES`: dopo un reimport restano quelli che Drupal dice
+  `warnings` è fra le `IMPORT_OWNED_TAXONOMIES`: dopo un reimport restano quelli che Drupal dice
   adesso, mai la somma.
 
 **I dati non sono stati migrati:** li riscrive l'import, e il conto torna con la sorgente —
@@ -48,7 +48,7 @@ pivot vecchio non veniva svuotato dal reset.
 
 **La vista Nova è rimasta dov'era**, `/nova/resources/taxonomy-warnings` e la stessa voce di
 menu: `App\Nova\TaxonomyWarning` ora estende `AbstractTaxonomyTermsResource` del package, dichiara
-il tassonomia e tiene l'`uriKey` di prima. Sulla scheda del sentiero, invece, le avvertenze non
+la tassonomia e tiene l'`uriKey` di prima. Sulla scheda del sentiero, invece, le avvertenze non
 sono più un campo a sé: stanno nel tab «Classifications» con le altre tassonomie.
 
 ## Come l'import mappa i termini di Drupal
@@ -77,7 +77,7 @@ sono più un campo a sé: stanno nel tab «Classifications» con le altre tasson
 | Grado di accessibilità e disabilità accolte | A mano, in Nova | Li sostituisce **solo se** Drupal ha almeno un termine di accessibilità per quel sentiero (oggi 2 sentieri su 614) |
 | Le cinque scale di difficoltà (escursionistica, mtb, ippovia, nordic walking, mobilità dolce) | Da Drupal | Le **sostituisce a ogni import**: ciò che si compila a mano in queste tassonomie si perde al reimport del sentiero |
 
-I tassonomie create da Nova (tematismi, tipo percorso) non sono toccate dall'import.
+Le tassonomie create da Nova (tematismi, tipo percorso) non sono toccate dall'import.
 
 **I dati compilati a mano si perdono al reset notturno**: `ec_tracks` viene troncata
 (`resetData()`), su UAT ogni mattina alle 06:00. È stato accettato in questa fase (non siamo in

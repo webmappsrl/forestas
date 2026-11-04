@@ -57,7 +57,7 @@ function something()
  * Sentieri: i test dell'import mockano letture e download GPX sullo stesso
  * oggetto, e il service lo riceve in entrambi i ruoli (oc:8900).
  */
-function fonteSardegnaSentieriMock(): SardegnaSentieriClient&SardegnaSentieriSource&MockInterface
+function mockSardegnaSentieriSource(): SardegnaSentieriClient&SardegnaSentieriSource&MockInterface
 {
     return Mockery::mock(
         SardegnaSentieriClient::class.', '.SardegnaSentieriSource::class
@@ -73,7 +73,7 @@ function fonteSardegnaSentieriMock(): SardegnaSentieriClient&SardegnaSentieriSou
  * @param  array<int|string, string>  $pois  nid ⇒ changed
  * @param  array<int|string, string>  $enti  nid ⇒ changed
  */
-function fonteSardegnaSentieriFinta(array $tracks = [], array $pois = [], bool $available = true, array $enti = []): void
+function fakeSardegnaSentieriSource(array $tracks = [], array $pois = [], bool $available = true, array $enti = []): void
 {
     $source = Mockery::mock(SardegnaSentieriSource::class);
     $source->shouldReceive('isAvailable')->andReturn($available);

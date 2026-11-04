@@ -99,8 +99,8 @@ class ResetSardegnaSentieriCommand extends Command
         TaxonomyActivity::whereIn('id', $activityIds)->delete();
         $this->info("Eliminati {$activityCount} TaxonomyActivity.");
 
-        // Le avvertenze sono termini del tassonomia `warnings` (oc:8910): si cancellano quelle
-        // che vengono da Drupal, non il tassonomia, che la ricrea il comando dei termini.
+        // Le avvertenze sono termini della tassonomia `warnings` (oc:8910): si cancellano quelle
+        // che vengono da Drupal, non la tassonomia, che la ricrea il comando dei termini.
         $warningIds = TaxonomyTerm::query()
             ->where('identifier', 'like', SardegnaSentieriImportService::WARNING_TERM_PREFIX.'%')
             ->pluck('id');

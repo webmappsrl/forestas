@@ -42,7 +42,7 @@ beforeEach(function () {
     ]));
 });
 
-function importaConColonne(array $extra = [], int $nid = 80): EcTrack
+function importWithColumns(array $extra = [], int $nid = 80): EcTrack
 {
     $feature = ApiTrackResponse::fromJson([
         'type' => 'Feature',
@@ -69,7 +69,7 @@ function importaConColonne(array $extra = [], int $nid = 80): EcTrack
 }
 
 it('scrive codice e data di rilievo in colonna e lascia la zona geografica nel JSON', function () {
-    $track = importaConColonne()->fresh();
+    $track = importWithColumns()->fresh();
 
     expect($track->forestas_registry_code)->toBe('SE-001')
         ->and($track->forestas_survey_date?->format('Y-m-d'))->toBe('2024-05-17')
@@ -78,14 +78,14 @@ it('scrive codice e data di rilievo in colonna e lascia la zona geografica nel J
 });
 
 it('non tocca le colonne dell\'inclusività a un reimport', function () {
-    $track = importaConColonne();
+    $track = importWithColumns();
     $track->forceFill([
         'forestas_inclusivity_physical' => 30,
         'forestas_inclusivity_aids' => 5,
         'forestas_inclusivity_digital' => 0,
     ])->saveQuietly();
 
-    importaConColonne(['codice' => 'SE-002']);
+    importWithColumns(['codice' => 'SE-002']);
 
     $track = $track->fresh();
     expect($track->forestas_registry_code)->toBe('SE-002')
@@ -95,7 +95,7 @@ it('non tocca le colonne dell\'inclusività a un reimport', function () {
 });
 
 it('ri-espone le colonne piatte nel GeoJSON', function () {
-    $track = importaConColonne();
+    $track = importWithColumns();
     $track->forceFill([
         'forestas_inclusivity_physical' => 30,
         'forestas_inclusivity_aids' => 5,
@@ -114,13 +114,13 @@ it('ri-espone le colonne piatte nel GeoJSON', function () {
 });
 
 it('conserva i due testi liberi dell\'inclusività a un reimport', function () {
-    $track = importaConColonne();
+    $track = importWithColumns();
     $properties = $track->properties;
     $properties['forestas']['inclusivity_independent_use'] = 'Con accompagnatore';
     $properties['forestas']['inclusivity_assistance'] = 'Su prenotazione';
     $track->forceFill(['properties' => $properties])->saveQuietly();
 
-    importaConColonne(['codice' => 'SE-002']);
+    importWithColumns(['codice' => 'SE-002']);
 
     $forestas = $track->fresh()->properties['forestas'];
     expect($forestas['inclusivity_independent_use'])->toBe('Con accompagnatore')

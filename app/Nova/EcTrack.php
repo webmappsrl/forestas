@@ -124,7 +124,7 @@ class EcTrack extends WmNovaEcTrack
      * Le tassonomie storiche, senza le righe che attività non sono (oc:8910).
      *
      * `sardegnasentieri:type:*` e `sardegnasentieri:cammino` dicono che tipo di percorso è, non
-     * cosa ci si fa: la stessa informazione sta nel tassonomia «Tipo percorso», e Alessio in
+     * cosa ci si fa: la stessa informazione sta nella tassonomia «Tipo percorso», e Alessio in
      * call il 3/11 ha confermato che sono due cose ortogonali.
      *
      * Si nascondono e non si cancellano: i layer «Sentieri», «Itinerari» e «Cammini di Sardegna»

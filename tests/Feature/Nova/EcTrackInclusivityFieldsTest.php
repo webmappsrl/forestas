@@ -36,7 +36,7 @@ function novaTabNames($resource): array
  * Il campo del form con quell'attributo. Ogni tassonomia ne produce due: quello con cui si
  * sceglie e quello di sola lettura del dettaglio, che ha lo stesso attributo.
  */
-function novaTabField($resource, string $tab, string $attribute, bool $soloForm = true)
+function novaTabField($resource, string $tab, string $attribute, bool $formOnly = true)
 {
     foreach (novaTabs($resource) as $t) {
         if (((string) $t->name) !== $tab) {
@@ -46,7 +46,7 @@ function novaTabField($resource, string $tab, string $attribute, bool $soloForm 
             if ($field->attribute !== $attribute) {
                 continue;
             }
-            if ($soloForm && ! ($field->showOnUpdate ?? false)) {
+            if ($formOnly && ! ($field->showOnUpdate ?? false)) {
                 continue;
             }
 
@@ -77,7 +77,7 @@ it('limita i due testi a 30 caratteri', function () {
     }
 });
 
-it('mette un tassonomia creata da Nova nel tab Classifications senza toccare codice', function () {
+it('mette una tassonomia creata da Nova nel tab Classifications senza toccare codice', function () {
     TaxonomyTerm::create(['identifier' => 'tassonomia-nuova', 'name' => ['it' => 'Nuova']]);
 
     expect(novaTabField(new EcTrackResource(new EcTrack), __('General'), 'taxonomy_tassonomia_nuova'))->not->toBeNull()
@@ -110,7 +110,7 @@ it('mostra Tipologia itinerario per itinerari e cammini e la nasconde per i sent
 });
 
 /** Invoca le rules del campo e restituisce il messaggio di errore, o null se passa. */
-function erroreValidazione(string $attribute, array $input): ?string
+function validationError(string $attribute, array $input): ?string
 {
     $field = novaTabField(new EcTrackResource(new EcTrack), __('General'), $attribute);
     $request = NovaRequest::create('/nova-api/ec-tracks', 'POST', $input);
@@ -129,25 +129,25 @@ function erroreValidazione(string $attribute, array $input): ?string
 }
 
 it('rifiuta al salvataggio una tipologia itinerario su un sentiero, non solo la nasconde', function () {
-    $sentiero = TaxonomyTerm::where('identifier', 'route-type-trail')->value('id');
-    $itinerario = TaxonomyTerm::where('identifier', 'route-type-itinerary')->value('id');
+    $track = TaxonomyTerm::where('identifier', 'route-type-trail')->value('id');
+    $itinerary = TaxonomyTerm::where('identifier', 'route-type-itinerary')->value('id');
     $tipologia = TaxonomyTerm::where('identifier', 'sardegnasentieri:tid:4725')->value('id');
 
-    expect(erroreValidazione('taxonomy_itinerary_type', [
-        'taxonomy_route_type' => $sentiero,
+    expect(validationError('taxonomy_itinerary_type', [
+        'taxonomy_route_type' => $track,
         'taxonomy_itinerary_type' => [$tipologia],
     ]))->not->toBeNull();
 
-    expect(erroreValidazione('taxonomy_itinerary_type', [
-        'taxonomy_route_type' => $itinerario,
+    expect(validationError('taxonomy_itinerary_type', [
+        'taxonomy_route_type' => $itinerary,
         'taxonomy_itinerary_type' => [$tipologia],
     ]))->toBeNull();
 });
 
-it('prende la regola dai dati: un tassonomia nuova con depends_on si comporta uguale', function () {
+it('prende la regola dai dati: una tassonomia nuova con depends_on si comporta uguale', function () {
     $source = TaxonomyTerm::where('identifier', 'route-type')->first();
-    $cammino = TaxonomyTerm::where('identifier', 'route-type-walk')->value('id');
-    $sentiero = TaxonomyTerm::where('identifier', 'route-type-trail')->value('id');
+    $walk = TaxonomyTerm::where('identifier', 'route-type-walk')->value('id');
+    $track = TaxonomyTerm::where('identifier', 'route-type-trail')->value('id');
 
     $taxonomy = TaxonomyTerm::create([
         'identifier' => 'tappe',
@@ -156,18 +156,18 @@ it('prende la regola dai dati: un tassonomia nuova con depends_on si comporta ug
     ]);
     TaxonomyTerm::create(['identifier' => 'tappe-si', 'name' => ['it' => 'Sì'], 'parent_id' => $taxonomy->id]);
 
-    expect(erroreValidazione('taxonomy_tappe', [
-        'taxonomy_route_type' => $sentiero,
+    expect(validationError('taxonomy_tappe', [
+        'taxonomy_route_type' => $track,
         'taxonomy_tappe' => [TaxonomyTerm::where('identifier', 'tappe-si')->value('id')],
     ]))->not->toBeNull();
 
-    expect(erroreValidazione('taxonomy_tappe', [
-        'taxonomy_route_type' => $cammino,
+    expect(validationError('taxonomy_tappe', [
+        'taxonomy_route_type' => $walk,
         'taxonomy_tappe' => [TaxonomyTerm::where('identifier', 'tappe-si')->value('id')],
     ]))->toBeNull();
 });
 
-it('mette il tassonomia nel tab che dichiara lui, non in un elenco nel codice', function () {
+it('mette la tassonomia nel tab che dichiara lui, non in un elenco nel codice', function () {
     // Nasce senza dirlo: finisce nel tab di default.
     $v = TaxonomyTerm::create(['identifier' => 'prova-tab', 'name' => ['it' => 'Prova tab']]);
     TaxonomyTerm::create(['identifier' => 'prova-tab-uno', 'name' => ['it' => 'Uno'], 'parent_id' => $v->id]);

@@ -141,7 +141,7 @@ class ImportSardegnaSentieriCommand extends Command
             $this->info('Reset completed.');
         }
 
-        // Il vocabolario delle classificazioni non viene da Drupal: lo crea
+        // La tassonomia delle classificazioni non viene da Drupal: la crea
         // il comando dei termini. Con `--reset` si riparte da zero (le relazioni
         // sono gia' state svuotate da resetData); nell'import orario, che
         // non ricarica tutti i sentieri, azzerare i termini romperebbe le
@@ -867,7 +867,7 @@ class ImportSardegnaSentieriCommand extends Command
 
         // Stessa trappola per le relazioni dei termini delle classificazioni: il
         // pivot polimorfo non ha chiavi esterne verso tracce e POI. Il
-        // vocabolario (`taxonomy_terms`) invece non si tocca: non viene da
+        // la tassonomia (`taxonomy_terms`) invece non si tocca: non viene da
         // Drupal e l'import non saprebbe ricrearlo (oc:8910).
         DB::table('taxonomy_termables')
             ->whereIn('termable_type', self::TRACK_AND_POI_MORPH_TYPES)

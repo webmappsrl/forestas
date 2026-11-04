@@ -11,11 +11,11 @@ use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
 
 /**
- * Crea i tassonomie e i termini del modello unico delle classificazioni (oc:8910).
+ * Crea le tassonomie e i termini del modello unico delle classificazioni (oc:8910).
  *
  * Senza opzioni allinea: per ogni tassonomia e ogni termine dell'elenco cerca la riga per
  * `identifier`, crea ciò che manca e riallinea nome e icona.
- * Non cambia gli id e non tocca ciò che non è nell'elenco, comprese i tassonomie create a mano da
+ * Non cambia gli id e non tocca ciò che non è nell'elenco, comprese le tassonomie create a mano da
  * Nova. Con `--fresh` svuota `taxonomy_terms` e ricrea. Con `--dry-run` stampa e non scrive.
  *
  * Si scrive con `insertOrIgnore` più rilettura, mai con `firstOrCreate` né catturando
@@ -31,7 +31,7 @@ class ConfigureTaxonomyTermsCommand extends Command
         {--fresh : Svuota taxonomy_terms e ricrea tutto}
         {--dry-run : Stampa cosa farebbe senza scrivere}';
 
-    protected $description = 'Crea (o allinea) i tassonomie e i termini del modello unico delle classificazioni';
+    protected $description = 'Crea (o allinea) le tassonomie e i termini del modello unico delle classificazioni';
 
     private const DRUPAL = 'sardegnasentieri:tid:';
 
@@ -65,7 +65,7 @@ class ConfigureTaxonomyTermsCommand extends Command
                 ['Medio', 'educational-trails-difficulty-medium', 1],
                 ['Impegnativo', 'educational-trails-difficulty-hard', 2],
             ]],
-            // Il tab in cui il tassonomia si mostra sulla scheda di un contenuto: è un dato, non
+            // Il tab in cui la tassonomia si mostra sulla scheda di un contenuto: è un dato, non
             // un elenco di identifier nel codice della Resource (oc:8910).
             ['identifier' => 'inclusivity-difficulty', 'icon' => 'txn-wheelchair', 'name' => 'Difficoltà di accessibilità', 'single_choice' => true, 'properties' => ['tab' => 'Inclusivity'], 'terms' => [
                 ['AT', 'inclusivity-difficulty-at', 0],
@@ -82,7 +82,7 @@ class ConfigureTaxonomyTermsCommand extends Command
                 ['Itinerario', 'route-type-itinerary', 1],
                 ['Cammino', 'route-type-walk', 2],
             ]],
-            // Tassonomieo a scelta multipla: 99 nodi Drupal hanno più di una tipologia (oc:8910).
+            // Tipo a scelta multipla: 99 nodi Drupal hanno più di una tipologia (oc:8910).
             // Nomi come in Drupal. Il termine 4728 «Cammini di Sardegna» non c'è: è `route-type-walk`.
             // Ordine per usi, dal più frequente.
             // «Tipologia itinerario» ha senso solo su un itinerario o un cammino: su un sentiero
@@ -101,7 +101,7 @@ class ConfigureTaxonomyTermsCommand extends Command
                 ['Vie della Transumanza', $d(4724), 6],
                 ['Itinerari dello Spirito e altre Destinazioni', $d(4729), 7],
             ]],
-            // Avvertenze: il tassonomia nasce qui, i termini li porta l'import da Drupal
+            // Avvertenze: la tassonomia nasce qui, i termini li porta l'import da Drupal
             // (`sardegnasentieri:warning:<tid>`) e cambiano con la sorgente (oc:8910).
             ['identifier' => 'warnings', 'icon' => 'txn-alert', 'name' => 'Avvertenze', 'single_choice' => false, 'terms' => []],
         ];
@@ -128,7 +128,7 @@ class ConfigureTaxonomyTermsCommand extends Command
      *
      * Vanno rinominate, non ricreate: `align()` cerca per identifier, quindi senza questo passo
      * nascerebbe una riga nuova accanto alla vecchia, che resterebbe lì con i suoi termini e i
-     * suoi legami. Una voce si può togliere da qui quando nessun database ha più la chiave
+     * sue relazioni. Una voce si può togliere da qui quando nessun database ha più la chiave
      * vecchia; tenerla non costa niente, perché la rinomina non trova nulla da fare.
      *
      * @var array<string, string>
@@ -212,7 +212,7 @@ class ConfigureTaxonomyTermsCommand extends Command
     }
 
     /**
-     * Toglie i tassonomie ritirati, se vuoti.
+     * Toglie le tassonomie ritirate, se vuote.
      */
     private function removeRetired(bool $dry): void
     {
@@ -230,7 +230,7 @@ class ConfigureTaxonomyTermsCommand extends Command
                 continue;
             }
 
-            $this->line(($dry ? '[dry-run] ' : '')."Tolgo il tassonomia ritirato {$identifier}");
+            $this->line(($dry ? '[dry-run] ' : '')."Tolgo la tassonomia ritirata {$identifier}");
             if (! $dry) {
                 $row->delete();
             }
@@ -300,11 +300,11 @@ class ConfigureTaxonomyTermsCommand extends Command
     }
 
     /**
-     * Accende i tassonomie di questo shard in tutte le sue app (oc:8910).
+     * Accende le tassonomie di questo shard in tutte le sue app (oc:8910).
      *
      * Sono custom, non di sistema: nascono spenti e nessuno li accenderebbe da solo. Forestas
      * ha una sola app, ma il comando non lo dà per scontato. `syncWithoutDetaching` non tocca
-     * ciò che è già acceso e non spegne niente: se qualcuno ha spento un tassonomia in Nova,
+     * ciò che è già acceso e non spegne niente: se qualcuno ha spento una tassonomia in Nova,
      * un rilancio del comando lo riaccende — è il prezzo di un comando che allinea.
      */
     private function enableForApps(bool $dry): int

@@ -26,7 +26,7 @@ readonly class ApiTaxonomiesData
         /**
          * Padre di ogni tid di `categorie_fruibilita_sentieri` nella gerarchia del vocabolario: tid => tid del
          * padre, `'0'` per una radice. Lo dà solo la copia del DB Drupal (le API non lo esponevano): senza,
-         * l'import non scrive i legami dei termini (oc:8910).
+         * l'import non scrive le relazioni dei termini (oc:8910).
          *
          * @var array<string, string>
          */
