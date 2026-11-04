@@ -4,8 +4,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Models\App;
-use Wm\WmPackage\Models\EcPoi;
-use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Models\TaxonomyTerm;
@@ -20,9 +18,11 @@ use Wm\WmPackage\Services\RolesAndPermissionsService;
  * passava quei test e rompeva ogni salvataggio dalla scheda. Qui si fa la richiesta che fa il
  * browser, una per Resource, e dove il ticket ha aggiunto qualcosa si verifica anche l'effetto.
  *
- * Qui stanno solo le Resource di Forestas. Quelle del package — `TaxonomyTerm`, `Layer`, `App` —
- * hanno il loro test nel package (`wm-package/tests/Feature/Nova/PackageResourceSaveTest.php`),
- * che gira da uno shard ma protegge tutti.
+ * Qui restano solo le due tassonomie con tabella propria, che sono di Forestas, e la vista delle
+ * avvertenze. Tutto il resto — `TaxonomyTerm`, `Layer`, `App` e la sezione delle tassonomie sulle
+ * schede EC, che il package compone e lo shard eredita — ha il suo test nel package, in
+ * `wm-package/tests/Feature/Nova/PackageResourceSaveTest.php`: gira da uno shard ma protegge
+ * tutti.
  */
 uses(RefreshDatabase::class);
 
@@ -60,66 +60,6 @@ beforeEach(function () {
     ]);
     // Le tassonomie si vedono solo se accese sull'app del contenuto.
     $this->app1->taxonomies()->sync([$this->routeType->id]);
-});
-
-it('salva il tipo percorso sulla scheda di un sentiero', function () {
-    $track = EcTrack::factory()->createQuietly([
-        'app_id' => $this->app1->id,
-        'user_id' => $this->user->id,
-        'properties' => [],
-    ]);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/ec-tracks/{$track->id}", [
-            'app' => $this->app1->id,
-            'user' => $this->user->id,
-            'taxonomy_route_type' => (string) $this->trail->id,
-        ])
-        ->assertOk();
-
-    expect($track->fresh()->terms('route-type')->pluck('identifier')->all())
-        ->toBe(['route-type-trail']);
-});
-
-it('cambia il tipo percorso di un sentiero e non lascia il vecchio', function () {
-    $track = EcTrack::factory()->createQuietly([
-        'app_id' => $this->app1->id,
-        'user_id' => $this->user->id,
-        'properties' => [],
-    ]);
-    $track->taxonomyTerms()->attach($this->trail->id);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/ec-tracks/{$track->id}", [
-            'app' => $this->app1->id,
-            'user' => $this->user->id,
-            'taxonomy_route_type' => (string) $this->walk->id,
-        ])
-        ->assertOk();
-
-    expect($track->fresh()->terms('route-type')->pluck('identifier')->all())
-        ->toBe(['route-type-walk']);
-});
-
-it('salva la scheda di un POI', function () {
-    // `properties` come array: la colonna porta anche due campi traducibili per path
-    // (`properties->description`), e su una stringa il riempimento di Nova non regge.
-    $poi = EcPoi::factory()->createQuietly([
-        'app_id' => $this->app1->id,
-        'user_id' => $this->user->id,
-        'name' => ['it' => 'Fonte'],
-        'properties' => [],
-    ]);
-
-    $this->actingAs($this->user)
-        ->putJson("/nova-api/ec-pois/{$poi->id}", [
-            'app' => $this->app1->id,
-            'user' => $this->user->id,
-            'translations_name_it' => 'Fonte vecchia',
-        ])
-        ->assertOk();
-
-    expect($poi->fresh()->getTranslation('name', 'it'))->toBe('Fonte vecchia');
 });
 
 it('salva la scheda di un\'attività, di un tipo di POI e di un\'avvertenza', function () {

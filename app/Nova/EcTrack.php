@@ -39,22 +39,19 @@ class EcTrack extends WmNovaEcTrack
     {
         $parentFields = parent::fields($request);
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
-        $regularFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
+        // I TabsGroup del package si scartano per ricomporli qui sotto; la sezione delle
+        // tassonomie resta, perché arriva già nel punto giusto, sopra i Blocchi Dettaglio.
+        $regularFields = $this->keepOnlyTaxonomySection($parentFields);
+        $regularFields = array_values(array_filter(
+            $regularFields,
+            fn ($f) => ! in_array(get_class($f), $relationTypes)
+        ));
         // Forestas ha una sola app: il filtro App restituirebbe sempre tutte le tracce (oc:8875).
         foreach ($regularFields as $field) {
             if ($field instanceof BelongsTo && $field->attribute === 'app') {
                 $field->withoutFilterable();
             }
         }
-
-        // La sezione delle classificazioni va sopra il pannello «Blocchi Dettaglio», che arriva
-        // dalla Resource del package ed è in mezzo ai campi ereditati: va inserita lì dentro,
-        // non in coda, altrimenti finisce sotto (oc:8910).
-        $regularFields = $this->insertBefore(
-            $regularFields,
-            __('Detail Blocks'),
-            $this->makeTaxonomySection()
-        );
 
         // Il pannello delle proprietà (il JSON grezzo) va in fondo alla pagina: è l'ultima cosa
         // che interessa a chi compila una scheda — deciso in call con Alessio il 3/11 (oc:8910).
@@ -99,25 +96,6 @@ class EcTrack extends WmNovaEcTrack
             array_values(array_filter($fields, fn ($f) => ! $matches($f))),
             array_values(array_filter($fields, $matches)),
         ];
-    }
-
-    /**
-     * Inserisce un campo prima di quello con il nome dato; in coda se quel nome non c'è.
-     *
-     * @param  array<int, mixed>  $fields
-     * @return array<int, mixed>
-     */
-    private function insertBefore(array $fields, string $name, mixed $nuovo): array
-    {
-        foreach ($fields as $i => $field) {
-            if (((string) ($field->name ?? '')) === $name) {
-                array_splice($fields, $i, 0, [$nuovo]);
-
-                return $fields;
-            }
-        }
-
-        return [...$fields, $nuovo];
     }
 
     /**

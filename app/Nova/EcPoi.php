@@ -52,7 +52,11 @@ class EcPoi extends WmNovaEcPoi
     {
         $parentFields = parent::fields($request);
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
-        $regularFields = array_values(array_filter($parentFields, fn ($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
+        // Come su EcTrack: via i TabsGroup del package, tranne le tassonomie (oc:8910).
+        $regularFields = array_values(array_filter(
+            $this->keepOnlyTaxonomySection($parentFields),
+            fn ($f) => ! in_array(get_class($f), $relationTypes)
+        ));
 
         return [
             ...$regularFields,

@@ -136,3 +136,15 @@ Le colonne che Forestas aggiunge a una tabella del package portano il prefisso `
 (`forestas_registry_code`, `forestas_survey_date`, `forestas_geographic_area`,
 `forestas_inclusivity_*`): se il package aggiungesse una colonna omonima, il suo `ALTER TABLE`
 fallirebbe al deploy.
+
+## Le tassonomie di Forestas classificano i sentieri
+
+Tutte e undici dichiarano `properties->models = ["EcTrack"]`, scritto da
+`ConfigureTaxonomyTermsCommand`. Senza quella chiave una tassonomia accesa sull'app compare su
+ogni contenuto, POI compresi: l'accensione per app dice dove esiste, non a cosa si applica. Su
+Forestas l'app è una sola, quindi le due select dell'inclusività sarebbero finite sulla scheda di
+ogni POI.
+
+Il meccanismo è del package — `BuildsTaxonomyFields::taxonomyAppliesHere()` — e non vale sui
+Layer, dove le tassonomie sono filtri che scelgono i contenuti. Se un giorno una tassonomia dovrà
+valere anche per i POI, si aggiunge `"EcPoi"` all'elenco nel comando: non serve altro (oc:8910).

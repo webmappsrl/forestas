@@ -106,3 +106,16 @@ it('dà alle attività il nome italiano, senza toccare quelle che ne hanno già 
     expect($horse->fresh()->getTranslation('name', 'it', false))->toBe('Ippovia')
         ->and($custom->fresh()->getTranslation('name', 'it', false))->toBe('La mia bici');
 });
+
+it('dichiara che le tassonomie di Forestas classificano i sentieri, non i POI (oc:8910)', function () {
+    // L'accensione per app dice dove una tassonomia esiste, non a cosa si applica: senza
+    // `models` le select dell'inclusività comparirebbero anche sulla scheda di un POI.
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertExitCode(0);
+
+    $senzaModels = TaxonomyTerm::query()->taxonomies()->get()
+        ->filter(fn ($t) => data_get($t->properties, 'models') !== ['EcTrack'])
+        ->pluck('identifier')
+        ->all();
+
+    expect($senzaModels)->toBe([]);
+});
