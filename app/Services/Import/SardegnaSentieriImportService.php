@@ -1117,7 +1117,7 @@ class SardegnaSentieriImportService
     /**
      * Segna sul sentiero ciò che la classificazione non ha saputo scrivere, o
      * toglie il segno quando non c'è più niente da segnalare, e lo mette nel
-     * log `import`. Stesso schema di `rememberEntiMancanti`: il sentiero
+     * log `import`. Stesso schema di `rememberMissingEntes`: il sentiero
      * porta con sé cosa va corretto in Drupal (oc:8910).
      *
      * @param  list<array<string, mixed>>  $anomalies
@@ -1189,7 +1189,7 @@ class SardegnaSentieriImportService
 
     private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
-        $this->entiMancanti = false;
+        $this->missingEntes = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         $pairs = [];
@@ -1238,12 +1238,12 @@ class SardegnaSentieriImportService
             ]);
         }
 
-        $this->rememberEntiMancanti($ecPoi);
+        $this->rememberMissingEntes($ecPoi);
     }
 
     private function syncEnti(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $this->entiMancanti = false;
+        $this->missingEntes = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         // Collect all (enteId, ruolo) pairs — same ente can have multiple roles
@@ -1299,7 +1299,7 @@ class SardegnaSentieriImportService
             ]);
         }
 
-        $this->rememberEntiMancanti($ecTrack);
+        $this->rememberMissingEntes($ecTrack);
     }
 
     /**
@@ -1308,16 +1308,16 @@ class SardegnaSentieriImportService
      * con lo stesso `changed`, altrimenti il collegamento in produzione
      * tornerebbe solo al prossimo cambio del nodo in Drupal (oc:8513).
      */
-    private function rememberEntiMancanti(EcPoi|EcTrack $model): void
+    private function rememberMissingEntes(EcPoi|EcTrack $model): void
     {
         $properties = is_array($model->properties) ? $model->properties : [];
         $before = $properties['forestas']['enti_mancanti'] ?? false;
 
-        if ($before === $this->entiMancanti) {
+        if ($before === $this->missingEntes) {
             return;
         }
 
-        if ($this->entiMancanti) {
+        if ($this->missingEntes) {
             $properties['forestas']['enti_mancanti'] = true;
         } else {
             unset($properties['forestas']['enti_mancanti']);
@@ -1349,7 +1349,7 @@ class SardegnaSentieriImportService
         }
 
         if ($this->enteCache[$cacheKey] === null) {
-            $this->entiMancanti = true;
+            $this->missingEntes = true;
         }
 
         return $this->enteCache[$cacheKey];

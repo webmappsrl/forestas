@@ -189,3 +189,50 @@ it('mette la tassonomia nel tab che dichiara lui, non in un elenco nel codice', 
     expect(novaTabField(new EcTrackResource(new EcTrack), __('Inclusivity'), 'taxonomy_prova_tab'))->not->toBeNull()
         ->and(novaTabField(new EcTrackResource(new EcTrack), __('General'), 'taxonomy_prova_tab'))->toBeNull();
 });
+
+it('valida i tre valori lato server, non solo nel browser (oc:8910)', function () {
+    // `min()` e `max()` di Nova scrivono solo i meta del campo, cioè gli attributi
+    // dell'<input>: una richiesta fuori dall'interfaccia li scavalca, la colonna è
+    // smallInteger e accetta fino a 32767, e il punteggio finisce fuori scala.
+    $ranges = [
+        'forestas_inclusivity_physical' => [11, 55],
+        'forestas_inclusivity_aids' => [1, 23],
+        'forestas_inclusivity_digital' => [0, 22],
+    ];
+
+    foreach ($ranges as $attribute => [$min, $max]) {
+        $field = novaTabField(new EcTrackResource(new EcTrack), __('Inclusivity'), $attribute);
+        expect($field)->not->toBeNull()
+            ->and(collect($field->rules)->flatten()->all())->toContain("between:{$min},{$max}")
+            ->and($field->min)->toBe($min)
+            ->and($field->max)->toBe($max);
+    }
+});
+
+it('l_endpoint Nova rifiuta un valore fuori scala (oc:8910)', function () {
+    $track = \Wm\WmPackage\Models\EcTrack::factory()->createQuietly([
+        'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
+        'properties' => [],
+    ]);
+    \Wm\WmPackage\Services\RolesAndPermissionsService::seedDatabase();
+    $user = \App\Models\User::factory()->create();
+    $user->assignRole('Administrator');
+
+    $this->actingAs($user)
+        ->putJson("/nova-api/ec-tracks/{$track->id}", [
+            'forestas_inclusivity_physical' => 500,
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('forestas_inclusivity_physical');
+
+    expect($track->fresh()->forestas_inclusivity_physical)->toBeNull();
+});
+
+it('prende gli intervalli dalla configurazione, così il Tavolo Tecnico li cambia lì (oc:8910)', function () {
+    config(['forestas.inclusivity_ranges.physical' => ['min' => 20, 'max' => 40]]);
+
+    $field = novaTabField(new EcTrackResource(new EcTrack), __('Inclusivity'), 'forestas_inclusivity_physical');
+
+    expect(collect($field->rules)->flatten()->all())->toContain('between:20,40')
+        ->and($field->name)->toContain('(20-40)');
+});

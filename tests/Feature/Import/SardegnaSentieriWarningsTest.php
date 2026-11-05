@@ -140,7 +140,7 @@ it('non lascia in giro le tabelle vecchie', function () {
         ->and(Schema::hasTable('taxonomy_warningables'))->toBeFalse();
 });
 
-it('mostra nella vista Avvertenze solo i termini di quelil tassonomia', function () {
+it('mostra nella vista Avvertenze solo i termini di quella tassonomia', function () {
     [$service] = warningsService();
     $service->importAll();
 

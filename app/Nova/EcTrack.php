@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Enums\StatoValidazione;
+use App\Models\EcTrack as EcTrackModel;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Nova\Filters\EcTrackLayerFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
@@ -142,16 +143,53 @@ class EcTrack extends WmNovaEcTrack
         return [
             'Inclusivity' => [
                 // Punteggi a mano: nessuna sorgente li possiede e l'import non li tocca.
-                Number::make(__('Physical inclusivity (11-55)'), 'forestas_inclusivity_physical')->min(11)->max(55)->nullable()->hideFromIndex(),
-                Number::make(__('Aids inclusivity (1-23)'), 'forestas_inclusivity_aids')->min(1)->max(23)->nullable()->hideFromIndex(),
-                Number::make(__('Digital inclusivity (0-22)'), 'forestas_inclusivity_digital')->min(0)->max(22)->nullable()->hideFromIndex(),
+                $this->inclusivityField(__('Physical inclusivity'), 'forestas_inclusivity_physical', 'physical'),
+                $this->inclusivityField(__('Aids inclusivity'), 'forestas_inclusivity_aids', 'aids'),
+                $this->inclusivityField(__('Digital inclusivity'), 'forestas_inclusivity_digital', 'digital'),
                 Text::make(__('Independent use'), 'properties->forestas->inclusivity_independent_use')->rules('nullable', 'max:30')->hideFromIndex(),
                 Text::make(__('Assistance availability'), 'properties->forestas->inclusivity_assistance')->rules('nullable', 'max:30')->hideFromIndex(),
                 // Derivati, non scritti da nessuno: si calcolano dai tre valori sopra.
-                Text::make(__('Inclusivity score'), fn () => InclusivityScore::for($this->resource instanceof \App\Models\EcTrack ? $this->resource : new \App\Models\EcTrack)['score'] ?? null)->onlyOnDetail(),
-                Text::make(__('Inclusivity class'), fn () => InclusivityScore::for($this->resource instanceof \App\Models\EcTrack ? $this->resource : new \App\Models\EcTrack)['class'] ?? null)->onlyOnDetail(),
+                Text::make(__('Inclusivity score'), fn () => $this->inclusivity()['score'] ?? null)->onlyOnDetail(),
+                Text::make(__('Inclusivity class'), fn () => $this->inclusivity()['class'] ?? null)->onlyOnDetail(),
             ],
         ];
+    }
+
+    /**
+     * Uno dei tre valori dell'inclusività, con il suo intervallo da `config/forestas.php`.
+     *
+     * L'intervallo compare in tre posti — l'etichetta, gli attributi del campo e la regola di
+     * validazione — e vengono tutti e tre da lì: `min()` e `max()` di Nova scrivono solo i
+     * `meta` del campo, cioè gli attributi dell'`<input>` nel browser, e non aggiungono nessuna
+     * regola. Senza `rules()` una richiesta fuori dall'interfaccia scrive quello che vuole, la
+     * colonna è `smallInteger` e accetta fino a 32767, e il punteggio finisce fuori scala:
+     * `InclusivityScore::classFor()` non trova nessuna classe e il sentiero sparisce dai filtri
+     * senza che niente segnali un errore (oc:8910).
+     */
+    private function inclusivityField(string $label, string $attribute, string $range): Number
+    {
+        $min = (int) config("forestas.inclusivity_ranges.{$range}.min");
+        $max = (int) config("forestas.inclusivity_ranges.{$range}.max");
+
+        return Number::make("{$label} ({$min}-{$max})", $attribute)
+            ->min($min)
+            ->max($max)
+            ->rules('nullable', 'integer', "between:{$min},{$max}")
+            ->nullable()
+            ->hideFromIndex();
+    }
+
+    /**
+     * Il punteggio del sentiero in scheda, o `null` su una risorsa vuota (Nova costruisce i
+     * campi anche su un'istanza senza modello, in creazione).
+     *
+     * @return array{score: int, class: string}|null
+     */
+    private function inclusivity(): ?array
+    {
+        return $this->resource instanceof EcTrackModel
+            ? InclusivityScore::for($this->resource)
+            : null;
     }
 
     public function filters(NovaRequest $request): array

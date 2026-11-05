@@ -68,6 +68,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Intervalli dei tre valori di inclusività (oc:8910)
+    |--------------------------------------------------------------------------
+    |
+    | AF accessibilità fisica, AA presenza di ausili, AD accessibilità digitale:
+    | li compila un operatore in Nova, estremi compresi. Come le classi qui sotto,
+    | il Tavolo Tecnico Regionale può cambiarli ogni anno, quindi stanno qui e non
+    | sparsi fra il campo Nova, la sua etichetta e le regole di validazione.
+    |
+    | Da qui nascono il controllo lato server e il minimo e massimo del campo: il
+    | secondo da solo è solo un attributo del campo nel browser, che una richiesta
+    | fuori dall'interfaccia scavalca senza accorgersene.
+    |
+    */
+
+    'inclusivity_ranges' => [
+        'physical' => ['min' => 11, 'max' => 55],
+        'aids' => ['min' => 1, 'max' => 23],
+        'digital' => ['min' => 0, 'max' => 22],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Classi di inclusività A1-A6 (oc:8910)
     |--------------------------------------------------------------------------
     |

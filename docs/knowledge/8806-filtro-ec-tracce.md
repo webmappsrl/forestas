@@ -94,8 +94,7 @@ Vincoli:
   uguale all'id di un'area può prendere il posto della voce dell'area su una traccia che le
   attraversa entrambe. Il controllo della sorgente evita i falsi positivi, non questa perdita;
 - **un layer di tipologia senza termini resta vuoto o vecchio**: il job salta i layer senza
-  filtro. Succede finché `configure-layers` non è stato lanciato, e dopo il comando manuale
-  `sardegnasentieri:reset`;
+  filtro. Succede finché `configure-layers` non è stato lanciato;
 - **svuotare `taxonomy_terms` svuota anche i layer**: il pivot `taxonomy_termables` ha
   `cascadeOnDelete` sul termine, quindi un `configure-taxonomy-terms --fresh` porta via relazioni
   che con i termini ricreati non tornano, perché gli id sono nuovi. Per questo l'import non passa
