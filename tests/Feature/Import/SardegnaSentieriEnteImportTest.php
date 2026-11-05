@@ -28,7 +28,7 @@ uses(RefreshDatabase::class);
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function nodoEnte(int $nid, array $overrides = []): array
+function enteNode(int $nid, array $overrides = []): array
 {
     return array_merge([
         'nid' => [['value' => $nid]],
@@ -46,16 +46,16 @@ function nodoEnte(int $nid, array $overrides = []): array
  * Il service con una fonte che restituisce i nodi dati e una sync delle
  * immagini finta, restituita per le aspettative.
  *
- * @param  array<int, array<string, mixed>|Throwable>  $nodi
+ * @param  array<int, array<string, mixed>|Throwable>  $nodes
  * @return array{0: SardegnaSentieriImportService, 1: SardegnaSentieriSource&MockInterface, 2: SardegnaSentieriMediaSyncService&MockInterface}
  */
-function serviceEnti(array $nodi = []): array
+function enteService(array $nodes = []): array
 {
     $source = Mockery::mock(SardegnaSentieriSource::class);
-    $source->shouldReceive('getNodeDetail')->andReturnUsing(function (int $id) use ($nodi) {
-        $nodo = $nodi[$id] ?? throw new RuntimeException("Nodo {$id} non trovato nella copia del DB Drupal");
+    $source->shouldReceive('getNodeDetail')->andReturnUsing(function (int $id) use ($nodes) {
+        $node = $nodes[$id] ?? throw new RuntimeException("Nodo {$id} non trovato nella copia del DB Drupal");
 
-        return $nodo instanceof Throwable ? throw $nodo : $nodo;
+        return $node instanceof Throwable ? throw $node : $node;
     });
     $mediaSync = Mockery::mock(SardegnaSentieriMediaSyncService::class);
 
@@ -63,7 +63,7 @@ function serviceEnti(array $nodi = []): array
 }
 
 it('scrive l ente e salva il changed di Drupal', function () {
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281)]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281)]);
     $mediaSync->shouldReceive('syncImportedImages')->once();
 
     $id = $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
@@ -76,13 +76,13 @@ it('scrive l ente e salva il changed di Drupal', function () {
 });
 
 it('svuota i campi svuotati in Drupal', function () {
-    $vuoti = ['body' => [], 'field_contatti' => [], 'field_pagina_web' => [], 'field_geolocalizzazione' => []];
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281)]);
+    $empties = ['body' => [], 'field_contatti' => [], 'field_pagina_web' => [], 'field_geolocalizzazione' => []];
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281)]);
     $mediaSync->shouldReceive('syncImportedImages');
     $id = $service->importOrUpdateEnte('5281', '2026-10-29 10:00:00');
 
     // Lo stesso ente, riletto dopo che in Drupal hanno svuotato i campi.
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281, $vuoti)]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281, $empties)]);
     $mediaSync->shouldReceive('syncImportedImages');
     $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
 
@@ -94,13 +94,13 @@ it('svuota i campi svuotati in Drupal', function () {
 });
 
 it('svuota i campi anche di un ente senza tipo in Drupal', function () {
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281)]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281)]);
     $mediaSync->shouldReceive('syncImportedImages');
     $id = $service->importOrUpdateEnte('5281', '2026-10-29 10:00:00');
 
     // In Drupal tolgono il tipo e svuotano i contatti: il ramo del tipo
     // non mappato non deve far perdere le altre modifiche.
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281, ['field_tipo_ente' => [], 'field_contatti' => []])]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281, ['field_tipo_ente' => [], 'field_contatti' => []])]);
     $mediaSync->shouldReceive('syncImportedImages');
     $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
 
@@ -110,7 +110,7 @@ it('svuota i campi anche di un ente senza tipo in Drupal', function () {
 });
 
 it('toglie l immagine rimossa in Drupal', function () {
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281, ['field_immagine_principale' => []])]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281, ['field_immagine_principale' => []])]);
     $mediaSync->shouldReceive('syncImportedImages')->once()->withArgs(fn ($ente, array $items) => $items === []);
 
     $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
@@ -122,7 +122,7 @@ it('toglie il marchio di ente sparito', function () {
         'name' => ['it' => 'Vecchio nome'],
         'properties' => ['forestas' => ['updated_at' => '2026-01-01 00:00:00', 'deleted_from_source' => true]],
     ]);
-    [$service, , $mediaSync] = serviceEnti([5281 => nodoEnte(5281)]);
+    [$service, , $mediaSync] = enteService([5281 => enteNode(5281)]);
     $mediaSync->shouldReceive('syncImportedImages');
 
     $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
@@ -133,7 +133,7 @@ it('toglie il marchio di ente sparito', function () {
 });
 
 it('fallisce se il nodo non si legge', function () {
-    [$service] = serviceEnti([5281 => new RuntimeException('copia irraggiungibile')]);
+    [$service] = enteService([5281 => new RuntimeException('copia irraggiungibile')]);
 
     $service->importOrUpdateEnte('5281', '2026-10-30 10:00:00');
 })->throws(RuntimeException::class, 'copia irraggiungibile');
@@ -150,7 +150,7 @@ it('un sentiero collega solo enti esistenti', function () {
     Storage::fake('wmfe');
     Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
     $gestore = Ente::create(['sardegnasentieri_id' => '5281', 'name' => ['it' => 'Agenzia Forestas']]);
-    [$service, $source] = serviceEnti();
+    [$service, $source] = enteService();
     $source->shouldReceive('getTaxonomy', 'getTaxonomyWarnings')->andReturn([]);
 
     $track = $service->importTrackFromResponse(1836, ApiTrackResponse::fromJson([
@@ -184,7 +184,7 @@ it('un sentiero con tutti gli enti presenti non resta da ricollegare', function 
     Storage::fake('wmfe');
     Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
     Ente::create(['sardegnasentieri_id' => '5281', 'name' => ['it' => 'Agenzia Forestas']]);
-    [$service, $source] = serviceEnti();
+    [$service, $source] = enteService();
     $source->shouldReceive('getTaxonomy', 'getTaxonomyWarnings')->andReturn([]);
 
     $track = $service->importTrackFromResponse(1836, ApiTrackResponse::fromJson([

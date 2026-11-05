@@ -53,8 +53,6 @@ readonly class ForestasTrackData
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'zona_geografica' => self::listToAssoc($this->zona_geografica),
-            'codice' => $this->codice,
-            'data_rilievo' => $this->data_rilievo,
             'info_utili' => $this->info_utili,
             'roadbook' => $this->roadbook,
             'skip_dem_jobs' => $this->skip_dem_jobs,

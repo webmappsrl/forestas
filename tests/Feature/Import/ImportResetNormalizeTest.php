@@ -53,7 +53,7 @@ beforeEach(function () {
     // Le liste restituiscono un elemento per tipo: serve solo che qualche job
     // venga prodotto, non che l'import scriva davvero. Le tassonomie tornano
     // vuote, cosi' `importAll()` non ha nulla da costruire.
-    fonteSardegnaSentieriFinta(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
+    fakeSardegnaSentieriSource(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
 
     // Il backup che `--reset` esegue prima di troncare: qui deve riuscire.
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
@@ -136,7 +136,7 @@ it('azzera anche le domande di iscrizione', function () {
     expect(DB::table('trail_applications')->count())->toBe(0);
 });
 
-it('il reset conserva le attività e i loro legami con i layer (oc:8827)', function () {
+it('il reset conserva le attività e le loro relazioni con i layer (oc:8827)', function () {
     Bus::fake();
 
     $activityId = DB::table('taxonomy_activities')->insertGetId([
@@ -165,7 +165,7 @@ it('il reset conserva le attività e i loro legami con i layer (oc:8827)', funct
             ->all())->toBe(['App\Models\Layer', 'Wm\WmPackage\Models\Layer']);
 });
 
-it('il reset cancella i legami di tracce e POI con attività e layer (oc:8827)', function () {
+it('il reset cancella le relazioni di tracce e POI con attività e layer (oc:8827)', function () {
     Bus::fake();
 
     $activityId = DB::table('taxonomy_activities')->insertGetId([

@@ -66,4 +66,50 @@ return [
         'compare_cache_path' => storage_path('app/sardegnasentieri-compare-cache'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Intervalli dei tre valori di inclusività (oc:8910)
+    |--------------------------------------------------------------------------
+    |
+    | AF accessibilità fisica, AA presenza di ausili, AD accessibilità digitale:
+    | li compila un operatore in Nova, estremi compresi. Come le classi qui sotto,
+    | il Tavolo Tecnico Regionale può cambiarli ogni anno, quindi stanno qui e non
+    | sparsi fra il campo Nova, la sua etichetta e le regole di validazione.
+    |
+    | Da qui nascono il controllo lato server e il minimo e massimo del campo: il
+    | secondo da solo è solo un attributo del campo nel browser, che una richiesta
+    | fuori dall'interfaccia scavalca senza accorgersene.
+    |
+    */
+
+    'inclusivity_ranges' => [
+        'physical' => ['min' => 11, 'max' => 55],
+        'aids' => ['min' => 1, 'max' => 23],
+        'digital' => ['min' => 0, 'max' => 22],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Classi di inclusività A1-A6 (oc:8910)
+    |--------------------------------------------------------------------------
+    |
+    | Intervalli del punteggio (somma dei tre valori, da 12 a 100), estremi compresi.
+    | Il Tavolo Tecnico Regionale può cambiarli ogni anno. Le classi già scritte
+    | nell'indice Elasticsearch non si aggiornano da sole: dopo una modifica serve
+    | un reindex (basta quello normale, il mapping non cambia).
+    |
+    | ATTENZIONE: solo A1 e A2 vengono dalla call; le soglie di A3-A6 sono
+    | provvisorie, da sostituire con quelle del regolamento regionale.
+    |
+    */
+
+    'inclusivity_classes' => [
+        'A1' => ['min' => 80, 'max' => 100],
+        'A2' => ['min' => 57, 'max' => 79],
+        'A3' => ['min' => 43, 'max' => 56],
+        'A4' => ['min' => 29, 'max' => 42],
+        'A5' => ['min' => 15, 'max' => 28],
+        'A6' => ['min' => 0, 'max' => 14],
+    ],
+
 ];

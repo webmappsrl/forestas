@@ -34,17 +34,17 @@ beforeEach(function () {
     Bus::fake();
 });
 
-function enteLocale(string $nid, string $changed, bool $sparito = false): Ente
+function enteLocale(string $nid, string $changed, bool $gone = false): Ente
 {
     return Ente::create([
         'sardegnasentieri_id' => $nid,
         'name' => ['it' => "Ente {$nid}"],
-        'properties' => ['forestas' => array_filter(['updated_at' => $changed, 'deleted_from_source' => $sparito ?: null])],
+        'properties' => ['forestas' => array_filter(['updated_at' => $changed, 'deleted_from_source' => $gone ?: null])],
     ]);
 }
 
 it('accoda prima gli enti e poi POI e sentieri', function () {
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -59,7 +59,7 @@ it('accoda prima gli enti e poi POI e sentieri', function () {
 
 it('non riaccoda un ente non cambiato', function () {
     enteLocale('5281', '2026-10-30 10:00:00');
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -68,7 +68,7 @@ it('non riaccoda un ente non cambiato', function () {
 });
 
 it('senza POI e sentieri cambiati accoda solo gli enti', function () {
-    fonteSardegnaSentieriFinta([], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource([], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -77,7 +77,7 @@ it('senza POI e sentieri cambiati accoda solo gli enti', function () {
 
 it('marca gli enti spariti', function () {
     enteLocale('123', '2026-01-01 00:00:00');
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -88,7 +88,7 @@ it('non marca nulla se la lista degli enti e vuota', function () {
     // Sentieri presenti e nessun ente: la copia e' a meta' o la query e'
     // rotta, non 93 enti spariti insieme.
     enteLocale('5281', '2026-10-30 10:00:00');
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], [], enti: []);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: []);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -97,8 +97,8 @@ it('non marca nulla se la lista degli enti e vuota', function () {
 
 it('riaccoda un ente marcato sparito che e tornato in Drupal', function () {
     // Stesso changed: senza questa regola resterebbe marcato per sempre.
-    enteLocale('5281', '2026-10-30 10:00:00', sparito: true);
-    fonteSardegnaSentieriFinta([], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    enteLocale('5281', '2026-10-30 10:00:00', gone: true);
+    fakeSardegnaSentieriSource([], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 
@@ -107,7 +107,7 @@ it('riaccoda un ente marcato sparito che e tornato in Drupal', function () {
 });
 
 it('con --only=tracks importa comunque gli enti', function () {
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], ['2' => '2026-10-30 10:00:00'], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], ['2' => '2026-10-30 10:00:00'], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import', ['--only' => 'tracks'])->assertSuccessful();
 
@@ -120,7 +120,7 @@ it('con --only=tracks importa comunque gli enti', function () {
 it('il reset svuota enteables e tiene gli enti', function () {
     $ente = enteLocale('5281', '2026-10-30 10:00:00');
     DB::table('enteables')->insert(['ente_id' => $ente->id, 'enteable_id' => 99, 'enteable_type' => 'Wm\\WmPackage\\Models\\EcTrack', 'ruolo' => 'gestore']);
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import', ['--reset' => true])->assertSuccessful();
 
@@ -144,7 +144,7 @@ it('rimette in coda un sentiero rimasto senza un ente', function () {
         'properties' => json_encode(['sardegnasentieri_id' => '1836', 'forestas' => ['updated_at' => '2026-10-30 10:00:00', 'enti_mancanti' => true]]),
         'created_at' => now(), 'updated_at' => now(),
     ]));
-    fonteSardegnaSentieriFinta(['1836' => '2026-10-30 10:00:00']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00']);
 
     $this->artisan('sardegnasentieri:import')->assertSuccessful();
 

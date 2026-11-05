@@ -14,8 +14,8 @@ use App\Nova\Media as NovaMedia;
 use App\Nova\RegistroCatastaleRow;
 use App\Nova\TaxonomyActivity;
 use App\Nova\TaxonomyPoiType;
+use App\Nova\TaxonomyTerm;
 use App\Nova\TaxonomyTheme as NovaTaxonomyTheme;
-use App\Nova\TaxonomyWarning;
 use App\Nova\TaxonomyWhere;
 use App\Nova\Tile as NovaTile;
 use App\Nova\UgcPoi;
@@ -25,11 +25,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Fortify\Features;
+use Laravel\Nova\Dashboard;
 use Laravel\Nova\Menu\MenuItem;
 use Laravel\Nova\Menu\MenuSection;
-use Laravel\Nova\Menu\MenuGroup;
 use Laravel\Nova\Nova;
 use Laravel\Nova\NovaApplicationServiceProvider;
+use Laravel\Nova\Tool;
+use Wm\WmPackage\Nova\Menu\TaxonomyTermsMenu;
 
 class NovaServiceProvider extends NovaApplicationServiceProvider
 {
@@ -71,15 +73,15 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
 
                 MenuSection::make(__('Admin'), [
                     MenuItem::resource(NovaApp::class)
-                        ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                     MenuItem::resource(NovaUser::class)
-                        ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                     MenuItem::resource(NovaMedia::class)
-                        ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                     MenuItem::resource(NovaTile::class)
-                        ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator')),
+                        ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator')),
                 ])->icon('user')
-                    ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
+                    ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator'))
                     ->collapsedByDefault(),
 
                 MenuSection::make('UGC', [
@@ -102,14 +104,18 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     MenuItem::resource(TaxonomyActivity::class),
                     MenuItem::resource(NovaTaxonomyTheme::class),
                     MenuItem::resource(TaxonomyWhere::class),
-                    MenuItem::resource(TaxonomyWarning::class),
+                    // Le viste dedicate a una tassonomia di termini (Avvertenze, e quelle che
+                    // verranno) le elenca il package guardando chi estende
+                    // AbstractTaxonomyTermsResource: una tassonomia nuova non richiede di tornare qui.
+                    ...TaxonomyTermsMenu::items($request),
+                    MenuItem::resource(TaxonomyTerm::class),
                 ])->icon('document')
                     ->collapsedByDefault(),
 
                 MenuSection::make(__('Files'), [
                     MenuItem::externalLink(__('Icons'), route('icons.upload.show'))->openInNewTab(),
                 ])->icon('folder')
-                    ->canSee(fn(Request $request) => $request->user()->hasRole('Administrator'))
+                    ->canSee(fn (Request $request) => $request->user()->hasRole('Administrator'))
                     ->collapsedByDefault(),
 
                 // Sezione Tools: wm-package cerca una MenuSection con questo nome
@@ -175,19 +181,19 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     /**
      * Get the dashboards that should be listed in the Nova sidebar.
      *
-     * @return array<int, \Laravel\Nova\Dashboard>
+     * @return array<int, Dashboard>
      */
     protected function dashboards(): array
     {
         return [
-            new \App\Nova\Dashboards\Main,
+            new Main,
         ];
     }
 
     /**
      * Get the tools that should be listed in the Nova sidebar.
      *
-     * @return array<int, \Laravel\Nova\Tool>
+     * @return array<int, Tool>
      */
     public function tools(): array
     {

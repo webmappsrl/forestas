@@ -99,16 +99,16 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
     public function handle(LayerService $layerService, PBFGeneratorService $pbfGeneratorService): void
     {
         foreach ($this->autoLayers() as $layer) {
-            $prima = $this->membership($layer);
+            $before = $this->membership($layer);
 
             $this->writePivot($layerService, $layer);
 
-            $pivotCambiato = $this->membership($layer) !== $prima;
+            $pivotChanged = $this->membership($layer) !== $before;
 
             try {
-                $featureCambiate = $this->alignFeatures($layerService, $layer);
+                $changedFeatures = $this->alignFeatures($layerService, $layer);
 
-                if (! $pivotCambiato && ! $featureCambiate) {
+                if (! $pivotChanged && ! $changedFeatures) {
                     continue;
                 }
 
@@ -131,12 +131,12 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
      */
     private function writePivot(LayerService $layerService, Layer $layer): void
     {
-        $haAree = $layer->taxonomyWheres->isNotEmpty();
+        $hasAreas = $layer->taxonomyWheres->isNotEmpty();
 
-        Layerable::withoutEvents(function () use ($layerService, $layer, $haAree) {
+        Layerable::withoutEvents(function () use ($layerService, $layer, $hasAreas) {
             $layerService->assignTracksByTaxonomy($layer);
 
-            if ($haAree) {
+            if ($hasAreas) {
                 $layerService->assignPoisByTaxonomy($layer);
             } elseif ($layer->isAutoPoiMode()) {
                 $layer->ecPois()->sync([]);
@@ -155,28 +155,28 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
         $layer->unsetRelation('ecTracks')->unsetRelation('ecPois');
 
         $trackModelClass = config('wm-package.ec_track_model', 'App\Models\EcTrack');
-        $cambiate = $this->haCambiato($layerService->updateLayersPropertyOnLayeredFeature($layer, $trackModelClass));
+        $changed = $this->hasChanged($layerService->updateLayersPropertyOnLayeredFeature($layer, $trackModelClass));
 
         if ($layer->taxonomyWheres->isNotEmpty()) {
-            return $this->haCambiato($layerService->updateLayersPropertyOnLayeredFeature($layer, EcPoi::class)) || $cambiate;
+            return $this->hasChanged($layerService->updateLayersPropertyOnLayeredFeature($layer, EcPoi::class)) || $changed;
         }
 
         // Con i POI manuali il pivot non è nostro: non si tocca nemmeno `properties.layers`.
         if ($layer->isAutoPoiMode()) {
-            return $this->removeLayerFromPois($layer) > 0 || $cambiate;
+            return $this->removeLayerFromPois($layer) > 0 || $changed;
         }
 
-        return $cambiate;
+        return $changed;
     }
 
     /**
      * Se `updateLayersPropertyOnLayeredFeature()` ha aggiunto o tolto il layer da qualche feature.
      *
-     * @param  array{added: array<int>, deleted: array<int>}  $esito
+     * @param  array{added: array<int>, deleted: array<int>}  $outcome
      */
-    private function haCambiato(array $esito): bool
+    private function hasChanged(array $outcome): bool
     {
-        return $esito['added'] !== [] || $esito['deleted'] !== [];
+        return $outcome['added'] !== [] || $outcome['deleted'] !== [];
     }
 
     /**
@@ -190,20 +190,20 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
      */
     private function removeLayerFromPois(Layer $layer): int
     {
-        $tolti = 0;
+        $removed = 0;
 
         EcPoi::query()
             ->whereRaw("properties->'layers' @> ?::jsonb", [json_encode([$layer->id])])
             ->lazyById()
-            ->each(function (EcPoi $poi) use ($layer, &$tolti) {
+            ->each(function (EcPoi $poi) use ($layer, &$removed) {
                 $properties = $poi->properties;
                 $properties['layers'] = array_values(array_diff($properties['layers'], [$layer->id]));
                 $poi->properties = $properties;
                 $poi->saveQuietly();
-                $tolti++;
+                $removed++;
             });
 
-        return $tolti;
+        return $removed;
     }
 
     /**
@@ -220,12 +220,13 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
             ->orderBy('layerable_type')
             ->orderBy('layerable_id')
             ->get(['layerable_type', 'layerable_id'])
-            ->map(fn (object $riga) => $riga->layerable_type.':'.$riga->layerable_id)
+            ->map(fn (object $row) => $row->layerable_type.':'.$row->layerable_id)
             ->all();
     }
 
     /**
-     * Layer dell'app di import, propri o associati, in `track_mode` auto e con almeno un filtro:
+     * Layer dell'app di import, propri o associati, in `track_mode` auto e con almeno un filtro
+     * — attività, zona o termine di classificazione:
      * un layer auto senza filtro verrebbe svuotato da `assignTracksByTaxonomy()`.
      *
      * @return iterable<Layer>
@@ -244,7 +245,9 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
             })
             ->where(function (Builder $query) {
                 $query->whereHas('taxonomyActivities')
-                    ->orWhereHas('taxonomyWheres');
+                    ->orWhereHas('taxonomyWheres')
+                    // Anche i termini di classificazione sono un filtro del layer (oc:8910).
+                    ->orWhereHas('taxonomyTerms');
             })
             ->orderBy('id')
             ->get()

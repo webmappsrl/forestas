@@ -22,17 +22,25 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   di POI, non una cancellazione selettiva per `app_id`: su Forestas è innocuo perché l'app è
   una sola (`SardegnaSentieriImportService::IMPORT_APP_ID` = 1), diventerebbe un problema con più
   app nello stesso database (oc:8489). **Le attività invece non si troncano**: si cancellano a mano
-  solo le righe di tracce e POI in `taxonomy_activityables` e `layerables`, e i legami dei layer
+  solo le righe di tracce e POI in `taxonomy_activityables` e `layerables`, e le relazioni dei layer
   restano (oc:8827)
 - **L'import scrive le attività delle tracce senza eventi sul pivot**: i layer li ricalcola solo
   `RecalculateSardegnaSentieriLayersJob` nella catena di fine batch, prima del reindex. Un nuovo
   percorso che scrive attività sulle tracce fuori da quel batch deve accodarlo, altrimenti layer e
   `properties.layers` restano vecchi — vedi
   [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
-- **Un layer di tipologia senza attività viene saltato dal ricalcolo**: `sardegnasentieri:configure-layers`
-  va lanciato una volta su ogni ambiente e di nuovo dopo `sardegnasentieri:reset`, sempre dopo un
-  `sardegnasentieri:import --force` (o il reset notturno) e la fine dei suoi job — vedi
-  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827)
+- **Un layer di tipologia senza termini viene saltato dal ricalcolo**, e resta una mappa vuota.
+  Dal modello unico i layer si legano ai termini di «Tipo percorso», non più alle attività
+  storiche, e `sardegnasentieri:configure-layers` lo fa l'import con `--reset`: dopo il reset
+  notturno non c'è più niente da lanciare a mano. Su un ambiente senza reset notturno il comando
+  va lanciato una volta dopo il deploy. Un layer assente su quell'ambiente viene saltato con un
+  avvertimento, non fa fallire gli altri — vedi
+  [docs/knowledge/8806-filtro-ec-tracce.md](../../docs/knowledge/8806-filtro-ec-tracce.md) (oc:8827, oc:8910)
+- **Mai passare `--fresh` a `sardegnasentieri:configure-taxonomy-terms` da un percorso
+  automatico**: svuota `taxonomy_terms`, e `taxonomy_termables` cade in cascata portando via anche
+  le relazioni dei layer, che con l'import non c'entrano. I termini rinascono con id nuovi e i layer
+  restano senza filtri. L'allineamento senza opzioni fa già tutto: cerca per `identifier`, e le
+  righe fuori elenco le tolgono `renameIdentifiers()` e `removeRetired()` (oc:8910)
 - **Il troncamento notturno porta via anche ciò che non viene da Drupal**, per vincolo a cascata: la
   storia dei cambi di stato dei codici e le istanze di accatastamento. Oggi è **deliberato**:
   `--reset` tronca esplicitamente anche `trail_applications`, che altrimenti sopravvivrebbe ai

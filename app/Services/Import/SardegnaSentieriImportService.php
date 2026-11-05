@@ -14,9 +14,9 @@ use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\EcPoi as LocalEcPoi;
 use App\Models\EcTrack;
 use App\Models\Ente;
-use App\Models\TaxonomyWarning;
 use App\Models\User;
 use App\Services\Import\Source\SardegnaSentieriSource;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -27,6 +27,7 @@ use Wm\WmPackage\Models\EcPoi;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyActivityable;
 use Wm\WmPackage\Models\TaxonomyPoiType;
+use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
 use Wm\WmPackage\TrailRegistry\TrailCodeRegistrationOutcome;
@@ -47,6 +48,68 @@ class SardegnaSentieriImportService
 
     /** Termine «Cammini di Sardegna» di `field_tipologia_itinerario` in Drupal (oc:8827). */
     public const CAMMINI_TERM_ID = '4728';
+
+    /**
+     * Le tre scale `Accessibili dis. *` di Drupal collassano in una (oc:8910): ogni tid
+     * dà il grado, nella tassonomia `inclusivity-difficulty`, e la categoria, in
+     * `inclusivity-disabilities`. Va scritta qui perché i nove tid non esistono come
+     * termini nel nostro modello e dall'identifier non si derivano: «sensoriale»
+     * accorpa udito e vista, che in Drupal sono scale separate.
+     *
+     * tid Drupal => [identifier del grado, identifier della categoria].
+     */
+    private const ACCESSIBILITY_TIDS = [
+        '4897' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-physical'],
+        '4900' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-physical'],
+        '4893' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-physical'],
+        '4896' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-sensory'],
+        '4892' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-sensory'],
+        '4898' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-sensory'],
+        '4891' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-cognitive'],
+        '4901' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-cognitive'],
+        '4899' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-cognitive'],
+    ];
+
+    /**
+     * Le tassonomie che l'import scrive e di cui è l'unica fonte: a ogni import
+     * le loro relazioni si sostituiscono con quelle di Drupal. Fuori da qui
+     * (difficoltà del sentiero didattico, tematismi, tipo percorso) le relazioni
+     * sono di Nova e l'import non li tocca mai.
+     */
+    private const IMPORT_OWNED_TAXONOMIES = [
+        'hiking-difficulty',
+        'mtb-difficulty',
+        'horse-difficulty',
+        'nordic-walking-difficulty',
+        'soft-mobility-difficulty',
+        'route-type',
+        'itinerary-type',
+        self::WARNINGS_TAXONOMY,
+    ];
+
+    /**
+     * I vocabolari dell'accessibilità: Drupal ne ha due righe su 614 sentieri e il
+     * resto lo compila un operatore in Nova. Si sostituiscono solo se Drupal, per
+     * quel sentiero, porta almeno un tid di `ACCESSIBILITY_TIDS`; altrimenti i
+     * relazioni esistenti non si toccano, o ogni reimport cancellerebbe il lavoro
+     * fatto a mano (oc:8910).
+     */
+    private const ACCESSIBILITY_FAMILIES = [
+        'inclusivity-difficulty',
+        'inclusivity-disabilities',
+    ];
+
+    /** Prefisso dell'`identifier` dei termini che vengono da `categorie_fruibilita_sentieri` (oc:8910). */
+    public const DRUPAL_TERM_PREFIX = 'sardegnasentieri:tid:';
+
+    /** La tassonomia delle avvertenze, che prima era la tabella `taxonomy_warnings` (oc:8910). */
+    public const WARNINGS_TAXONOMY = 'warnings';
+
+    /** Prefisso dell'`identifier` di un'avvertenza: lo stesso di quando era una tassonomia a sé. */
+    public const WARNING_TERM_PREFIX = 'sardegnasentieri:warning:';
+
+    /** Dove l'import segna, sul sentiero, ciò che nella classificazione non ha saputo scrivere (oc:8910). */
+    public const CLASSIFICATION_ANOMALIES_KEY = 'classificazioni_anomale';
 
     private const POI_VOCABULARIES = [
         'tipologia_poi',
@@ -76,13 +139,19 @@ class SardegnaSentieriImportService
     /**
      * Se il POI o il sentiero in import ha saltato un ente mancante.
      */
-    private bool $entiMancanti = false;
+    private bool $missingEntes = false;
 
     /** @var array<string, array<string, array<string, mixed>>> */
     private array $taxonomyTermsCache = [];
 
     /** @var array<int, string>|null */
     private ?array $iconNamesCache = null;
+
+    /** @var Collection<string, TaxonomyTerm>|null Tassonomie del modello unico per identifier. */
+    private ?Collection $termTaxonomies = null;
+
+    /** @var Collection<string, TaxonomyTerm>|null Termini del modello unico per identifier, con la tassonomia. */
+    private ?Collection $termsByIdentifier = null;
 
     public function __construct(
         private readonly SardegnaSentieriSource $source,
@@ -201,11 +270,28 @@ class SardegnaSentieriImportService
         }
     }
 
+    /**
+     * Le avvertenze di Drupal diventano termini della tassonomia `warnings` (oc:8910).
+     *
+     * Erano una tassonomia a sé, con le sue due tabelle; ora sono termini come tutti gli altri.
+     * L'`identifier` resta quello di prima, `sardegnasentieri:warning:<tid>`, così l'import
+     * continua a riconoscerle per quello e non per il nome.
+     *
+     * Si scrive con `insertOrIgnore` più rilettura, mai con `firstOrCreate`: due job che
+     * importano insieme violerebbero l'unicità, e sotto transazione PostgreSQL l'errore aborta la
+     * transazione (oc:8607).
+     */
     private function importWarningTaxonomies(): void
     {
-        $terms = $this->source->getTaxonomyWarnings();
+        $vocabulary = TaxonomyTerm::query()->taxonomies()->where('identifier', self::WARNINGS_TAXONOMY)->first();
 
-        foreach ($terms as $apiId => $term) {
+        if ($vocabulary === null) {
+            Log::channel('import')->warning('Tassonomia «'.self::WARNINGS_TAXONOMY.'» non trovata: avvertenze non importate.');
+
+            return;
+        }
+
+        foreach ($this->source->getTaxonomyWarnings() as $apiId => $term) {
             if (! is_array($term)) {
                 continue;
             }
@@ -217,16 +303,33 @@ class SardegnaSentieriImportService
                 continue;
             }
 
-            $identifier = 'sardegnasentieri:warning:'.$apiId;
+            $identifier = self::WARNING_TERM_PREFIX.$apiId;
+            $properties = ['source_id' => (string) $apiId, 'vocabulary' => 'tipologia_di_avvertenze'];
 
-            $taxonomy = TaxonomyWarning::firstOrNew(['identifier' => $identifier]);
-            $taxonomy->identifier = $identifier;
-            $taxonomy->name = $name;
-            $taxonomy->properties = array_merge($taxonomy->properties ?? [], [
-                'source_id' => (string) $apiId,
-                'vocabulary' => 'tipologia_di_avvertenze',
+            $now = now();
+            DB::table('taxonomy_terms')->insertOrIgnore([
+                'parent_id' => $vocabulary->id,
+                'identifier' => $identifier,
+                'name' => json_encode($name, JSON_UNESCAPED_UNICODE),
+                'properties' => json_encode($properties, JSON_UNESCAPED_UNICODE),
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
-            $taxonomy->saveQuietly();
+
+            $existing = TaxonomyTerm::query()->where('identifier', $identifier)->first();
+            if ($existing === null) {
+                continue;
+            }
+
+            // Nome e tassonomia si riallineano: un termine rinominato in Drupal, o rimasto fuori
+            // dalla tassonomia perché creato prima di lei, si rimette a posto da solo.
+            $existing->setTranslations('name', $name);
+            $existing->parent_id = $vocabulary->id;
+            $existing->properties = array_merge($existing->properties ?? [], $properties);
+
+            if ($existing->isDirty()) {
+                $existing->save();
+            }
         }
     }
 
@@ -303,29 +406,6 @@ class SardegnaSentieriImportService
             ->all();
 
         $this->cache['activities'][$cacheKey] = $ids === [] ? null : $ids;
-
-        return $ids;
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    public function resolveWarningIds(string $apiTermId): array
-    {
-        if (isset($this->cache['warnings'][$apiTermId])) {
-            return (array) ($this->cache['warnings'][$apiTermId] ?? []);
-        }
-
-        $identifier = 'sardegnasentieri:warning:'.$apiTermId;
-
-        $ids = TaxonomyWarning::query()
-            ->where('identifier', $identifier)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-
-        $this->cache['warnings'][$apiTermId] = $ids === [] ? null : $ids;
 
         return $ids;
     }
@@ -420,6 +500,12 @@ class SardegnaSentieriImportService
             'app_id' => $this->getAppId(),
             'user_id' => $this->getUserId(),
             'name' => $response->name,
+            // Colonne di Forestas che vengono da Drupal (oc:8910). Le tre dell'inclusivita'
+            // restano fuori: nessuna sorgente le possiede, sono degli operatori.
+            'forestas_registry_code' => $response->codice,
+            'forestas_survey_date' => $response->data_rilievo !== null
+                ? substr($response->data_rilievo, 0, 10)
+                : null,
         ];
 
         $ecTrack = EcTrack::firstWhere(
@@ -435,6 +521,14 @@ class SardegnaSentieriImportService
             $existingProperties,
             TrackPropertiesData::fromApiResponse($externalId, $response)->toArray()
         );
+
+        // L'array_merge sostituisce l'intera chiave `forestas`: le chiavi compilate a mano in Nova
+        // al suo interno vanno rimesse, l'import non le possiede (oc:8910).
+        foreach (EcTrack::MANUAL_FORESTAS_KEYS as $key) {
+            if (isset($existingProperties['forestas'][$key])) {
+                $data['properties']['forestas'][$key] = $existingProperties['forestas'][$key];
+            }
+        }
 
         $isNew = ! $ecTrack->exists;
 
@@ -459,7 +553,7 @@ class SardegnaSentieriImportService
         $this->syncEnti($ecTrack, $response);
         $this->syncRelatedPois($ecTrack, $response);
         $this->syncTrackActivities($ecTrack, $response);
-        $this->syncTrackWarnings($ecTrack, $response);
+        $this->syncTrackTerms($ecTrack, $response);
 
         $this->registerTrailRegistryCode($ecTrack);
 
@@ -794,16 +888,282 @@ class SardegnaSentieriImportService
         return $activity;
     }
 
-    private function syncTrackWarnings(EcTrack $ecTrack, ApiTrackResponse $response): void
+    /**
+     * Cosa dice `field_frubilita` di un sentiero, in termini del modello unico
+     * (oc:8910). Non scrive niente.
+     *
+     * Per ogni tid, col padre che la copia di Drupal dà nella gerarchia:
+     * - radice → ignorata (vedi sotto);
+     * - figlio fra i nove delle scale di accessibilità → due relazioni: il grado in
+     *   `inclusivity-difficulty` e la categoria in `inclusivity-disabilities`;
+     * - altro figlio → il termine `sardegnasentieri:tid:<tid>` nella sua tassonomia;
+     * - un tid che il modello non conosce → anomalia, non eccezione.
+     *
+     * Le righe che puntano a una radice (Trekking, Mountain Bike, ...) non
+     * producono niente, di proposito: dicono «percorso in mountain bike», ma le
+     * attività di un sentiero vengono da `field_tipologia_sentiero`
+     * (vocabolario `tipologia_sentieri`), che l'import legge già in
+     * `syncTrackActivities()`. Dedurle da qui sarebbe ridondante e
+     * rischierebbe di dare al sentiero un'attività che non ha. Non è una
+     * dimenticanza, e nemmeno un'anomalia: la riga non ha un grado da scrivere.
+     *
+     * Una tassonomia a scelta singola con due termini diversi dopo il collasso
+     * tiene il primo, nell'ordine di Drupal, e segnala gli altri: nessuna
+     * scelta di dominio, ma nemmeno un'informazione persa in silenzio.
+     *
+     * @return array{
+     *     terms: array<string, list<string>>,
+     *     anomalies: list<array<string, mixed>>
+     * }
+     */
+    private function classifyUsabilityTerm(ApiTrackResponse $response): array
     {
-        $warningIds = collect($response->taxonomies->tipologia_di_avvertenze)
-            ->flatMap(fn ($apiId) => $this->resolveWarningIds((string) $apiId))
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
+        $wanted = [];
+        $anomalies = [];
 
-        $ecTrack->taxonomyWarnings()->sync($warningIds);
+        foreach (array_values(array_unique($response->taxonomies->categorie_fruibilita_sentieri)) as $tid) {
+            $tid = (string) $tid;
+            $parent = $response->taxonomies->fruibilita_padri[$tid] ?? null;
+            // Una radice non ha grado da scrivere: si ignora (vedi sopra). Un termine di cui la
+            // copia non dà il padre passa invece dal controllo dei termini noti.
+            if ($parent === '0') {
+                continue;
+            }
+
+            if (isset(self::ACCESSIBILITY_TIDS[$tid])) {
+                [$grade, $category] = self::ACCESSIBILITY_TIDS[$tid];
+                $wanted['inclusivity-difficulty'][] = $grade;
+                $wanted['inclusivity-disabilities'][] = $category;
+
+                continue;
+            }
+
+            $term = $this->classificationTerms()->get(self::DRUPAL_TERM_PREFIX.$tid);
+            // La tassonomia a cui il termine appartiene, non il vocabolario di Drupal.
+            $taxonomy = $term?->parent?->identifier;
+
+            if ($taxonomy === null) {
+                $anomalies[] = ['type' => 'unknown_term', 'tid' => $tid];
+
+                continue;
+            }
+
+            $wanted[$taxonomy][] = $term->identifier;
+        }
+
+        foreach ($wanted as $taxonomy => $identifiers) {
+            $identifiers = array_values(array_unique($identifiers));
+            $wanted[$taxonomy] = $identifiers;
+
+            if (count($identifiers) > 1 && $this->classificationTaxonomies()->get($taxonomy)?->single_choice) {
+                $wanted[$taxonomy] = [$identifiers[0]];
+                $anomalies[] = [
+                    'type' => 'multiple_terms_single_choice',
+                    'taxonomy' => $taxonomy,
+                    'kept' => $identifiers[0],
+                    'discarded' => array_slice($identifiers, 1),
+                ];
+            }
+        }
+
+        return ['terms' => $wanted, 'anomalies' => $anomalies];
+    }
+
+    /**
+     * Scrive le relazioni dei termini del sentiero (oc:8910).
+     *
+     * Le relazioni di ogni tassonomia dell'import si sostituiscono: dopo il
+     * reimport restano quelli che Drupal dice adesso, mai la somma. La
+     * tabella non ha vincoli di unicità, quindi gli unici a evitare i doppioni
+     * siamo noi: si aggiunge ciò che manca, si toglie ciò che non c'è più, e
+     * un vocabolario che i doppioni li ha già si riscrive da zero.
+     *
+     * Il resto delle relazioni (tassonomie di Nova, tematismi, tipo percorso) non si tocca.
+     *
+     * `withoutSyncingToSearch`: senza, ogni riga di pivot farebbe partire un
+     * reindex sincrono su Elasticsearch, e il reindex di fine batch lo fa già.
+     * Conta la classe del package: l'observer del pivot risolve l'alias del
+     * morph map in `Wm\WmPackage\Models\EcTrack`, ed è lì che il sync va
+     * spento. La chiamata sulla classe di Forestas è ridondante e innocua; si
+     * tiene per non dipendere da come si risolve l'alias.
+     *
+     * Non solleva mai per una classificazione che non torna: la segnala.
+     */
+    private function syncTrackTerms(EcTrack $ecTrack, ApiTrackResponse $response): void
+    {
+        $vocabularies = $this->classificationTaxonomies();
+
+        // La tassonomia la crea `sardegnasentieri:configure-taxonomy-terms`, che lancia il comando di import.
+        if ($vocabularies->isEmpty()) {
+            Log::channel('import')->warning("Tassonomie dei termini non trovate: relazioni del sentiero {$ecTrack->id} non scritte.");
+
+            return;
+        }
+
+        $classification = $this->classifyUsabilityTerm($response);
+        $anomalies = $classification['anomalies'];
+        $terms = $this->classificationTerms();
+
+        if (($routeType = $this->routeTypeIdentifier($response)) !== null) {
+            $classification['terms']['route-type'] = [$routeType];
+        }
+
+        // Tipologie di itinerario: multiple, senza il 4728 che è diventato un tipo di percorso.
+        // Un sentiero non ne prende (la tassonomia si svuota comunque: è fra quelle dell'import).
+        $classification['terms']['itinerary-type'] = $this->itineraryTypeIdentifiers($response);
+
+        // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono una tassonomia come le
+        // altre e seguono la stessa regola di sostituzione (oc:8910).
+        $classification['terms'][self::WARNINGS_TAXONOMY] = array_map(
+            fn ($apiId) => self::WARNING_TERM_PREFIX.$apiId,
+            $response->taxonomies->tipologia_di_avvertenze ?? []
+        );
+
+        $wantedIds = [];
+        foreach ($classification['terms'] as $vocabulary => $identifiers) {
+            foreach ($identifiers as $identifier) {
+                $term = $terms->get($identifier);
+                if ($term === null) {
+                    $anomalies[] = ['type' => 'missing_term', 'vocabulary' => $vocabulary, 'identifier' => $identifier];
+
+                    continue;
+                }
+                $wantedIds[$term->parent_id][] = $term->id;
+            }
+        }
+
+        $hasAccessibility = array_intersect(
+            array_map('strval', $response->taxonomies->categorie_fruibilita_sentieri),
+            array_map('strval', array_keys(self::ACCESSIBILITY_TIDS))
+        ) !== [];
+
+        $replaced = array_unique(array_merge(
+            self::IMPORT_OWNED_TAXONOMIES,
+            $hasAccessibility ? self::ACCESSIBILITY_FAMILIES : [],
+            array_keys($classification['terms'])
+        ));
+
+        $current = $ecTrack->taxonomyTerms()->get()->groupBy('parent_id');
+
+        \Wm\WmPackage\Models\EcTrack::withoutSyncingToSearch(fn () => EcTrack::withoutSyncingToSearch(function () use ($ecTrack, $vocabularies, $replaced, $wantedIds, $current) {
+            foreach ($replaced as $vocabularyIdentifier) {
+                $vocabulary = $vocabularies->get($vocabularyIdentifier);
+                if ($vocabulary === null) {
+                    continue;
+                }
+
+                $want = array_values(array_unique($wantedIds[$vocabulary->id] ?? []));
+                $have = $current->get($vocabulary->id, collect())->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+                if (count($have) !== count(array_unique($have))) {
+                    $ecTrack->taxonomyTerms()->detach($have);
+                    $have = [];
+                }
+
+                $toDetach = array_values(array_diff($have, $want));
+                $toAttach = array_values(array_diff($want, $have));
+
+                if ($toDetach !== []) {
+                    $ecTrack->taxonomyTerms()->detach($toDetach);
+                }
+                if ($toAttach !== []) {
+                    $ecTrack->taxonomyTerms()->attach($toAttach);
+                }
+            }
+        }));
+
+        $ecTrack->unsetRelation('taxonomyTerms');
+
+        $this->rememberClassificationAnomalies($ecTrack, $anomalies);
+    }
+
+    /**
+     * Tipo di percorso dal bundle del nodo (oc:8910): `sentiero` è un sentiero; `itinerario`
+     * è un cammino se porta il termine 4728 in `field_tipologia_itinerario`, altrimenti un
+     * itinerario. Il cammino esce dall'itinerario, non si somma.
+     */
+    private function routeTypeIdentifier(ApiTrackResponse $response): ?string
+    {
+        return match ($response->type) {
+            'sentiero' => 'route-type-trail',
+            'itinerario' => in_array(self::CAMMINI_TERM_ID, array_map('strval', $response->taxonomies->tipologia_itinerari), true)
+                ? 'route-type-walk'
+                : 'route-type-itinerary',
+            default => null,
+        };
+    }
+
+    /**
+     * Identifier dei termini di `itinerary-type`: i tid di `field_tipologia_itinerario` tranne il
+     * 4728, e solo per gli itinerari.
+     *
+     * @return list<string>
+     */
+    private function itineraryTypeIdentifiers(ApiTrackResponse $response): array
+    {
+        if ($response->type !== 'itinerario') {
+            return [];
+        }
+
+        return collect($response->taxonomies->tipologia_itinerari)
+            ->map(fn ($tid) => (string) $tid)
+            ->reject(fn (string $tid) => $tid === self::CAMMINI_TERM_ID)
+            ->unique()
+            ->map(fn (string $tid) => self::DRUPAL_TERM_PREFIX.$tid)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Segna sul sentiero ciò che la classificazione non ha saputo scrivere, o
+     * toglie il segno quando non c'è più niente da segnalare, e lo mette nel
+     * log `import`. Stesso schema di `rememberMissingEntes`: il sentiero
+     * porta con sé cosa va corretto in Drupal (oc:8910).
+     *
+     * @param  list<array<string, mixed>>  $anomalies
+     */
+    private function rememberClassificationAnomalies(EcTrack $ecTrack, array $anomalies): void
+    {
+        $properties = is_array($ecTrack->properties) ? $ecTrack->properties : [];
+        $before = $properties['forestas'][self::CLASSIFICATION_ANOMALIES_KEY] ?? [];
+
+        foreach ($anomalies as $anomaly) {
+            Log::channel('import')->warning("Sentiero {$ecTrack->id}: classificazione anomala.", $anomaly);
+        }
+
+        if ($before === $anomalies) {
+            return;
+        }
+
+        if ($anomalies !== []) {
+            $properties['forestas'][self::CLASSIFICATION_ANOMALIES_KEY] = $anomalies;
+        } else {
+            unset($properties['forestas'][self::CLASSIFICATION_ANOMALIES_KEY]);
+        }
+
+        $ecTrack->properties = $properties;
+        $ecTrack->saveQuietly();
+    }
+
+    /**
+     * Le tassonomie del modello unico per identifier. Lette una volta per istanza.
+     *
+     * @return Collection<string, TaxonomyTerm>
+     */
+    private function classificationTaxonomies(): Collection
+    {
+        return $this->termTaxonomies ??= TaxonomyTerm::query()->taxonomies()->get()->keyBy('identifier');
+    }
+
+    /**
+     * I termini del modello unico per identifier, ciascuno con la sua tassonomia.
+     *
+     * @return Collection<string, TaxonomyTerm>
+     */
+    private function classificationTerms(): Collection
+    {
+        return $this->termsByIdentifier ??= TaxonomyTerm::query()
+            ->whereNotNull('parent_id')->with('parent')->get()->keyBy('identifier');
     }
 
     private function syncRelatedPoisForPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
@@ -829,7 +1189,7 @@ class SardegnaSentieriImportService
 
     private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
-        $this->entiMancanti = false;
+        $this->missingEntes = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         $pairs = [];
@@ -878,12 +1238,12 @@ class SardegnaSentieriImportService
             ]);
         }
 
-        $this->rememberEntiMancanti($ecPoi);
+        $this->rememberMissingEntes($ecPoi);
     }
 
     private function syncEnti(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $this->entiMancanti = false;
+        $this->missingEntes = false;
         $ente = $response->ente_istituzione_societa ?? [];
 
         // Collect all (enteId, ruolo) pairs — same ente can have multiple roles
@@ -939,7 +1299,7 @@ class SardegnaSentieriImportService
             ]);
         }
 
-        $this->rememberEntiMancanti($ecTrack);
+        $this->rememberMissingEntes($ecTrack);
     }
 
     /**
@@ -948,16 +1308,16 @@ class SardegnaSentieriImportService
      * con lo stesso `changed`, altrimenti il collegamento in produzione
      * tornerebbe solo al prossimo cambio del nodo in Drupal (oc:8513).
      */
-    private function rememberEntiMancanti(EcPoi|EcTrack $model): void
+    private function rememberMissingEntes(EcPoi|EcTrack $model): void
     {
         $properties = is_array($model->properties) ? $model->properties : [];
         $before = $properties['forestas']['enti_mancanti'] ?? false;
 
-        if ($before === $this->entiMancanti) {
+        if ($before === $this->missingEntes) {
             return;
         }
 
-        if ($this->entiMancanti) {
+        if ($this->missingEntes) {
             $properties['forestas']['enti_mancanti'] = true;
         } else {
             unset($properties['forestas']['enti_mancanti']);
@@ -989,7 +1349,7 @@ class SardegnaSentieriImportService
         }
 
         if ($this->enteCache[$cacheKey] === null) {
-            $this->entiMancanti = true;
+            $this->missingEntes = true;
         }
 
         return $this->enteCache[$cacheKey];

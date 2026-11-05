@@ -14,9 +14,14 @@ class TaxonomyVocabularyFilter extends Filter
     /** @param class-string<Model> $modelClass */
     public function __construct(private readonly string $modelClass) {}
 
+    /**
+     * «Vocabolario di origine» e non «Vocabolario»: nomina il vocabolario di Drupal da cui il
+     * termine è stato importato (`properties->vocabulary`), non una tassonomia nostra. Con la
+     * sola parola «Vocabolario» si confonderebbe con le tassonomie del modello unico (oc:8910).
+     */
     public function name(): string
     {
-        return __('Vocabulary');
+        return __('Source vocabulary');
     }
 
     public function apply(Request $request, $query, $value): Builder

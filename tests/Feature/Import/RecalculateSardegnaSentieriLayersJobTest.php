@@ -38,7 +38,7 @@ beforeEach(function () {
     App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
 });
 
-function ricalcoloLayerAttivita(string $identifier): TaxonomyActivity
+function recalcActivity(string $identifier): TaxonomyActivity
 {
     return TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create([
         'identifier' => $identifier,
@@ -46,9 +46,9 @@ function ricalcoloLayerAttivita(string $identifier): TaxonomyActivity
     ]));
 }
 
-function ricalcoloLayerTraccia(?TaxonomyActivity $attivita = null): EcTrack
+function recalcTrack(?TaxonomyActivity $activity = null): EcTrack
 {
-    $traccia = EcTrack::withoutEvents(fn () => EcTrack::query()->create([
+    $track = EcTrack::withoutEvents(fn () => EcTrack::query()->create([
         'name' => ['it' => 'Traccia', 'en' => 'Traccia'],
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
         // properties sempre oggetto, come nei dati veri: un array JSON vuoto fa fallire jsonb_set().
@@ -56,18 +56,18 @@ function ricalcoloLayerTraccia(?TaxonomyActivity $attivita = null): EcTrack
         'geometry' => DB::raw("ST_GeomFromText('MULTILINESTRING Z((9 40.5 0, 9.1 40.5 0))', 4326)"),
     ]));
 
-    if ($attivita !== null) {
+    if ($activity !== null) {
         DB::table('taxonomy_activityables')->insert([
-            'taxonomy_activity_id' => $attivita->id,
+            'taxonomy_activity_id' => $activity->id,
             'taxonomy_activityable_type' => (new EcTrack)->getMorphClass(),
-            'taxonomy_activityable_id' => $traccia->id,
+            'taxonomy_activityable_id' => $track->id,
         ]);
     }
 
-    return $traccia;
+    return $track;
 }
 
-function ricalcoloLayerPoi(?TaxonomyActivity $attivita = null, float $lon = 9.5): EcPoi
+function recalcPoi(?TaxonomyActivity $activity = null, float $lon = 9.5): EcPoi
 {
     $poi = EcPoi::withoutEvents(fn () => EcPoi::factory()->createQuietly([
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
@@ -75,9 +75,9 @@ function ricalcoloLayerPoi(?TaxonomyActivity $attivita = null, float $lon = 9.5)
         'geometry' => DB::raw("ST_GeomFromText('POINT Z({$lon} 40.5 0)', 4326)"),
     ]));
 
-    if ($attivita !== null) {
+    if ($activity !== null) {
         DB::table('taxonomy_activityables')->insert([
-            'taxonomy_activity_id' => $attivita->id,
+            'taxonomy_activity_id' => $activity->id,
             'taxonomy_activityable_type' => (new EcPoi)->getMorphClass(),
             'taxonomy_activityable_id' => $poi->id,
         ]);
@@ -86,7 +86,7 @@ function ricalcoloLayerPoi(?TaxonomyActivity $attivita = null, float $lon = 9.5)
     return $poi;
 }
 
-function ricalcoloLayerLayer(?TaxonomyActivity $attivita = null): Layer
+function recalcLayer(?TaxonomyActivity $activity = null): Layer
 {
     $layer = Layer::factory()->createQuietly([
         'name' => ['it' => 'Sentieri', 'en' => 'Sentieri'],
@@ -95,9 +95,9 @@ function ricalcoloLayerLayer(?TaxonomyActivity $attivita = null): Layer
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
     ]);
 
-    if ($attivita !== null) {
+    if ($activity !== null) {
         DB::table('taxonomy_activityables')->insert([
-            'taxonomy_activity_id' => $attivita->id,
+            'taxonomy_activity_id' => $activity->id,
             'taxonomy_activityable_type' => (new Layer)->getMorphClass(),
             'taxonomy_activityable_id' => $layer->id,
         ]);
@@ -106,11 +106,11 @@ function ricalcoloLayerLayer(?TaxonomyActivity $attivita = null): Layer
     return $layer;
 }
 
-function ricalcoloLayerRiga(Layer $layer, string $tipo, int $id): void
+function recalcRow(Layer $layer, string $kind, int $id): void
 {
     DB::table('layerables')->insert([
         'layer_id' => $layer->id,
-        'layerable_type' => $tipo,
+        'layerable_type' => $kind,
         'layerable_id' => $id,
         'created_at' => now(),
         'updated_at' => now(),
@@ -120,7 +120,7 @@ function ricalcoloLayerRiga(Layer $layer, string $tipo, int $id): void
 /**
  * @return list<int>
  */
-function ricalcoloLayerTracce(Layer $layer): array
+function recalcTracks(Layer $layer): array
 {
     return DB::table('layerables')
         ->where('layer_id', $layer->id)
@@ -131,65 +131,65 @@ function ricalcoloLayerTracce(Layer $layer): array
 }
 
 it('assegna a un layer le tracce con la sua attività e toglie le altre (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $itinerario = ricalcoloLayerAttivita('sardegnasentieri:type:itinerario');
-    $layer = ricalcoloLayerLayer($sentiero);
-    $primo = ricalcoloLayerTraccia($sentiero);
-    $secondo = ricalcoloLayerTraccia($sentiero);
-    $altro = ricalcoloLayerTraccia($itinerario);
-    ricalcoloLayerRiga($layer, EcTrack::class, $altro->id);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $layer = recalcLayer($track);
+    $first = recalcTrack($track);
+    $second = recalcTrack($track);
+    $other = recalcTrack($itinerary);
+    recalcRow($layer, EcTrack::class, $other->id);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
-    expect(ricalcoloLayerTracce($layer))->toBe([$primo->id, $secondo->id]);
+    expect(recalcTracks($layer))->toBe([$first->id, $second->id]);
 });
 
 it('aggiorna properties.layers delle tracce prima di finire (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $itinerario = ricalcoloLayerAttivita('sardegnasentieri:type:itinerario');
-    $layer = ricalcoloLayerLayer($sentiero);
-    $primo = ricalcoloLayerTraccia($sentiero);
-    $secondo = ricalcoloLayerTraccia($sentiero);
-    $altro = ricalcoloLayerTraccia($itinerario);
-    ricalcoloLayerRiga($layer, EcTrack::class, $altro->id);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $layer = recalcLayer($track);
+    $first = recalcTrack($track);
+    $second = recalcTrack($track);
+    $other = recalcTrack($itinerary);
+    recalcRow($layer, EcTrack::class, $other->id);
     // La traccia che non appartiene al layer lo porta già in properties.layers: va tolto.
-    $altro->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
-    $altro->saveQuietly();
+    $other->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
+    $other->saveQuietly();
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
-    expect($primo->fresh()->properties['layers'] ?? [])->toContain($layer->id)
-        ->and($secondo->fresh()->properties['layers'] ?? [])->toContain($layer->id)
-        ->and($altro->fresh()->properties['layers'] ?? [])->not->toContain($layer->id);
+    expect($first->fresh()->properties['layers'] ?? [])->toContain($layer->id)
+        ->and($second->fresh()->properties['layers'] ?? [])->toContain($layer->id)
+        ->and($other->fresh()->properties['layers'] ?? [])->not->toContain($layer->id);
 });
 
 it('non svuota un layer automatico senza attività né aree (oc:8827)', function () {
-    $layer = ricalcoloLayerLayer();
-    $traccia = ricalcoloLayerTraccia();
-    ricalcoloLayerRiga($layer, EcTrack::class, $traccia->id);
+    $layer = recalcLayer();
+    $track = recalcTrack();
+    recalcRow($layer, EcTrack::class, $track->id);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
-    expect(ricalcoloLayerTracce($layer))->toBe([$traccia->id]);
+    expect(recalcTracks($layer))->toBe([$track->id]);
 });
 
 it('lascia vuoti i POI dei layer di tipologia (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $layer = ricalcoloLayerLayer($sentiero);
-    ricalcoloLayerTraccia($sentiero);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $layer = recalcLayer($track);
+    recalcTrack($track);
     // Un POI con la stessa attività del layer: assignPoisByTaxonomy() lo aggancerebbe.
-    $conAttivita = ricalcoloLayerPoi($sentiero);
-    $vecchio = ricalcoloLayerPoi();
-    $vecchio->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
-    $vecchio->saveQuietly();
-    ricalcoloLayerRiga($layer, (new EcPoi)->getMorphClass(), $vecchio->id);
+    $withActivity = recalcPoi($track);
+    $old = recalcPoi();
+    $old->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
+    $old->saveQuietly();
+    recalcRow($layer, (new EcPoi)->getMorphClass(), $old->id);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
     expect(DB::table('layerables')->where('layer_id', $layer->id)->where('layerable_type', (new EcPoi)->getMorphClass())->count())
         ->toBe(0)
-        ->and($conAttivita->fresh()->properties['layers'] ?? [])->not->toContain($layer->id)
-        ->and($vecchio->fresh()->properties['layers'] ?? [])->not->toContain($layer->id);
+        ->and($withActivity->fresh()->properties['layers'] ?? [])->not->toContain($layer->id)
+        ->and($old->fresh()->properties['layers'] ?? [])->not->toContain($layer->id);
 });
 
 it('assegna i POI ai layer delle aree catastali (oc:8827)', function () {
@@ -201,23 +201,23 @@ it('assegna i POI ai layer delle aree catastali (oc:8827)', function () {
         'UPDATE taxonomy_wheres SET geometry = ST_GeomFromText(?, 4326)::geography WHERE id = ?',
         ['POLYGON((9 40, 9 41, 10 41, 10 40, 9 40))', $area->id]
     );
-    $layer = ricalcoloLayerLayer();
+    $layer = recalcLayer();
     Layer::withoutEvents(fn () => $layer->taxonomyWheres()->attach($area->id));
-    ricalcoloLayerTraccia();
-    $dentro = ricalcoloLayerPoi(null, 9.5);
-    ricalcoloLayerPoi(null, 20);
+    recalcTrack();
+    $inside = recalcPoi(null, 9.5);
+    recalcPoi(null, 20);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
     expect(DB::table('layerables')->where('layer_id', $layer->id)->where('layerable_type', (new EcPoi)->getMorphClass())->pluck('layerable_id')->all())
-        ->toBe([$dentro->id]);
+        ->toBe([$inside->id]);
 });
 
 it('accoda PBF e geometria una volta per layer, non per riga (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    ricalcoloLayerLayer($sentiero);
-    ricalcoloLayerTraccia($sentiero);
-    ricalcoloLayerTraccia($sentiero);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    recalcLayer($track);
+    recalcTrack($track);
+    recalcTrack($track);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
@@ -227,28 +227,28 @@ it('accoda PBF e geometria una volta per layer, non per riga (oc:8827)', functio
 });
 
 it('rilanciato non cambia nulla (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $layer = ricalcoloLayerLayer($sentiero);
-    ricalcoloLayerTraccia($sentiero);
-    ricalcoloLayerTraccia($sentiero);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $layer = recalcLayer($track);
+    recalcTrack($track);
+    recalcTrack($track);
 
     // Si confrontano id, tipo e feature, non i timestamp: sync() del package riscrive
     // created_at/updated_at delle righe esistenti a ogni giro (costo accettato, vedi il job).
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
-    $prima = DB::table('layerables')->where('layer_id', $layer->id)->orderBy('id')->get(['id', 'layerable_type', 'layerable_id'])->all();
+    $before = DB::table('layerables')->where('layer_id', $layer->id)->orderBy('id')->get(['id', 'layerable_type', 'layerable_id'])->all();
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
-    $dopo = DB::table('layerables')->where('layer_id', $layer->id)->orderBy('id')->get(['id', 'layerable_type', 'layerable_id'])->all();
+    $after = DB::table('layerables')->where('layer_id', $layer->id)->orderBy('id')->get(['id', 'layerable_type', 'layerable_id'])->all();
 
-    expect($dopo)->toEqual($prima)->and($prima)->toHaveCount(2);
+    expect($after)->toEqual($before)->and($before)->toHaveCount(2);
 });
 
 it('rilanciato senza cambiamenti non riaccoda PBF né geometria (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    ricalcoloLayerLayer($sentiero);
-    ricalcoloLayerLayer();
-    ricalcoloLayerTraccia($sentiero);
-    ricalcoloLayerTraccia($sentiero);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    recalcLayer($track);
+    recalcLayer();
+    recalcTrack($track);
+    recalcTrack($track);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
@@ -260,17 +260,17 @@ it('rilanciato senza cambiamenti non riaccoda PBF né geometria (oc:8827)', func
 it('ripara properties.layers anche se il pivot è già corretto (oc:8827)', function () {
     // Il tentativo precedente è morto dopo aver scritto il pivot: le righe sono giuste,
     // properties.layers no. Il retry deve ripararlo e accodare geometria e PBF.
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $layer = ricalcoloLayerLayer($sentiero);
-    $traccia = ricalcoloLayerTraccia($sentiero);
-    ricalcoloLayerRiga($layer, EcTrack::class, $traccia->id);
-    $poi = ricalcoloLayerPoi();
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $layer = recalcLayer($track);
+    $track = recalcTrack($track);
+    recalcRow($layer, EcTrack::class, $track->id);
+    $poi = recalcPoi();
     $poi->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
     $poi->saveQuietly();
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
-    expect($traccia->fresh()->properties['layers'] ?? [])->toContain($layer->id)
+    expect($track->fresh()->properties['layers'] ?? [])->toContain($layer->id)
         ->and($poi->fresh()->properties['layers'] ?? [])->not->toContain($layer->id);
     Bus::assertDispatchedTimes(GenerateOptimizedPBFChainJob::class, 1);
     Bus::assertDispatchedTimes(UpdateLayerGeometryJob::class, 1);
@@ -283,38 +283,38 @@ it('ripara properties.layers anche se il pivot è già corretto (oc:8827)', func
 });
 
 it('un layer i cui effetti falliscono non ferma gli altri (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $itinerario = ricalcoloLayerAttivita('sardegnasentieri:type:itinerario');
-    $rotto = ricalcoloLayerLayer($sentiero);
-    $sano = ricalcoloLayerLayer($itinerario);
-    ricalcoloLayerTraccia($sentiero);
-    $traccia = ricalcoloLayerTraccia($itinerario);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $broken = recalcLayer($track);
+    $healthy = recalcLayer($itinerary);
+    recalcTrack($track);
+    $track = recalcTrack($itinerary);
 
     // Come generateWholeAppPbfsOptimized() su un'app senza tracce: la rigenerazione lancia.
     $this->mock(PBFGeneratorService::class)
         ->shouldReceive('regeneratePbfsForLayer')
-        ->andReturnUsing(function (Layer $layer) use ($rotto) {
-            if ($layer->id === $rotto->id) {
+        ->andReturnUsing(function (Layer $layer) use ($broken) {
+            if ($layer->id === $broken->id) {
                 throw new RuntimeException('PBF rotti');
             }
         });
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 
-    expect(ricalcoloLayerTracce($sano))->toBe([$traccia->id])
-        ->and($traccia->fresh()->properties['layers'] ?? [])->toContain($sano->id);
+    expect(recalcTracks($healthy))->toBe([$track->id])
+        ->and($track->fresh()->properties['layers'] ?? [])->toContain($healthy->id);
 });
 
 it('non svuota i POI di un layer di tipologia con poi_mode manuale (oc:8827)', function () {
-    $sentiero = ricalcoloLayerAttivita('sardegnasentieri:type:sentiero');
-    $layer = ricalcoloLayerLayer($sentiero);
+    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $layer = recalcLayer($track);
     $layer->configuration = ['poi_mode' => 'manual'];
     $layer->saveQuietly();
-    ricalcoloLayerTraccia($sentiero);
-    $poi = ricalcoloLayerPoi();
+    recalcTrack($track);
+    $poi = recalcPoi();
     $poi->properties = ['ref' => 'TEST', 'layers' => [$layer->id]];
     $poi->saveQuietly();
-    ricalcoloLayerRiga($layer, (new EcPoi)->getMorphClass(), $poi->id);
+    recalcRow($layer, (new EcPoi)->getMorphClass(), $poi->id);
 
     RecalculateSardegnaSentieriLayersJob::dispatchSync();
 

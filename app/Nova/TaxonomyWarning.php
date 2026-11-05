@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace App\Nova;
 
-use Laravel\Nova\Fields\MorphToMany;
+use App\Services\Import\SardegnaSentieriImportService;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Wm\WmPackage\Nova\AbstractTaxonomyResource;
+use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\Nova\AbstractTaxonomyTermsResource;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\ApiLinksCard;
 
-class TaxonomyWarning extends AbstractTaxonomyResource
+/**
+ * Le avvertenze (oc:8910).
+ *
+ * Erano una tassonomia a sé, con `taxonomy_warnings` e il suo pivot; ora sono la tassonomia
+ * `warnings` del modello unico. La vista resta quella di prima — stesso indirizzo, stessa voce
+ * di menu, stesso elenco — e cambia solo la tabella sotto.
+ */
+class TaxonomyWarning extends AbstractTaxonomyTermsResource
 {
-    public static $model = \App\Models\TaxonomyWarning::class;
-
-    public static $title = 'name';
-
-    public static function label(): string
+    public static function taxonomyIdentifier(): string
     {
-        return __('Warnings');
+        return SardegnaSentieriImportService::WARNINGS_TAXONOMY;
     }
 
-    public static function singularLabel(): string
+    /** L'indirizzo di prima: i segnalibri di chi la usa continuano a funzionare. */
+    public static function uriKey(): string
     {
-        return __('Warning');
+        return 'taxonomy-warnings';
     }
 
     public function fields(NovaRequest $request): array
@@ -31,10 +36,7 @@ class TaxonomyWarning extends AbstractTaxonomyResource
         return [
             ...parent::fields($request),
             Text::make('Source ID', 'properties->source_id')->readonly()->hideFromIndex(),
-            Text::make('Vocabulary', 'properties->vocabulary')->readonly()->hideFromIndex(),
-            MorphToMany::make('Tracks Associati', 'ecTracks', EcTrack::class)
-                ->display('name')
-                ->help('Track associati a questo warning'),
+            Text::make(__('Source vocabulary'), 'properties->vocabulary')->readonly()->hideFromIndex(),
         ];
     }
 
@@ -44,8 +46,7 @@ class TaxonomyWarning extends AbstractTaxonomyResource
             return [];
         }
 
-        /** @var \App\Models\TaxonomyWarning $model */
-
+        /** @var TaxonomyTerm $model */
         $model = $request->findModelOrFail();
         $sourceId = data_get($model->properties, 'source_id');
 
@@ -54,8 +55,8 @@ class TaxonomyWarning extends AbstractTaxonomyResource
         }
 
         $card = new ApiLinksCard([]);
-        $card->addLink('Sardegna Sentieri (termine)', 'https://www.sardegnasentieri.it/taxonomy/term/' . $sourceId . '?_format=json');
-        $card->addLink('Sardegna Sentieri (vocabolario)', 'https://www.sardegnasentieri.it/ss/tassonomia/tipologia_di_avvertenze?_format=json');
+        $card->addLink('Sardegna Sentieri (termine)', 'https://www.sardegnasentieri.it/taxonomy/term/'.$sourceId.'?_format=json');
+        $card->addLink('Sardegna Sentieri (tassonomia)', 'https://www.sardegnasentieri.it/ss/tassonomia/tipologia_di_avvertenze?_format=json');
 
         return [$card];
     }

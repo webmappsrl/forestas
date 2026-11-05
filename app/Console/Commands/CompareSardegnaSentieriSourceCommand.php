@@ -164,6 +164,9 @@ class CompareSardegnaSentieriSourceCommand extends Command
             $this->collectEnti($apiData);
             $apiData = Arr::except($apiData, self::IGNORED_FIELDS);
             $dbData = Arr::except($dbData, self::IGNORED_FIELDS);
+            // La gerarchia di field_frubilita la dà solo la copia: le API non l'avevano (oc:8910).
+            Arr::forget($dbData, 'taxonomies.fruibilita_padri');
+            Arr::forget($apiData, 'taxonomies.fruibilita_padri');
             foreach (array_keys($apiData + $dbData) as $field) {
                 $this->compareValues("{$kind} {$nid} {$field}", $apiData[$field] ?? null, $dbData[$field] ?? null);
             }
