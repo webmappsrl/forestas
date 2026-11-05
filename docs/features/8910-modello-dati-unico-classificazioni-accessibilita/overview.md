@@ -334,6 +334,36 @@ filtri sui Layer — è nell'overview del package, in coda.
       leggeva da uno fermo al 6 ottobre. L'alias è stato rifatto senza filtro e **l'indice vecchio
       `ec_tracks_1791277311` è stato cancellato**.
 
+### Collaudato su dev, 5 novembre
+
+- [x] Il branch è stato messo su `dev.forestas` e provato per intero, con l'import lanciato nello
+      stesso modo dello scheduler delle 06:00 (`sardegnasentieri:import --reset`). Risultato:
+      **769 tracce su 769, tutte classificate**, 976 POI, 2743 relazioni dei termini, 769 documenti
+      nell'indice con i `terms` dentro.
+- [x] I quattro layer di tipologia si sono popolati da soli, senza che nessuno lanciasse niente:
+      Sentieri 614, Itinerari 102, Cammini di Sardegna 53, Sentieri Accessibili 2 — quest'ultimo
+      basso perché in Drupal le righe di accessibilità sono due in tutto, come scritto nei rischi.
+      Le quattro aree catastali, che filtrano per zona, restano popolate: 400, 255, 237, 60.
+- [x] L'import ha chiamato da sé `configure-taxonomy-terms` e `configure-layers`, che è il
+      comportamento costruito in questo ticket: nei log si legge «Layer «Sentieri»: già a posto».
+- [x] **La guardia ha funzionato quando serviva.** Alle 14:36 l'import orario è partito mentre la
+      sorgente era irraggiungibile e si è fermato con «Source unreachable or empty, import aborted
+      before any change», senza cancellare un dato.
+- [x] Su dev `EC_TRACK_MODEL` e `REDIS_CLIENT=predis` erano già valorizzate, quindi i due rischi
+      segnalati per il bump non si presentano lì. Su UAT `REDIS_CLIENT=predis` è stata verificata
+      il 4 novembre.
+- [x] Dev non aveva la copia del DB Drupal e l'import non ci era mai girato: ora la legge da UAT
+      con un tunnel SSH installato come servizio — vedi
+      [docs/howto/copia-database-drupal.md](../../howto/copia-database-drupal.md).
+
+### Trovato collaudando, fuori da questo ticket
+
+- **1183 `UpdateEcTrackAwsJob` falliti** con `MaxAttemptsExceeded`: su dev il caricamento dei file
+  su S3 non funziona. Girano dopo la creazione della traccia e non hanno impedito nulla di questo
+  lavoro, ma sono rotti.
+- **54.740 job falliti alle 06:12** con `finfo_file(): Failed identify data` su immagini JPEG: la
+  conversione delle foto. Preesistente, nessuno la sta guardando.
+
 ### Cosa resta aperto
 
 - **L'icona di «Difficoltà mobilità dolce»** è ancora `txn-bike` ed è sbagliata: è la difficoltà
