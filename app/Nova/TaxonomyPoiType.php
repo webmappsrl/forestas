@@ -30,7 +30,7 @@ class TaxonomyPoiType extends WmTaxonomyPoiType
         return [
             ...parent::fields($request),
             Text::make('Source ID', 'properties->source_id')->readonly()->hideFromIndex(),
-            Text::make('Vocabulary', 'properties->vocabulary')->readonly()->hideFromIndex(),
+            Text::make(__('Source vocabulary'), 'properties->vocabulary')->readonly()->hideFromIndex(),
         ];
     }
 
@@ -41,7 +41,6 @@ class TaxonomyPoiType extends WmTaxonomyPoiType
         }
 
         /** @var \Wm\WmPackage\Models\TaxonomyPoiType $model */
-
         $model = $request->findModelOrFail();
         $sourceId = data_get($model->properties, 'source_id');
         $vocabulary = data_get($model->properties, 'vocabulary');
@@ -51,9 +50,9 @@ class TaxonomyPoiType extends WmTaxonomyPoiType
         }
 
         $card = new ApiLinksCard([]);
-        $card->addLink('Sardegna Sentieri (termine)', 'https://www.sardegnasentieri.it/taxonomy/term/' . $sourceId . '?_format=json');
+        $card->addLink('Sardegna Sentieri (termine)', 'https://www.sardegnasentieri.it/taxonomy/term/'.$sourceId.'?_format=json');
         if ($vocabulary) {
-            $card->addLink('Sardegna Sentieri (vocabolario)', 'https://www.sardegnasentieri.it/ss/tassonomia/' . $vocabulary . '?_format=json');
+            $card->addLink('Sardegna Sentieri (vocabolario)', 'https://www.sardegnasentieri.it/ss/tassonomia/'.$vocabulary.'?_format=json');
         }
 
         return [$card];

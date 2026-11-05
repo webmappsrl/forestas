@@ -141,6 +141,31 @@ class ImportSardegnaSentieriCommand extends Command
             $this->info('Reset completed.');
         }
 
+        // La tassonomia delle classificazioni non viene da Drupal: la crea
+        // il comando dei termini. Con `--reset` si riparte da zero (le relazioni
+        // sono gia' state svuotate da resetData); nell'import orario, che
+        // non ricarica tutti i sentieri, azzerare i termini romperebbe le
+        // relazioni di quelli non reimportati: li' ci si limita ad allinearlo
+        // (oc:8910).
+        // Mai `--fresh`, nemmeno con `--reset`: svuota `taxonomy_terms`, e il pivot
+        // `taxonomy_termables` cade in cascata portando via anche le relazioni dei layer, che con
+        // l'import non c'entrano. I termini rinascerebbero con id nuovi e ogni notte i layer
+        // resterebbero senza filtri, con le mappe vuote fino a un intervento a mano. L'allineamento
+        // non ne ha bisogno: `align()` cerca per identifier, e le righe fuori elenco le tolgono
+        // `renameIdentifiers()` e `removeRetired()`. Le relazioni delle tracce, che il troncamento
+        // deve invece portare via, le cancella `resetData()` per morph type (oc:8910).
+        $this->call('sardegnasentieri:configure-taxonomy-terms');
+
+        // Dopo il reset i layer vanno riconfigurati: con `RESTART IDENTITY` i contenuti rinascono
+        // e un layer nuovo di zecca non ha filtri. È idempotente, e qui gira prima del batch
+        // perché le sue relazioni non dipendono dalle tracce; il ricalcolo lo fa la catena di fine
+        // batch, quindi `--no-recalc`. Non si chiama nell'import orario: lì niente è stato
+        // azzerato, e un `sync()` a ogni ora sovrascriverebbe ogni modifica fatta in Nova
+        // (oc:8910).
+        if ($this->option('reset')) {
+            $this->call('sardegnasentieri:configure-layers', ['--no-recalc' => true]);
+        }
+
         $this->info('Importing taxonomies...');
         $importService->importAll();
         $this->info('Taxonomies imported.');
@@ -817,10 +842,10 @@ class ImportSardegnaSentieriCommand extends Command
         $this->info('Truncated taxonomy_poi_types.');
 
         // Le attività non si troncano più: i layer sono configurati per
-        // attività, e il TRUNCATE ... CASCADE portava via anche i loro legami
+        // attività, e il TRUNCATE ... CASCADE portava via anche le loro relazioni
         // in taxonomy_activityables, lasciando i filtri di EC Tracce vuoti
         // ogni mattina. L'import le ritrova per `identifier` (oc:8827).
-        // Le due pivot (legami con attività e con layer) non hanno chiavi
+        // Le due pivot (relazioni con attività e con layer) non hanno chiavi
         // esterne verso tracce e POI, quindi il CASCADE non le raggiunge: dopo
         // RESTART IDENTITY le righe vecchie punterebbero ai record nuovi con lo
         // stesso id. Si cancellano a mano solo le righe di tracce e POI; quelle
@@ -839,6 +864,15 @@ class ImportSardegnaSentieriCommand extends Command
         // enti invece restano: il reset li riscrive tutti (oc:8513).
         DB::statement('TRUNCATE TABLE enteables RESTART IDENTITY');
         $this->info('Truncated enteables.');
+
+        // Stessa trappola per le relazioni dei termini delle classificazioni: il
+        // pivot polimorfo non ha chiavi esterne verso tracce e POI. Il
+        // la tassonomia (`taxonomy_terms`) invece non si tocca: non viene da
+        // Drupal e l'import non saprebbe ricrearlo (oc:8910).
+        DB::table('taxonomy_termables')
+            ->whereIn('termable_type', self::TRACK_AND_POI_MORPH_TYPES)
+            ->delete();
+        $this->info('Cleared track and POI links from taxonomy_termables.');
     }
 
     private function ensurePrerequisites(): bool

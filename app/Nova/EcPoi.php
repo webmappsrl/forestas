@@ -9,10 +9,10 @@ use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Text;
-use Marshmallow\Tiptap\Tiptap;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
+use Marshmallow\Tiptap\Tiptap;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\ApiLinksCard;
 use Wm\WmPackage\Nova\EcPoi as WmNovaEcPoi;
 use Wm\WmPackage\Nova\EcTrack;
@@ -29,7 +29,6 @@ class EcPoi extends WmNovaEcPoi
         }
 
         /** @var \App\Models\EcPoi $poi */
-
         $poi = $request->findModelOrFail();
         $sourceId = data_get($poi->properties, 'out_source_feature_id');
         $htmlUrl = data_get($poi->properties, 'forestas.url');
@@ -40,7 +39,7 @@ class EcPoi extends WmNovaEcPoi
 
         $card = new ApiLinksCard([]);
         if ($sourceId) {
-            $card->addLink('Sardegna Sentieri (JSON)', 'https://www.sardegnasentieri.it/ss/poi/' . $sourceId . '?_format=json');
+            $card->addLink('Sardegna Sentieri (JSON)', 'https://www.sardegnasentieri.it/ss/poi/'.$sourceId.'?_format=json');
         }
         if ($htmlUrl) {
             $card->addLink('Sardegna Sentieri (HTML)', $htmlUrl);
@@ -53,13 +52,16 @@ class EcPoi extends WmNovaEcPoi
     {
         $parentFields = parent::fields($request);
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
-        $regularFields = array_values(array_filter($parentFields, fn($f) => ! ($f instanceof TabsGroup) && ! in_array(get_class($f), $relationTypes)));
+        // Come su EcTrack: via i TabsGroup del package, tranne le tassonomie (oc:8910).
+        $regularFields = array_values(array_filter(
+            $this->keepOnlyTaxonomySection($parentFields),
+            fn ($f) => ! in_array(get_class($f), $relationTypes)
+        ));
 
         return [
             ...$regularFields,
             Tab::group(__('Details'), [
                 Tab::make(__('Info'), $this->getInfoTabFields()),
-                Tab::make(__('Accessibility'), $this->getAccessibilityTabFields()),
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
             ]),
             BelongsToMany::make('Related POIs', 'relatedPois', self::class)->collapsedByDefault(),

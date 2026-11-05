@@ -5,6 +5,7 @@ use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -13,117 +14,204 @@ use Wm\WmPackage\Jobs\UpdateLayeredFeaturesJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyActivity;
+use Wm\WmPackage\Models\TaxonomyActivityable;
+use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\Models\TaxonomyWhere;
+use Wm\WmPackage\Models\TaxonomyWhereable;
 
 /**
- * Comando di configurazione dei layer di tipologia (oc:8827): lega ogni layer alla sua attività
- * con insert diretti e senza observer (che farebbero ricalcoli sincroni e scritture su S3), poi
- * accoda ricalcolo e reindex. Il setup scrive con `withoutEvents()` per lo stesso motivo.
+ * Comando di configurazione dei layer di tipologia (oc:8827, rifatto sui termini in oc:8910):
+ * lega ogni layer ai termini che lo definiscono e accoda ricalcolo e reindex. Un layer assente
+ * si salta con un avvertimento, perché gli ambienti non hanno tutti e quattro i layer.
  */
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Bus::fake();
     App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
+    // I termini li crea il comando delle tassonomie: è la stessa sequenza dell'import.
+    Artisan::call('sardegnasentieri:configure-taxonomy-terms');
 });
 
-function configLayerAttivita(string $identifier): TaxonomyActivity
-{
-    return TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create([
-        'identifier' => $identifier,
-        'name' => $identifier,
-    ]));
-}
-
-function configLayerLayer(string $nome): Layer
+function makeTypeLayer(string $name): Layer
 {
     return Layer::factory()->createQuietly([
-        'name' => ['it' => $nome, 'en' => $nome],
+        'name' => ['it' => $name, 'en' => $name],
         'properties' => [],
         'configuration' => [],
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
     ]);
 }
 
-/** @return array<string, TaxonomyActivity> identifier => attività */
-function configLayerScenario(): array
+function makeAllTypeLayers(): void
 {
-    $attivita = [];
-    foreach (ConfigureSardegnaSentieriLayersCommand::LAYER_ACTIVITIES as $nome => $identifier) {
-        configLayerLayer($nome);
-        $attivita[$identifier] = configLayerAttivita($identifier);
+    foreach (array_keys(ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS) as $name) {
+        makeTypeLayer($name);
     }
-
-    return $attivita;
 }
 
-function configLayerLegami(): array
+function layerByName(string $name): Layer
 {
-    return DB::table('taxonomy_activityables')
-        ->where('taxonomy_activityable_type', (new Layer)->getMorphClass())
+    return Layer::query()->get()->first(fn ($l) => $l->getTranslation('name', 'it') === $name);
+}
+
+function layerTermRows(): array
+{
+    return DB::table('taxonomy_termables')
+        ->where('termable_type', (new Layer)->getMorphClass())
         ->orderBy('id')
-        ->get(['id', 'taxonomy_activity_id', 'taxonomy_activityable_id'])
+        ->get(['id', 'taxonomy_term_id', 'termable_id'])
         ->map(fn ($r) => (array) $r)
         ->all();
 }
 
-it('associa a ogni layer di tipologia solo la sua attività (oc:8827)', function () {
-    $attivita = configLayerScenario();
-    $estranea = configLayerAttivita('altra-attivita');
-    $sentieri = Layer::query()->get()->first(fn ($l) => $l->getTranslation('name', 'it') === 'Sentieri');
-    DB::table('taxonomy_activityables')->insert([
-        'taxonomy_activity_id' => $estranea->id,
-        'taxonomy_activityable_type' => (new Layer)->getMorphClass(),
-        'taxonomy_activityable_id' => $sentieri->id,
-    ]);
+it('associa a ogni layer di tipologia solo i suoi termini (oc:8910)', function () {
+    makeAllTypeLayers();
+    $foreign = TaxonomyTerm::query()->where('identifier', 'route-type-walk')->firstOrFail();
+    $trailsLayer = layerByName('Sentieri');
+    $trailsLayer->taxonomyTerms()->attach($foreign->id);
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    foreach (ConfigureSardegnaSentieriLayersCommand::LAYER_ACTIVITIES as $nome => $identifier) {
-        $layer = Layer::query()->get()->first(fn ($l) => $l->getTranslation('name', 'it') === $nome);
-        expect($layer->taxonomyActivities()->pluck('taxonomy_activities.id')->all())
-            ->toBe([$attivita[$identifier]->id]);
+    foreach (ConfigureSardegnaSentieriLayersCommand::LAYER_TERMS as $name => $identifiers) {
+        $expected = TaxonomyTerm::query()->whereIn('identifier', $identifiers)->pluck('id')->sort()->values()->all();
+        expect(layerByName($name)->taxonomyTerms()->pluck('taxonomy_terms.id')->sort()->values()->all())
+            ->toBe($expected);
     }
 });
 
-it('rilanciato non cambia nulla (oc:8827)', function () {
-    configLayerScenario();
+it('il layer dei percorsi accessibili prende tutta la scala di accessibilità (oc:8910)', function () {
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
-    $prima = configLayerLegami();
-    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    expect($prima)->toHaveCount(4)
-        ->and(configLayerLegami())->toBe($prima);
+    expect(layerByName('Sentieri Accessibili')->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
+        ->toBe(['inclusivity-difficulty-ae', 'inclusivity-difficulty-aee', 'inclusivity-difficulty-at']);
 });
 
-it('fallisce senza toccare nulla se manca un attività (oc:8827)', function () {
-    configLayerScenario();
-    TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::query()
-        ->where('identifier', SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER)->delete());
+it('scrive la tassonomia sulla relazione, cosi il filtro per famiglia funziona (oc:8910)', function () {
+    makeAllTypeLayers();
+    $routeType = TaxonomyTerm::query()->where('identifier', 'route-type')->firstOrFail();
+
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
+
+    expect(DB::table('taxonomy_termables')
+        ->where('termable_type', (new Layer)->getMorphClass())
+        ->where('termable_id', layerByName('Sentieri')->id)
+        ->value('parent_id'))->toBe($routeType->id);
+});
+
+it('rilanciato non cambia nulla (oc:8827)', function () {
+    makeAllTypeLayers();
+
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
+    $before = layerTermRows();
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
+
+    expect($before)->toHaveCount(6)
+        ->and(layerTermRows())->toBe($before);
+});
+
+it('crea i layer che su questo ambiente non esistono (oc:8910)', function () {
+    // La configurazione dei quattro layer la definisce questo comando: un ambiente dove
+    // qualcuno non li ha creati a mano in Nova deve arrivare allo stesso risultato.
+    Storage::fake('wmfe');
+    makeTypeLayer('Sentieri');
+    makeTypeLayer('Cammini di Sardegna');
 
     $this->artisan('sardegnasentieri:configure-layers')
-        ->expectsOutputToContain('sardegnasentieri:import --force')
+        ->expectsOutputToContain('Layer creati')
+        ->assertExitCode(0);
+
+    expect(Layer::query()->count())->toBe(4)
+        ->and(layerTermRows())->toHaveCount(6)
+        ->and(layerByName('Sentieri Accessibili')->taxonomyTerms()->count())->toBe(3);
+});
+
+it('il layer creato nasce in modalità automatica, così il ricalcolo lo popola (oc:8910)', function () {
+    Storage::fake('wmfe');
+
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
+
+    $layer = layerByName('Itinerari');
+    expect($layer->isAutoTrackMode())->toBeTrue()
+        ->and($layer->app_id)->toBe(SardegnaSentieriImportService::IMPORT_APP_ID)
+        ->and($layer->getTranslation('name', 'it'))->toBe('Itinerari');
+});
+
+it('fallisce senza toccare nulla se mancano i termini (oc:8910)', function () {
+    makeAllTypeLayers();
+    TaxonomyTerm::query()->where('identifier', 'route-type-trail')->delete();
+
+    $this->artisan('sardegnasentieri:configure-layers')
+        ->expectsOutputToContain('configure-taxonomy-terms')
         ->assertExitCode(1);
 
-    expect(configLayerLegami())->toBe([]);
+    expect(layerTermRows())->toBe([]);
     Bus::assertNothingDispatched();
 });
 
-it('fallisce se un layer manca o il nome è ambiguo (oc:8827)', function () {
-    configLayerScenario();
-    configLayerLayer('Sentieri');
+it('su un ambiente senza nessun layer li crea tutti e quattro (oc:8910)', function () {
+    Storage::fake('wmfe');
 
-    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(1);
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
-    expect(configLayerLegami())->toBe([]);
-    Bus::assertNothingDispatched();
+    expect(Layer::query()->count())->toBe(4)
+        ->and(layerTermRows())->toHaveCount(6);
 });
 
-it('accoda ricalcolo e reindex senza passare dagli observer (oc:8827)', function () {
+it('toglie dal layer le tassonomie che non sono i suoi termini (oc:8910)', function () {
+    // Il criterio in più non si somma, si moltiplica: `LayerService` mette attività, zone e
+    // termini in AND, quindi un'attività rimasta dalla versione precedente del comando
+    // taglierebbe il layer in silenzio.
+    Storage::fake('wmfe');
+    makeAllTypeLayers();
+    $trailsLayer = layerByName('Sentieri');
+    $activity = TaxonomyActivity::createQuietly(['identifier' => 'sardegnasentieri:type:sentiero', 'name' => ['it' => 'Sentiero']]);
+    $where = TaxonomyWhere::withoutEvents(fn () => TaxonomyWhere::create(['name' => ['it' => 'Area F Nord']]));
+    TaxonomyActivityable::withoutEvents(fn () => $trailsLayer->taxonomyActivities()->attach($activity->id));
+    TaxonomyWhereable::withoutEvents(fn () => $trailsLayer->taxonomyWheres()->attach($where->id));
+
+    $this->artisan('sardegnasentieri:configure-layers')
+        ->expectsOutputToContain('staccate 1 attività')
+        ->expectsOutputToContain('staccate 1 zone')
+        ->assertExitCode(0);
+
+    expect($trailsLayer->fresh()->taxonomyActivities()->count())->toBe(0)
+        ->and($trailsLayer->fresh()->taxonomyWheres()->count())->toBe(0)
+        ->and($trailsLayer->fresh()->taxonomyTerms()->pluck('identifier')->all())->toBe(['route-type-trail']);
+});
+
+it('stacca le altre tassonomie senza accodare una catena per ogni riga (oc:8910)', function () {
+    // `TaxonomyActivityablesObserver` riassegnerebbe le tracce e `LayerableObserver`
+    // accoderebbe una catena PBF per ogni riga scritta: con --no-recalc non deve partire nulla.
+    Storage::fake('wmfe');
+    makeAllTypeLayers();
+    $trailsLayer = layerByName('Sentieri');
+    $activity = TaxonomyActivity::createQuietly(['identifier' => 'sardegnasentieri:type:sentiero', 'name' => ['it' => 'Sentiero']]);
+    TaxonomyActivityable::withoutEvents(fn () => $trailsLayer->taxonomyActivities()->attach($activity->id));
+
+    $this->artisan('sardegnasentieri:configure-layers', ['--no-recalc' => true])->assertExitCode(0);
+
+    Bus::assertNothingDispatched();
+    expect($trailsLayer->fresh()->taxonomyActivities()->count())->toBe(0);
+});
+
+it('con un nome ambiguo salta quel layer e scrive gli altri (oc:8910)', function () {
+    makeAllTypeLayers();
+    makeTypeLayer('Sentieri');
+
+    $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
+
+    expect(layerByName('Cammini di Sardegna')->taxonomyTerms()->count())->toBe(1)
+        ->and(layerTermRows())->toHaveCount(5);
+});
+
+it('accoda ricalcolo e reindex, e con --no-recalc nemmeno quelli (oc:8910)', function () {
     // Con gli observer accesi il package scriverebbe le icone: senza fake il test morirebbe
     // sulla configurazione S3, non sull'asserzione dei job.
     Storage::fake('wmfe');
-    configLayerScenario();
+    makeAllTypeLayers();
 
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
@@ -132,10 +220,19 @@ it('accoda ricalcolo e reindex senza passare dagli observer (oc:8827)', function
         RegenerateTaxonomyWhereOutputsJob::class,
     ]);
     Bus::assertDispatchedTimes(RecalculateSardegnaSentieriLayersJob::class, 1);
-    Bus::assertDispatchedTimes(RegenerateTaxonomyWhereOutputsJob::class, 0);
     Bus::assertNotDispatched(ImportSardegnaSentieriTrackJob::class);
     // L'observer del package, su un Layer, accoderebbe UpdateLayeredFeaturesJob.
     Bus::assertNotDispatched(UpdateLayeredFeaturesJob::class);
     expect(collect(Bus::dispatched(RecalculateSardegnaSentieriLayersJob::class))->first()->queue)
         ->toBe(ImportSardegnaSentieriTrackJob::QUEUE);
+});
+
+it('con --no-recalc non accoda nulla (oc:8910)', function () {
+    Storage::fake('wmfe');
+    makeAllTypeLayers();
+
+    $this->artisan('sardegnasentieri:configure-layers', ['--no-recalc' => true])->assertExitCode(0);
+
+    Bus::assertNothingDispatched();
+    expect(layerTermRows())->toHaveCount(6);
 });

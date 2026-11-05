@@ -88,6 +88,37 @@ ssh uat.forestas 'tail -n 30 /var/www/html/forestas/storage/logs/drupal-dump-syn
 - **Il container** ha `restart: unless-stopped`: riparte da solo dopo un riavvio, resta spento se
   lo si ferma a mano.
 
+## La copia su dev: non c'è, si legge quella di UAT
+
+Su `dev.forestas` **la copia non esiste**: niente container, e il `.env` non aveva nemmeno le
+variabili di connessione. L'import ci girava a vuoto da sempre — si fermava sulla sua guardia con
+«Source unreachable or empty, import aborted before any change», senza cancellare niente.
+
+Non se ne tiene una seconda: è un dump in sola lettura, uguale per tutti e rigenerato da un
+processo solo, e pesa 15 GB. Dev legge quella di UAT attraverso un tunnel SSH, installato come
+servizio di sistema:
+
+```bash
+ssh dev.forestas 'systemctl status tunnel-sardegnasentieri-dump'
+```
+
+L'unità è `/etc/systemd/system/tunnel-sardegnasentieri-dump.service`, con `Restart=always` e
+`ServerAliveInterval=30`: se la connessione cade il tunnel si riapre da solo dopo dieci secondi, e
+riparte al boot. Se proprio non risale, l'import si ferma sulla guardia e non cancella niente.
+
+Due cose da sapere, perché non sono deducibili:
+
+- **Il tunnel ascolta su `172.24.0.1:3307`, non su `127.0.0.1`.** A leggere la copia è il
+  container `php-forestasdev`, che l'host lo raggiunge dal gateway della rete Docker
+  `forestas_default`: in ascolto sul solo loopback il container non lo vedrebbe. Nel `.env` di dev
+  ci sono `DB_SARDEGNASENTIERI_HOST=172.24.0.1` e `DB_SARDEGNASENTIERI_PORT=3307`, che è l'unico
+  posto dove la regola «dentro Docker si usa `mysql-sardegnasentieri-dump:3306`» non vale.
+- **Il Cloud Firewall Hetzner di dev chiude la 22 in uscita**, verso qualunque destinazione —
+  anche GitHub, ed è il motivo della riga `Host github.com / Port 443` nel suo `~/.ssh/config`.
+  Il filtro non è sulla macchina: `ufw` è inattivo e `iptables` ha la catena OUTPUT vuota. Serve
+  una regola in uscita TCP 22 verso l'IP di UAT, nella console Hetzner (instance `DEV-forestas`,
+  `fsn1-dc14`). Senza quella, `dev → uat:22` va in timeout a sei secondi netti.
+
 ## La porta è sempre la 3307
 
 Uno script che legge la copia dall'host si collega **sempre** a `127.0.0.1:3307`, utente
@@ -99,6 +130,7 @@ gira identico su UAT, senza cambiare configurazione.
 | UAT | la copia di UAT |
 | Mac, container locale acceso | la copia locale |
 | Mac, container locale spento e tunnel aperto | la copia di UAT, aggiornata ogni giorno |
+| dev | niente: la copia di UAT sta sulla `172.24.0.1:3307`, vedi sopra |
 
 Il codice Laravel non passa dall'host: dentro Docker usa `mysql-sardegnasentieri-dump:3306`, in
 locale come su UAT.

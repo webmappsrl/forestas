@@ -58,7 +58,7 @@ beforeEach(function () {
     // Un elemento per tipo basta a produrre qualche job: qui interessa solo
     // l'aggancio del batch, non la scrittura reale (stesso pattern di
     // ImportResetNormalizeTest).
-    fonteSardegnaSentieriFinta(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
+    fakeSardegnaSentieriSource(['1' => '2026-01-01 00:00:00'], ['2' => '2026-01-01 00:00:00']);
 
     Artisan::command('wm:backup-run {--only-db} {--disable-notifications}', fn () => 0);
 });
@@ -134,7 +134,7 @@ it('nell import orario i job sono raggruppati in un batch e il registro parte al
 
 it('nell import orario senza job il registro parte comunque', function () {
     Bus::fake();
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
 
     $this->artisan('sardegnasentieri:import')
         ->expectsOutputToContain('Nessun job da importare.')
@@ -146,7 +146,7 @@ it('nell import orario senza job il registro parte comunque', function () {
 
 it('con --reset e nessun job il registro non parte', function () {
     Bus::fake();
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
 
     $this->artisan('sardegnasentieri:import', ['--reset' => true])
         ->expectsOutputToContain('Nessun job da importare.')
@@ -158,7 +158,7 @@ it('con --reset e nessun job il registro non parte', function () {
 
 it('con --only e nessun job il registro non parte', function () {
     Bus::fake();
-    fonteSardegnaSentieriFinta();
+    fakeSardegnaSentieriSource();
 
     $this->artisan('sardegnasentieri:import', ['--only' => 'tracks'])
         ->expectsOutputToContain('Nessun job da importare.')

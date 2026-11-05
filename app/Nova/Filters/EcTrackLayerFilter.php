@@ -83,9 +83,15 @@ class EcTrackLayerFilter extends FeaturesByLayerFilter
     /**
      * Stessa condizione di LayerService::hasValidAutoModeFilter(), privata nel package.
      */
+    /**
+     * I termini sono un filtro come le zone e le attività (oc:8910): un layer del modello unico
+     * non ha più attività, e senza questa riga finirebbe nel ramo «senza filtro», che legge le
+     * tracce associate invece di ricalcolarle.
+     */
     private function hasAutoFilter(Layer $layer): bool
     {
         return ! empty($layer->properties['taxonomy_where'] ?? [])
-            || $layer->taxonomyActivities()->exists();
+            || $layer->taxonomyActivities()->exists()
+            || $layer->taxonomyTerms()->exists();
     }
 }

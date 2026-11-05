@@ -163,7 +163,7 @@ it('registra nel registro il codice di un sentiero appena importato', function (
         ],
     ]);
 
-    $client = fonteSardegnaSentieriMock();
+    $client = mockSardegnaSentieriSource();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $track = trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -185,7 +185,7 @@ it('non crea un secondo codice quando la stessa traccia viene reimportata', func
         ],
     ]);
 
-    $client = fonteSardegnaSentieriMock();
+    $client = mockSardegnaSentieriSource();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $service = trailRegistryMakeService($client);
@@ -206,7 +206,7 @@ it('importa comunque la traccia se la registrazione del codice fallisce', functi
         ],
     ]);
 
-    $client = fonteSardegnaSentieriMock();
+    $client = mockSardegnaSentieriSource();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     $track = trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -226,7 +226,7 @@ it('non registra nulla per un tracciato senza ref', function () {
         ],
     ]);
 
-    $client = fonteSardegnaSentieriMock();
+    $client = mockSardegnaSentieriSource();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
@@ -247,7 +247,7 @@ it('non tocca il registro quando il dominio e spento', function () {
         ],
     ]);
 
-    $client = fonteSardegnaSentieriMock();
+    $client = mockSardegnaSentieriSource();
     $client->shouldReceive('getGpxContent')->andReturn(trailRegistryGpx());
 
     trailRegistryMakeService($client)->importTrackFromResponse($externalId, $response);
