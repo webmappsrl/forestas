@@ -108,11 +108,13 @@ riparte al boot. Se proprio non risale, l'import si ferma sulla guardia e non ca
 
 Due cose da sapere, perché non sono deducibili:
 
-- **Il tunnel ascolta su `172.24.0.1:3307`, non su `127.0.0.1`.** A leggere la copia è il
-  container `php-forestasdev`, che l'host lo raggiunge dal gateway della rete Docker
-  `forestas_default`: in ascolto sul solo loopback il container non lo vedrebbe. Nel `.env` di dev
-  ci sono `DB_SARDEGNASENTIERI_HOST=172.24.0.1` e `DB_SARDEGNASENTIERI_PORT=3307`, che è l'unico
-  posto dove la regola «dentro Docker si usa `mysql-sardegnasentieri-dump:3306`» non vale.
+- **Il tunnel ascolta su `172.24.0.1:3307`, non su `127.0.0.1`.** A leggere la copia sono i
+  container `php-forestasdev` e `wordpress-forestasdev` (oc:8947), che l'host lo raggiungono dal
+  gateway della rete Docker `forestas_default`: in ascolto sul solo loopback non lo vedrebbero. Nel
+  `.env` di dev ci sono `DB_SARDEGNASENTIERI_HOST=172.24.0.1` e `DB_SARDEGNASENTIERI_PORT=3307`, nel
+  `wp-forestas/.env` di dev `DRUPAL_DB_HOST=172.24.0.1` e `DRUPAL_DB_PORT=3307`: sono gli unici due
+  posti dove la regola «dentro Docker si usa `mysql-sardegnasentieri-dump:3306`» non vale, e se il
+  gateway della rete cambia vanno aggiornati tutti e due, insieme all'unità del tunnel.
 - **Il Cloud Firewall Hetzner di dev chiude la 22 in uscita**, verso qualunque destinazione —
   anche GitHub, ed è il motivo della riga `Host github.com / Port 443` nel suo `~/.ssh/config`.
   Il filtro non è sulla macchina: `ufw` è inattivo e `iptables` ha la catena OUTPUT vuota. Serve

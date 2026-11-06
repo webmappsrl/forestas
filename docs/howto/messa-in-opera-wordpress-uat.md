@@ -119,8 +119,9 @@ scripts/wordpress-reset.sh --conferma
 
 Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri volumi. Cosa ha il
 sito ricreato e cosa si perde: [WordPress nello shard](../knowledge/wordpress-nello-shard.md),
-«Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel
-README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu, non le
-pagine statiche di oc:8758, le news di oc:8759 né eventi e «da sapere» di oc:8760: le crea `wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron
-quando ci sarà), che collega anche i menu. Oggi il reset si lancia solo a mano: il ciclo giornaliero su
-UAT non è ancora attivo. **In produzione non va usato**.
+«Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera
+nel README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu,
+non le pagine statiche di oc:8758, le news di oc:8759 né eventi e «da sapere» di oc:8760: le crea
+`wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron di
+`wp-forestas/cron/allinea.crontab`), che collega anche i menu. Oggi il reset si lancia solo a mano:
+il ciclo giornaliero su UAT non è ancora attivo. **In produzione non va usato**.

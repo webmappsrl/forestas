@@ -99,6 +99,7 @@ customizzazione di Forestas.
 | Creare o ruotare il client SUS | [docs/howto/creazione-client-sus.md](docs/howto/creazione-client-sus.md) |
 | Accendere, caricare o raggiungere la copia del DB Drupal | [docs/howto/copia-database-drupal.md](docs/howto/copia-database-drupal.md) |
 | Mettere in opera, aggiornare o azzerare WordPress su UAT | [docs/howto/messa-in-opera-wordpress-uat.md](docs/howto/messa-in-opera-wordpress-uat.md) |
+| Mettere in opera, aggiornare o azzerare WordPress su dev | [docs/howto/messa-in-opera-wordpress-dev.md](docs/howto/messa-in-opera-wordpress-dev.md) |
 
 ## Ruoli
 
