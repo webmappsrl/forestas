@@ -54,7 +54,7 @@ popola con l'import, così si verifica anche che l'installazione da zero funzion
   dell'host): fuori dall'orario di lavoro, perché `pagine` e `applica` prendono un blocco e, con un
   giro lanciato a mano in corso, quello del cron esce («un'altra sincronizzazione») e chiude non
   allineato; lontano anche dal giro di UAT (11:00) e dal reload della copia Drupal su UAT (10:00).
-- [ ] **Puntatore del submodule:** dopo il merge di `wp-forestas` su `develop`, il puntatore di
+- [x] **Puntatore del submodule:** dopo il merge di `wp-forestas` su `develop`, il puntatore di
   `wp-forestas` in `forestas` si aggiorna con l'hash letto da `git rev-parse` e va su `develop` di
   `forestas`, in un commit a parte che fa il dev; solo dopo si aggiorna lo shard di dev. Fino ad
   allora i virtual host sull'host si copiano dal locale in `/etc/apache2/sites-available/`.

@@ -173,7 +173,9 @@ Sequenza di `wp-forestas/docs/howto/ricreare-wordpress-da-zero.md`, passi 2-5.
 
 ### Task 8: Puntatore del submodule (dev)
 
-- [ ] **Passo 1 (dev):** dopo il merge della PR di `wp-forestas` su `develop` (fatto: PR #17,
+> ⚠️ L'implementazione ha deviato da questo task: [notes.md](notes.md#task-8-puntatore-del-submodule)
+
+- [x] **Passo 1 (dev):** dopo il merge della PR di `wp-forestas` su `develop` (fatto: PR #17,
   `b84a917`), in `forestas`
   aggiorna il puntatore con l'hash letto da `git -C wp-forestas rev-parse HEAD` e committalo da
   solo: `chore(oc:8947): puntatore di wp-forestas con i virtual host di dev`.

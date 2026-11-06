@@ -22,9 +22,10 @@ Il 06/11/2026 `https://wp.forestas.dev.maphub.it` è in opera sull'host di dev:
   corretti (Decisioni e Divergenze, Task 7).
 
 In `wp-forestas` il lavoro è su `develop`: commit `7b6fe2e` (8947), `60b65e6` (8760) e `d384dce`
-(8783) sul branch del ticket, PR #17 chiusa con squash and merge il 06/11 → `b84a917`. Resta il giro
-del puntatore di `wp-forestas` in `forestas`, da `b160727` a `b84a917` (Task 8 del piano, commit del
-dev): fino ad allora sull'host i virtual host sono copie di quelli in `wp-forestas/docker/dev/`.
+(8783) sul branch del ticket, PR #17 chiusa con squash and merge il 06/11 → `b84a917`. In `forestas`
+la documentazione è nel commit `428024c` e il puntatore di `wp-forestas` (da `b160727` a `b84a917`) nel
+commit `d5f587d`, sul branch del ticket, e vanno su `develop` con la PR del ticket. Resta
+l'aggiornamento dell'host di dev (Task 8, passi 2 e 3).
 
 ## Divergenze dal piano, task per task
 
@@ -51,6 +52,11 @@ posto» che punta al tunnel (ora c'è anche `wp-forestas/.env` di dev), in
 `docker/dev/` nella tabella del README, e lo stato del cron lasciato solo in `cron/allinea.crontab`
 (il `CLAUDE.md` e la procedura del cron ora rimandano lì, invece di ripeterlo).
 
+### Task 8: puntatore del submodule
+
+Il piano lo lasciava al dev, in una PR a parte. Su sua indicazione l'ho committato io sul branch del
+ticket (`d5f587d`, solo il puntatore), dopo il merge di `wp-forestas` su `develop` (PR #17).
+
 ## Bug trovati
 
 - **Verifica dell'accesso:** `/wp-admin` provato con `wp_authenticate()` nel container, con le
@@ -73,7 +79,8 @@ posto» che punta al tunnel (ora c'è anche `wp-forestas/.env` di dev), in
   trovato la review finale; l'orario resta valido col motivo corretto, che ora è in tutta la
   documentazione.
 - **Puntatore di `wp-forestas`** (06/11, challenge): i virtual host versionati arrivano sull'host
-  solo dopo l'aggiornamento del puntatore in `forestas`, commit a parte del dev.
+  solo dopo l'aggiornamento del puntatore in `forestas`. Il dev ha poi chiesto di committarlo sul
+  branch del ticket, in un commit suo (`d5f587d`), invece che in una PR separata.
 - **Virtual host versionati** in `wp-forestas/docker/dev/` (06/11); i file si scrivono in locale e
   il push lo fa il dev, mai dall'host.
 - **Sito di dev aperto, senza basic auth** (06/11, challenge): senza licenza Impreza non c'è la
@@ -127,7 +134,8 @@ Nessun bloccante, cinque correzioni fatte:
 
 ## Follow-up
 
-- Puntatore di `wp-forestas` in `forestas` da `b160727` a `b84a917` (commit a parte del dev), merge
-  su `develop` di `forestas`, poi aggiornamento di dev e `scripts/wordpress-up.sh` (Task 8).
+- Dopo il merge su `develop` di `forestas`, sull'host di dev: pull, `git submodule update --init
+  --recursive` (porta `wp-forestas` a `b84a917`), `scripts/wordpress-up.sh`, e verifica che
+  `wp-forestas/docker/dev/` coincida con `/etc/apache2/sites-available/` (Task 8, passi 2 e 3).
 - Titolo e introduzione di `wp-forestas/docs/howto/cron-sincronizzazione-pagine.md` estesi a eventi
   e «da sapere» (punto rimasto della nota di oc:8760).
