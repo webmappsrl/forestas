@@ -4,8 +4,10 @@ use App\Models\EcTrack as ForestasEcTrack;
 use App\Models\User;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
+use App\Nova\Filters\EcTrackValidationStatusFilter;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +15,7 @@ use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyActivity;
+use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Models\TaxonomyWhere;
 use Wm\WmPackage\Services\GeometryComputationService;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
@@ -342,9 +345,20 @@ function conEnte(EcTrack $traccia, string $ruolo): void
     ]);
 }
 
+/** Collega la traccia al termine di stato (identifier del termine, senza il prefisso della famiglia). */
 function conStato(EcTrack $traccia, ?string $stato): EcTrack
 {
-    DB::table('ec_tracks')->where('id', $traccia->id)->update(['stato_validazione' => $stato]);
+    if ($stato !== null) {
+        // I termini li crea il comando di allineamento: senza, la famiglia non esiste.
+        expect(Artisan::call('sardegnasentieri:configure-taxonomy-terms'))->toBe(0);
+        $termine = TaxonomyTerm::query()->where('identifier', 'validation-status-'.$stato)->firstOrFail();
+        DB::table('taxonomy_termables')->insert([
+            'taxonomy_term_id' => $termine->id,
+            'termable_type' => ForestasEcTrack::class,
+            'termable_id' => $traccia->id,
+            'parent_id' => $termine->parent_id,
+        ]);
+    }
 
     return $traccia;
 }
@@ -356,7 +370,7 @@ it('il menu dei filtri ha solo Layer, Aree catastali, Ruolo e Stato validazione'
         LAYER_FILTER_KEY,
         EcTrackCadastralAreaFilter::class,
         EcTrackRuoloFilter::class,
-        'Select:stato_validazione',
+        EcTrackValidationStatusFilter::class,
     ]);
 });
 
@@ -370,11 +384,11 @@ it('il filtro Ruolo restituisce le tracce con un ente in quel ruolo', function (
 });
 
 it('il filtro Stato validazione restituisce le tracce con quel valore', function () {
-    $percorribile = conStato(traccia(9.2, 9.4), 'percorribile');
-    conStato(traccia(9.5, 9.6), 'in_revisione_validazione');
+    $percorribile = conStato(traccia(9.2, 9.4), 'walkable');
+    conStato(traccia(9.5, 9.6), 'under-review');
     conStato(traccia(9.7, 9.8), null);
 
-    expect(idFiltrati($this, ['Select:stato_validazione' => 'percorribile']))->toBe([$percorribile->id]);
+    expect(idFiltrati($this, [EcTrackValidationStatusFilter::class => 'validation-status-walkable']))->toBe([$percorribile->id]);
 });
 
 it('i titoli dei filtri sono tradotti', function (string $lingua, array $attesi) {
@@ -386,7 +400,7 @@ it('i titoli dei filtri sono tradotti', function (string $lingua, array $attesi)
 
     expect($nomi[LAYER_FILTER_KEY])->toBe($attesi[0])
         ->and($nomi[EcTrackRuoloFilter::class])->toBe($attesi[1])
-        ->and($nomi['Select:stato_validazione'])->toBe($attesi[2]);
+        ->and($nomi[EcTrackValidationStatusFilter::class])->toBe($attesi[2]);
 })->with([
     'italiano' => ['it', ['Layer', 'Ruolo', 'Stato validazione']],
     'inglese' => ['en', ['Layer', 'Role', 'Validation status']],

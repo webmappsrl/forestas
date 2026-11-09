@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Nova;
 
-use App\Enums\StatoValidazione;
 use App\Models\EcTrack as EcTrackModel;
+use App\Nova\Concerns\HasForestasMediaFields;
+use App\Nova\Concerns\HasMirroredRelations;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Nova\Filters\EcTrackLayerFilter;
 use App\Nova\Filters\EcTrackRuoloFilter;
+use App\Nova\Filters\EcTrackValidationStatusFilter;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Support\InclusivityScore;
+use Illuminate\Validation\Rule;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\Field;
-use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Select;
@@ -31,10 +33,14 @@ use Wm\WmPackage\Nova\Filters\FeaturesByLayerFilter;
 use Wm\WmPackage\Nova\Filters\FeaturesExcludeByIds;
 use Wm\WmPackage\Nova\Filters\FeaturesIncludeByIds;
 use Wm\WmPackage\Nova\Layer;
+use Wm\WmPackage\Support\TaxonomyTermLabel;
 
 class EcTrack extends WmNovaEcTrack
 {
-    public static $model = \App\Models\EcTrack::class;
+    use HasForestasMediaFields;
+    use HasMirroredRelations;
+
+    public static $model = EcTrackModel::class;
 
     public function fields(NovaRequest $request): array
     {
@@ -42,7 +48,7 @@ class EcTrack extends WmNovaEcTrack
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
         // I TabsGroup del package si scartano per ricomporli qui sotto; la sezione delle
         // tassonomie resta, perché arriva già nel punto giusto, sopra i Blocchi Dettaglio.
-        $regularFields = $this->keepOnlyTaxonomySection($parentFields);
+        $regularFields = $this->withoutPackageImageField($this->keepOnlyTaxonomySection($parentFields));
         $regularFields = array_values(array_filter(
             $regularFields,
             fn ($f) => ! in_array(get_class($f), $relationTypes)
@@ -62,14 +68,6 @@ class EcTrack extends WmNovaEcTrack
 
         return [
             ...$regularFields,
-            Select::make(__('Validation status'), 'stato_validazione')
-                ->options(
-                    collect(StatoValidazione::cases())
-                        ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
-                        ->toArray()
-                )
-                ->nullable()
-                ->filterable(),
             Tab::group(__('Details'), [
                 Tab::make(__('Forestas'), $this->getForestasTabFields()),
                 Tab::make(__('Info'), $this->getInfoTabFields()),
@@ -78,7 +76,24 @@ class EcTrack extends WmNovaEcTrack
                 Tab::make(__('DEM'), $this->getDemTabFields()),
             ]),
             BelongsToMany::make('EcPois', 'ecPois', EcPoi::class)->searchable()->collapsedByDefault(),
+            // SOLA LETTURA, e deve restare cosi', per i punti di interesse come per i sentieri
+            // vicini. I punti di interesse correlati sono uno specchio di Drupal e i sentieri
+            // vicini sono calcolati dalla geometria: l'import li riscrive per intero a ogni giro
+            // (CalculateNearbyTracksJob per i secondi). Un collegamento aggiunto o tolto qui a
+            // mano sparirebbe al giro successivo, senza che nessuno capisca perche'. Il blocco di
+            // attach e detach sta negli override `authorizedToAttach*` e `authorizedToDetach`
+            // di questa classe (oc:8932).
+            BelongsToMany::make('Percorsi vicini', 'relatedTracks', self::class)->collapsedByDefault(),
             MorphToMany::make('Layers', 'layers', Layer::class)->collapsedByDefault(),
+            // Gli enti collegati al percorso, con il ruolo che hanno su di esso: in Drupal sono
+            // la sezione «Contatti a Guide, Gestori ed Enti», e finora si vedevano solo aprendo
+            // l'ente. Sola lettura come le altre relazioni importate: gli enti sono uno specchio
+            // di Drupal e l'import riscrive la pivot `enteables` (oc:8932).
+            MorphToMany::make('Enti', 'enti', Ente::class)
+                ->fields(fn () => [
+                    Text::make('Ruolo', 'ruolo')->readonly(),
+                ])
+                ->collapsedByDefault(),
             ...$properties,
         ];
     }
@@ -128,6 +143,24 @@ class EcTrack extends WmNovaEcTrack
 
             return $taxonomy;
         }, parent::legacyTaxonomies());
+    }
+
+    /**
+     * Lo stato di validazione apre il tab «Generale» delle classificazioni (oc:8932).
+     *
+     * Non passa da `taxonomyTabExtraFields()`, che appende in coda: e' il primo dato che chi
+     * compila la scheda cerca, quindi va prima di Tipo percorso e delle altre tassonomie. E' la
+     * famiglia `validation-status`, il cui campo generico resta tolto da
+     * `makeTermFieldsForTaxonomies()`, altrimenti sarebbero due.
+     *
+     * @return array<string, array<int, Field>>
+     */
+    public function makeTermFieldsByTab(string $default = 'General'): array
+    {
+        $byTab = parent::makeTermFieldsByTab($default);
+        $byTab['General'] = [$this->validationStatusField(), ...($byTab['General'] ?? [])];
+
+        return $byTab;
     }
 
     /**
@@ -192,6 +225,57 @@ class EcTrack extends WmNovaEcTrack
             : null;
     }
 
+    /**
+     * Lo stato di validazione, in cima alla scheda e in lista come quando era una colonna
+     * (oc:8932). È la famiglia `validation-status` del modello unico, a scelta singola: il campo
+     * generico del package la mostrerebbe nel tab delle classificazioni, senza colonna in lista,
+     * quindi si toglie da lì (`makeTermFieldsForTaxonomies`) e si disegna qui.
+     */
+    private function validationStatusField(): Select
+    {
+        $terms = EcTrackValidationStatusFilter::statuses();
+        $options = $terms->mapWithKeys(fn ($term) => [$term->identifier => TaxonomyTermLabel::for($term)])->all();
+
+        return Select::make(__('Validation status'), 'validation_status')
+            ->options($options)
+            ->displayUsingLabels()
+            ->nullable()
+            ->rules('nullable', Rule::in(array_keys($options)))
+            ->resolveUsing(fn ($value, $resource) => $resource->exists
+                ? $resource->term(EcTrackModel::VALIDATION_STATUS_TAXONOMY)?->identifier
+                : null)
+            ->fillUsing(function (NovaRequest $request, $model, $attribute, $requestAttribute) use ($terms) {
+                $wanted = $request->input($requestAttribute);
+                $wantedId = $wanted === null || $wanted === '' ? null : $terms->firstWhere('identifier', $wanted)?->id;
+
+                // Dopo il salvataggio: su una traccia nuova l'id non esiste ancora. Come i campi
+                // del package: si tocca solo la famiglia, e solo se il valore è cambiato.
+                return function () use ($model, $terms, $wantedId) {
+                    /** @var EcTrackModel $model */
+                    $current = $model->taxonomyTerms()->whereIn('taxonomy_terms.id', $terms->pluck('id'))
+                        ->pluck('taxonomy_terms.id')->map(fn ($id) => (int) $id)->all();
+                    $wantedIds = $wantedId === null ? [] : [(int) $wantedId];
+
+                    $removed = array_values(array_diff($current, $wantedIds));
+                    $added = array_values(array_diff($wantedIds, $current));
+                    $model->taxonomyTerms()->detach($removed);
+                    $model->taxonomyTerms()->attach($added);
+                    $model->unsetRelation('taxonomyTerms');
+                };
+            });
+    }
+
+    /**
+     * Toglie lo stato di validazione dai campi generici delle tassonomie: ha il suo campo,
+     * `validationStatusField()` (oc:8932).
+     */
+    public function makeTermFieldsForTaxonomies(array $taxonomyIdentifiers): array
+    {
+        return parent::makeTermFieldsForTaxonomies(
+            array_values(array_diff($taxonomyIdentifiers, [EcTrackModel::VALIDATION_STATUS_TAXONOMY]))
+        );
+    }
+
     public function filters(NovaRequest $request): array
     {
         // Il filtro dei layer del package va sostituito, non affiancato: con due filtri
@@ -215,6 +299,7 @@ class EcTrack extends WmNovaEcTrack
         return [
             ...$filters,
             new EcTrackRuoloFilter,
+            new EcTrackValidationStatusFilter,
         ];
     }
 
@@ -224,7 +309,7 @@ class EcTrack extends WmNovaEcTrack
             return [];
         }
 
-        /** @var \App\Models\EcTrack $track */
+        /** @var EcTrackModel $track */
         $track = $request->findModelOrFail();
         $card = new EcTrackApiLinksCard($track);
 
@@ -250,10 +335,7 @@ class EcTrack extends WmNovaEcTrack
                 Tiptap::make('Info utili', 'properties->forestas->info_utili')->readonly(),
                 Tiptap::make('Roadbook', 'properties->forestas->roadbook')->readonly(),
             ])->hideFromIndex(),
-            KeyValue::make('Allegati', 'properties->forestas->allegati'),
-            KeyValue::make('Video', 'properties->forestas->video'),
-            KeyValue::make('GPX', 'properties->forestas->gpx'),
-            KeyValue::make('Zona geografica', 'properties->forestas->zona_geografica'),
+            ...$this->forestasMediaFields(),
         ];
     }
 }

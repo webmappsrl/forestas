@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Nova;
 
+use App\Nova\Concerns\HasForestasMediaFields;
+use App\Nova\Concerns\HasMirroredRelations;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
 use Laravel\Nova\Fields\BelongsToMany;
-use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
@@ -20,6 +21,9 @@ use Wm\WmPackage\Nova\TaxonomyPoiType;
 
 class EcPoi extends WmNovaEcPoi
 {
+    use HasForestasMediaFields;
+    use HasMirroredRelations;
+
     public static $model = \App\Models\EcPoi::class;
 
     public function cards(NovaRequest $request): array
@@ -54,7 +58,7 @@ class EcPoi extends WmNovaEcPoi
         $relationTypes = [BelongsToMany::class, MorphToMany::class];
         // Come su EcTrack: via i TabsGroup del package, tranne le tassonomie (oc:8910).
         $regularFields = array_values(array_filter(
-            $this->keepOnlyTaxonomySection($parentFields),
+            $this->withoutPackageImageField($this->keepOnlyTaxonomySection($parentFields)),
             fn ($f) => ! in_array(get_class($f), $relationTypes)
         ));
 
@@ -80,8 +84,8 @@ class EcPoi extends WmNovaEcPoi
             ])->hideFromIndex(),
             Text::make('URL', 'properties->forestas->url')->readonly(),
             Text::make('Aggiornato il', 'properties->forestas->updated_at')->readonly(),
-            KeyValue::make('Collegamenti', 'properties->forestas->collegamenti'),
-            KeyValue::make('Zona geografica', 'properties->forestas->zona_geografica'),
+            Text::make('Creato il', 'properties->forestas->created_at')->readonly(),
+            ...$this->forestasMediaFields(),
         ];
     }
 }

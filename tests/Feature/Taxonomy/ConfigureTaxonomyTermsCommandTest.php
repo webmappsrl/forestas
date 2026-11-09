@@ -8,12 +8,20 @@ use Wm\WmPackage\Models\TaxonomyTerm;
 
 uses(RefreshDatabase::class);
 
-it('crea gli undici tassonomie e i loro termini', function () {
+it('crea le dodici tassonomie e i loro termini', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 
-    expect(TaxonomyTerm::taxonomies()->count())->toBe(11)
+    expect(TaxonomyTerm::taxonomies()->count())->toBe(12)
         // Le avvertenze: la tassonomia nasce qui, i termini li porta l'import (oc:8910).
         ->and(TaxonomyTerm::where('identifier', 'warnings')->first()->children)->toHaveCount(0)
+        // Stato di validazione (oc:8932): sette termini, uno solo per percorso.
+        ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->single_choice)->toBeTrue()
+        ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->children->pluck('identifier')->all())->toBe([
+            'validation-status-unverified', 'validation-status-not-walkable', 'validation-status-under-review',
+            'validation-status-pre-registration', 'validation-status-walkable', 'validation-status-validated',
+            'validation-status-certified',
+        ])
+        ->and(TaxonomyTerm::where('identifier', 'validation-status-pre-registration')->first()->getTranslation('name', 'it'))->toBe('In pre-accatastamento o manutenzione')
         ->and(TaxonomyTerm::where('identifier', 'warnings')->first()->icon)->toBe('txn-alert')
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-difficulty')->first()->single_choice)->toBeTrue()
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-disabilities')->first()->single_choice)->toBeFalse()
@@ -51,7 +59,7 @@ it('con --fresh riparte da vuoto', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms --fresh')->assertSuccessful();
 
     expect(TaxonomyTerm::find($custom->id))->toBeNull()
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(11);
+        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
 });
 
 it('con --dry-run non scrive niente', function () {
@@ -96,7 +104,7 @@ it('rinomina una chiave cambiata invece di creare un doppione', function () {
     expect(TaxonomyTerm::where('identifier', 'educational-trail-difficulty')->count())->toBe(0)
         // Stessa riga, non una nuova: le relazioni dei suoi termini restano dove sono.
         ->and(TaxonomyTerm::where('identifier', 'educational-trails-difficulty')->value('id'))->toBe($before->id)
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(11);
+        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
 });
 
 it('dà alle attività il nome italiano, senza toccare quelle che ne hanno già uno', function () {
@@ -119,7 +127,7 @@ it('accende le tassonomie sulle sole EC Track, non sui POI (oc:8910)', function 
     $ambiti = $app->fresh()->taxonomies()->get()
         ->mapWithKeys(fn ($t) => [$t->identifier => json_decode((string) $t->pivot->models, true)]);
 
-    expect($ambiti)->toHaveCount(11)
+    expect($ambiti)->toHaveCount(12)
         ->and($ambiti->unique()->values()->all())->toBe([['EcTrack']]);
 });
 

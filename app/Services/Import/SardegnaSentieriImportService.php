@@ -8,7 +8,6 @@ use App\Dto\Api\ApiPoiResponse;
 use App\Dto\Api\ApiTrackResponse;
 use App\Dto\Import\PoiPropertiesData;
 use App\Dto\Import\TrackPropertiesData;
-use App\Enums\StatoValidazione;
 use App\Enums\TipoEnte;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Models\EcPoi as LocalEcPoi;
@@ -32,9 +31,12 @@ use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
 use Wm\WmPackage\TrailRegistry\TrailCodeRegistrationOutcome;
 use Wm\WmPackage\TrailRegistry\TrailRegistryService;
+use Wm\WmPackage\Traits\NormalizesRelatedUrl;
 
 class SardegnaSentieriImportService
 {
+    use NormalizesRelatedUrl;
+
     /** Forestas: una sola app nel progetto; tutti gli import usano questo id. */
     public const IMPORT_APP_ID = 1;
 
@@ -97,6 +99,21 @@ class SardegnaSentieriImportService
     private const ACCESSIBILITY_FAMILIES = [
         'inclusivity-difficulty',
         'inclusivity-disabilities',
+    ];
+
+    /**
+     * Stato di validazione: tid del termine Drupal => identifier del termine della famiglia
+     * `validation-status` (oc:8932). È il contratto con la sorgente, lo stesso che prima stava in
+     * `StatoValidazione::fromApiId()`: i termini li dichiara `ConfigureTaxonomyTermsCommand`.
+     */
+    public const VALIDATION_STATUS_TERMS = [
+        '4871' => 'validation-status-unverified',
+        '4870' => 'validation-status-not-walkable',
+        '4869' => 'validation-status-under-review',
+        '4868' => 'validation-status-pre-registration',
+        '4187' => 'validation-status-walkable',
+        '4188' => 'validation-status-validated',
+        '4189' => 'validation-status-certified',
     ];
 
     /** Prefisso dell'`identifier` dei termini che vengono da `categorie_fruibilita_sentieri` (oc:8910). */
@@ -184,7 +201,7 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewPoiType($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->setTranslation('name', 'it', $data['name']);
+                $this->applyTaxonomyNames($taxonomy, $data);
                 if ($data['description'] !== null) {
                     $taxonomy->setTranslation('description', 'it', $data['description']);
                 }
@@ -196,7 +213,7 @@ class SardegnaSentieriImportService
                 // `icon` esiste in tabella ma non e' dichiarata sui modelli del
                 // package: si passa da get/setAttribute per restare type-safe.
                 if (empty($taxonomy->getAttribute('icon'))) {
-                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['identifier']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -217,7 +234,7 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewActivity($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->setTranslation('name', 'it', $data['name']);
+                $this->applyTaxonomyNames($taxonomy, $data);
                 if ($data['description'] !== null) {
                     $taxonomy->setTranslation('description', 'it', $data['description']);
                 }
@@ -229,7 +246,7 @@ class SardegnaSentieriImportService
                 // `icon` esiste in tabella ma non e' dichiarata sui modelli del
                 // package: si passa da get/setAttribute per restare type-safe.
                 if (empty($taxonomy->getAttribute('icon'))) {
-                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['identifier']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -250,7 +267,7 @@ class SardegnaSentieriImportService
 
                 $taxonomy = $this->findOrNewActivity($data['identifier'], $data['name']);
                 $taxonomy->identifier = $data['identifier'];
-                $taxonomy->setTranslation('name', 'it', $data['name']);
+                $this->applyTaxonomyNames($taxonomy, $data);
                 if ($data['description'] !== null) {
                     $taxonomy->setTranslation('description', 'it', $data['description']);
                 }
@@ -262,7 +279,7 @@ class SardegnaSentieriImportService
                 // `icon` esiste in tabella ma non e' dichiarata sui modelli del
                 // package: si passa da get/setAttribute per restare type-safe.
                 if (empty($taxonomy->getAttribute('icon'))) {
-                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['name']));
+                    $taxonomy->setAttribute('icon', $this->resolveIconNameByIdentifier((string) $data['identifier']));
                 }
 
                 $taxonomy->saveQuietly();
@@ -443,6 +460,7 @@ class SardegnaSentieriImportService
             $existingProperties,
             PoiPropertiesData::fromApiResponse($externalId, $response)->toArray()
         );
+        $this->applyRelatedUrl($data['properties'], $response->collegamenti);
 
         $ecPoi->fill($data)->saveQuietly();
 
@@ -521,6 +539,7 @@ class SardegnaSentieriImportService
             $existingProperties,
             TrackPropertiesData::fromApiResponse($externalId, $response)->toArray()
         );
+        $this->applyRelatedUrl($data['properties'], $response->collegamenti);
 
         // L'array_merge sostituisce l'intera chiave `forestas`: le chiavi compilate a mano in Nova
         // al suo interno vanno rimesse, l'import non le possiede (oc:8910).
@@ -540,11 +559,6 @@ class SardegnaSentieriImportService
                 $externalId,
                 $gpxFailures === [] ? 'unknown' : implode('; ', $gpxFailures)
             ));
-        }
-
-        $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
-        if ($statoId !== null) {
-            $data['stato_validazione'] = StatoValidazione::fromApiId($statoId)?->value;
         }
 
         $ecTrack->fill($data)->saveQuietly();
@@ -773,32 +787,43 @@ class SardegnaSentieriImportService
         }
     }
 
+    /**
+     * Registra i nid che la traccia cita, senza scrivere il pivot (oc:8932).
+     *
+     * Il pivot lo scrive `ResolveSardegnaSentieriRelationsJob` a fine batch: due `sync()`
+     * indipendenti (uno dal percorso, uno dal POI) si cancellerebbero a vicenda, e un contenuto
+     * citato puo' non essere ancora importato. L'ordine e' partenza, correlati, punti
+     * dell'itinerario, arrivo.
+     */
     private function syncRelatedPois(EcTrack $ecTrack, ApiTrackResponse $response): void
     {
-        $resolveId = fn (?string $sourceId): ?int => $sourceId === null ? null : EcPoi::whereRaw(
-            "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
-            [$sourceId, $sourceId]
-        )->value('id');
+        $this->registerSourceRelations($ecTrack, [
+            'pois' => array_values(array_unique(array_filter([
+                $response->partenza,
+                ...$response->poi_correlati,
+                ...$response->punti_di_interesse,
+                $response->arrivo,
+            ], fn ($nid) => $nid !== null && $nid !== ''))),
+            'tracks' => [],
+        ]);
+    }
 
-        $partenzaId = $resolveId($response->partenza);
+    /**
+     * Annota in `properties.forestas.source_relations` i nid citati dalla fonte.
+     *
+     * @param  array{pois: list<string>, tracks: list<string>}  $relations
+     */
+    private function registerSourceRelations(EcTrack|LocalEcPoi $model, array $relations): void
+    {
+        $properties = is_array($model->properties) ? $model->properties : [];
 
-        $correlatiIds = collect($response->poi_correlati)
-            ->map(fn ($sourceId) => $resolveId($sourceId))
-            ->filter()
-            ->values()
-            ->toArray();
+        if (($properties['forestas']['source_relations'] ?? null) === $relations) {
+            return;
+        }
 
-        $arrivoId = $resolveId($response->arrivo);
-
-        $poiIds = array_values(array_filter(
-            array_merge(
-                $partenzaId !== null ? [$partenzaId] : [],
-                $correlatiIds,
-                $arrivoId !== null ? [$arrivoId] : [],
-            )
-        ));
-
-        $ecTrack->ecPois()->sync($poiIds);
+        $properties['forestas']['source_relations'] = $relations;
+        $model->properties = $properties;
+        $model->saveQuietly();
     }
 
     /**
@@ -1012,6 +1037,17 @@ class SardegnaSentieriImportService
         // Un sentiero non ne prende (la tassonomia si svuota comunque: è fra quelle dell'import).
         $classification['terms']['itinerary-type'] = $this->itineraryTypeIdentifiers($response);
 
+        // Stato di validazione (oc:8932): uno solo, e solo se Drupal lo dice. Senza stato la
+        // famiglia non entra fra quelle sostituite e il valore già scritto, a mano o da un import
+        // precedente, resta. Un tid fuori dalla mappa non trova nessun termine: si segnala come
+        // `missing_term` e la famiglia si svuota, come faceva la colonna.
+        $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
+        if ($statoId !== null) {
+            $classification['terms'][EcTrack::VALIDATION_STATUS_TAXONOMY] = [
+                self::VALIDATION_STATUS_TERMS[(string) $statoId] ?? self::DRUPAL_TERM_PREFIX.$statoId,
+            ];
+        }
+
         // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono una tassonomia come le
         // altre e seguono la stessa regola di sostituzione (oc:8910).
         $classification['terms'][self::WARNINGS_TAXONOMY] = array_map(
@@ -1166,25 +1202,21 @@ class SardegnaSentieriImportService
             ->whereNotNull('parent_id')->with('parent')->get()->keyBy('identifier');
     }
 
+    /**
+     * Registra i nid citati dal POI (altri POI, percorsi e itinerari); li risolve il job di fine
+     * batch (oc:8932).
+     */
     private function syncRelatedPoisForPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
     {
-        if (empty($response->poi_correlati)) {
+        $localPoi = LocalEcPoi::find($ecPoi->id);
+        if ($localPoi === null) {
             return;
         }
 
-        $ids = collect($response->poi_correlati)
-            ->map(fn (string $sourceId) => EcPoi::whereRaw(
-                "(properties->>'out_source_feature_id' = ? OR properties->>'sardegnasentieri_id' = ?)",
-                [$sourceId, $sourceId]
-            )->value('id'))
-            ->filter()
-            ->values()
-            ->toArray();
-
-        $localPoi = LocalEcPoi::find($ecPoi->id);
-        if ($localPoi !== null) {
-            $localPoi->relatedPois()->sync($ids);
-        }
+        $this->registerSourceRelations($localPoi, [
+            'pois' => array_values(array_unique($response->poi_correlati)),
+            'tracks' => array_values(array_unique([...$response->sentieri_collegati, ...$response->itinerari_correlati])),
+        ]);
     }
 
     private function syncEntiPoi(EcPoi $ecPoi, ApiPoiResponse $response): void
@@ -1405,9 +1437,11 @@ class SardegnaSentieriImportService
             }
         }
 
-        $featureImageUrl = isset($node['field_immagine_principale'][0]['url'])
-            ? (string) $node['field_immagine_principale'][0]['url']
-            : null;
+        // Principale e galleria, già nell'ordine da importare. Senza la chiave
+        // nuova (altra fonte) resta la sola immagine del campo vecchio.
+        $images = $node['immagini'] ?? (isset($node['field_immagine_principale'][0]['url'])
+            ? [['url' => (string) $node['field_immagine_principale'][0]['url']]]
+            : []);
 
         $description = isset($node['body'][0]['value'])
             ? trim(strip_tags((string) $node['body'][0]['value']))
@@ -1431,6 +1465,10 @@ class SardegnaSentieriImportService
             $this->clearTranslatable($ente, 'contatti');
         }
         $ente->pagina_web = $paginaWeb;
+        $ente->pagina_web_title = $node['pagina_web_title'] ?? null;
+        $ente->slug = $node['slug'] ?? (string) Str::slug($title);
+        // Convertita in PHP dalla sorgente, mai con FROM_UNIXTIME.
+        $ente->drupal_created_at = $node['created'] ?? null;
         if ($description !== null && $description !== '') {
             $ente->setTranslations('description', ['it' => $description, 'en' => $description]);
         } else {
@@ -1449,16 +1487,66 @@ class SardegnaSentieriImportService
         $properties = is_array($ente->properties) ? $ente->properties : [];
         $forestas = is_array($properties['forestas'] ?? null) ? $properties['forestas'] : [];
         unset($forestas['deleted_from_source']);
-        $properties['forestas'] = ['updated_at' => $changed] + $forestas;
+        $forestas['updated_at'] = $changed;
+        $properties['forestas'] = $forestas;
+        // Collegamenti esterni come ovunque nel ticket: `related_url`, etichetta
+        // => indirizzo. Specchio di Drupal: senza collegamenti la chiave si toglie.
+        $this->applyRelatedUrl($properties, $node['collegamenti'] ?? []);
         $ente->properties = $properties;
         $ente->saveQuietly();
 
-        // Senza immagine in Drupal la lista vuota toglie quella importata.
-        $this->mediaSync->syncImportedImages($ente, $featureImageUrl === null ? [] : [
-            ['url' => $featureImageUrl, 'autore' => '', 'credits' => '', 'order' => 0],
-        ]);
+        // Tutte nella collection `default` (le sole con le miniature); senza
+        // immagini in Drupal la lista vuota toglie quelle importate.
+        $this->mediaSync->syncImportedImages($ente, array_map(fn (array $image, int $order) => [
+            'url' => (string) $image['url'],
+            'autore' => (string) ($image['autore'] ?? ''),
+            'credits' => (string) ($image['credits'] ?? ''),
+            'caption' => (string) ($image['caption'] ?? ''),
+            'order' => $order,
+        ], $images, array_keys($images)));
 
         return $ente->id;
+    }
+
+    /**
+     * Scrive i collegamenti esterni in `properties.related_url` (etichetta =>
+     * indirizzo), come per enti, percorsi e punti di interesse: `related_url`
+     * non e' una colonna, vive dentro `properties`. Specchio di Drupal: senza
+     * collegamenti la chiave si toglie.
+     *
+     * @param  array<string, mixed>  $properties
+     * @param  list<array{uri: string, title: string}>  $links
+     */
+    private function applyRelatedUrl(array &$properties, array $links): void
+    {
+        $relatedUrl = $this->normalizeRelatedUrl($this->relatedUrlLabels($links));
+        if ($relatedUrl !== []) {
+            $properties['related_url'] = $relatedUrl;
+        } else {
+            unset($properties['related_url']);
+        }
+    }
+
+    /**
+     * Collegamenti {uri, title} → etichetta => indirizzo. Senza titolo
+     * l'etichetta e' l'indirizzo stesso; a parita' di titolo il secondo
+     * collegamento prende l'indirizzo come etichetta, per non perderlo.
+     *
+     * @param  list<array{uri: string, title: string}>  $links
+     * @return array<string, string>
+     */
+    private function relatedUrlLabels(array $links): array
+    {
+        $map = [];
+        foreach ($links as $link) {
+            $label = trim($link['title']);
+            if ($label === '' || isset($map[$label])) {
+                $label = (string) $link['uri'];
+            }
+            $map[$label] = (string) $link['uri'];
+        }
+
+        return $map;
     }
 
     /**
@@ -1572,15 +1660,20 @@ class SardegnaSentieriImportService
 
     /**
      * @param  array<string, mixed>  $term
-     * @return array{identifier: string|null, name: string, description: mixed}|null
+     * @return array{identifier: string|null, name: string, names: array<string, string>, description: mixed}|null
      */
     private function buildTaxonomyData(array $term): ?array
     {
         $geohubIdentifier = $term['geohub_identifier'] ?? null;
         if (is_string($geohubIdentifier) && trim($geohubIdentifier) !== '') {
+            // L'identifier resta quello Geohub (la ricerca dei termini e i layer
+            // si agganciano a lui); il nome mostrato e' quello del termine Drupal.
+            $names = $this->extractTermNames($term['name'] ?? null);
+
             return [
                 'identifier' => $geohubIdentifier,
-                'name' => $geohubIdentifier,
+                'name' => $names['it'] ?? (reset($names) ?: $geohubIdentifier),
+                'names' => $names,
                 'description' => $term['description'] ?? null,
             ];
         }
@@ -1594,8 +1687,47 @@ class SardegnaSentieriImportService
         return [
             'identifier' => 'name:'.$this->normalizeKey($name),
             'name' => $name,
+            'names' => [],
             'description' => $term['description'] ?? null,
         ];
+    }
+
+    /**
+     * I nomi del termine per lingua, quelle che Drupal ha: dove l'inglese
+     * manca non si inventa niente, `name` e' un campo tradotto con ripiego
+     * sull'italiano.
+     *
+     * @return array<string, string>
+     */
+    private function extractTermNames(mixed $rawName): array
+    {
+        if (is_string($rawName)) {
+            return trim($rawName) === '' ? [] : ['it' => $rawName];
+        }
+
+        $names = [];
+        if (is_array($rawName)) {
+            foreach ($rawName as $langcode => $value) {
+                if (is_string($langcode) && is_string($value) && trim($value) !== '') {
+                    $names[$langcode] = $value;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param  array{name: string, names: array<string, string>}  $data
+     */
+    private function applyTaxonomyNames(TaxonomyPoiType|TaxonomyActivity $taxonomy, array $data): void
+    {
+        $taxonomy->setTranslation('name', 'it', $data['name']);
+        foreach ($data['names'] as $langcode => $value) {
+            if ($langcode !== 'it') {
+                $taxonomy->setTranslation('name', $langcode, $value);
+            }
+        }
     }
 
     private function findOrNewPoiType(?string $identifier, string $name): TaxonomyPoiType

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Jobs\Import\CalculateNearbyTracksJob;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
+use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
@@ -301,7 +303,11 @@ class ImportSardegnaSentieriCommand extends Command
                 // leggere le tracce gia' aggiornate (oc:8827).
                 Bus::chain([
                     new SyncTaxonomyWhereJob,
+                    // I collegamenti prima dei layer: il pivot ha un observer che associa i POI
+                    // ai layer del percorso (oc:8932).
+                    new ResolveSardegnaSentieriRelationsJob,
                     new RecalculateSardegnaSentieriLayersJob,
+                    new CalculateNearbyTracksJob,
                     new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
                 ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
 
@@ -834,6 +840,11 @@ class ImportSardegnaSentieriCommand extends Command
 
         DB::statement('TRUNCATE TABLE ec_tracks RESTART IDENTITY CASCADE');
         $this->info('Truncated ec_tracks.');
+
+        // Tabella dei sentieri vicini: ha chiavi esterne verso ec_tracks, quindi la
+        // porta via il CASCADE; la riga resta esplicita per chiarezza (oc:8932).
+        DB::statement('TRUNCATE TABLE ec_track_related_tracks RESTART IDENTITY');
+        $this->info('Truncated ec_track_related_tracks.');
 
         DB::statement('TRUNCATE TABLE ec_pois RESTART IDENTITY CASCADE');
         $this->info('Truncated ec_pois.');
