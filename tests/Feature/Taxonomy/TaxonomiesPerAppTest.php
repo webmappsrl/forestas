@@ -31,7 +31,7 @@ beforeEach(function () {
 it('accende le tassonomie dello shard in tutte le sue app, senza spegnerne altre', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 
-    expect($this->app1->taxonomies()->count())->toBe(11);
+    expect($this->app1->taxonomies()->count())->toBe(12);
 });
 
 it('una tassonomia custom nasce spenta e non compare in un\'app che non l\'ha accesa', function () {

@@ -26,6 +26,9 @@ class Ente extends Model implements HasMedia
         'description',
         'contatti',
         'pagina_web',
+        'pagina_web_title',
+        'slug',
+        'drupal_created_at',
         'tipo_ente',
         'geometry',
         'properties',
@@ -35,6 +38,7 @@ class Ente extends Model implements HasMedia
         'properties' => 'array',
         'description' => 'array',
         'contatti' => 'array',
+        'drupal_created_at' => 'datetime',
         'tipo_ente' => TipoEnte::class,
     ];
 

@@ -294,7 +294,7 @@ L'import confronta il `changed` con `properties.forestas.updated_at` dell'ente.
 | `taxonomies.tipologia_sentieri` | `node__field_tipologia_sentiero` | tid |
 | `taxonomies.tipologia_di_avvertenze` | `node__field_avvertenze_e_pericoli` | tid |
 | `taxonomies.categorie_fruibilita_sentieri` | `node__field_frubilita` | tid; letto ma non usato dal service |
-| `taxonomies.stato_di_validazione` | `node__field_stato_di_validazione` | tid, mappato sull'enum `StatoValidazione` |
+| `taxonomies.stato_di_validazione` | `node__field_stato_di_validazione` | tid, mappato sul termine della famiglia `validation-status` (`SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`) |
 | `taxonomies.zona_geografica` | `node__field_zona_geografica` | tid |
 | `url` | `path_alias.alias` del nodo | l'API dà l'URL canonico assoluto |
 | `geometryFallback` | `node__field_percorso._value`, solo `delta = 0` | GeoJSON; usato solo se il GPX manca |
@@ -308,7 +308,7 @@ L'import confronta il `changed` con `properties.forestas.updated_at` dell'ente.
 | `codice` | `node__field_codice` | traducibile: l'API dà quello della traduzione caricata |
 | `addr_locality` | `node__field_localita` | |
 | `come_arrivare` | `node__field_come_arrivare`, per lingua | HTML |
-| `collegamenti` | `node__field_collegamenti._uri`, `._title` | l'API li appiattisce in una lista, titolo spezzato su «, » |
+| `collegamenti` | `node__field_collegamenti._uri`, `._title` | l'import li legge come coppie `{uri, title}`, nella lingua originale, e li scrive in `properties.related_url` (etichetta => indirizzo) |
 | `coordinates` | `node__field_posizione._lon`, `._lat` | l'API li ricava dal WKT di `_value` |
 | `immaginePrincipale`, `galleria`, `allegati`, `video` | catene media come per il sentiero | l'API dà `allegati` sempre vuoto |
 | `poi_correlati` | `node__field_poi_correlati` | |
@@ -387,8 +387,11 @@ Regole non documentate del modulo `api_webmapp`, ricavate confrontando le rispos
 - **Date**: `changed`, `created` e `field_data_rilievo` in `Y-m-d H:i:s` nell'ora italiana,
   convertite in PHP (`DrupalValues`): `FROM_UNIXTIME` userebbe il fuso della sessione MySQL.
 - **`arrivo: ""`** su due sentieri senza arrivo nella copia: per l'import equivale a nessun valore.
-- **Titoli dei `collegamenti` spezzati su «, »**: «Comune di Oliena, servizi turistici» diventava
-  due voci della lista (POI 1046); gli altri spazi restano, anche iniziali e finali (POI 142, 2746).
+- **Titoli dei `collegamenti` con la virgola**: le API li appiattivano in una lista spezzando il
+  titolo su «, » («Comune di Oliena, servizi turistici» diventava due voci, POI 1046). L'import ora
+  legge coppie `{uri, title}` e il titolo resta intero, accoppiato al suo indirizzo. Si legge solo
+  la lingua originale: i collegamenti in inglese esistono su un solo nodo (5106), identici
+  all'italiano.
 - **Gli allegati dei POI non c'erano**: le API davano `allegati` vuoto anche ai dodici POI che in
   Drupal ne hanno uno (POI 176, 544); quelli dei sentieri invece sì.
 - **Geolocalizzazione vuota degli enti omessa**: Drupal tiene la riga con `lat` e `lon` `NULL`, le

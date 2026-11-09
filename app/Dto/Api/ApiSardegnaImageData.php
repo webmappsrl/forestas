@@ -10,6 +10,7 @@ final readonly class ApiSardegnaImageData
         public string $url,
         public string $autore,
         public string $credits,
+        public string $caption = '',
     ) {}
 
     /**
@@ -30,6 +31,7 @@ final readonly class ApiSardegnaImageData
             url: $url,
             autore: isset($value['autore']) ? (string) $value['autore'] : '',
             credits: isset($value['credits']) ? (string) $value['credits'] : '',
+            caption: isset($value['caption']) ? trim((string) $value['caption']) : '',
         );
     }
 }

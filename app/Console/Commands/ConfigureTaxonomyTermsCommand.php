@@ -104,6 +104,21 @@ class ConfigureTaxonomyTermsCommand extends Command
             // Avvertenze: la tassonomia nasce qui, i termini li porta l'import da Drupal
             // (`sardegnasentieri:warning:<tid>`) e cambiano con la sorgente (oc:8910).
             ['identifier' => 'warnings', 'icon' => 'txn-alert', 'name' => 'Avvertenze', 'single_choice' => false, 'terms' => []],
+            // Stato di validazione del percorso (oc:8932): era la colonna `stato_validazione` con un
+            // enum. Uno stato solo per percorso. I termini hanno un identifier semantico perché
+            // chi legge il dato (il semaforo del sito) lo confronta come chiave: la
+            // corrispondenza con i tid di Drupal vive nell'import
+            // (`SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`). L'ordine è quello del
+            // vecchio enum.
+            ['identifier' => 'validation-status', 'name' => 'Stato validazione', 'single_choice' => true, 'terms' => [
+                ['Non verificato', 'validation-status-unverified', 0],
+                ['Non percorribile', 'validation-status-not-walkable', 1],
+                ['In revisione-validazione', 'validation-status-under-review', 2],
+                ['In pre-accatastamento o manutenzione', 'validation-status-pre-registration', 3],
+                ['Percorribile', 'validation-status-walkable', 4],
+                ['Validato', 'validation-status-validated', 5],
+                ['Certificato', 'validation-status-certified', 6],
+            ]],
         ];
     }
 

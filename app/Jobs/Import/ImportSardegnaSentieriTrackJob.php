@@ -91,7 +91,9 @@ class ImportSardegnaSentieriTrackJob implements ShouldQueue
 
         ImportSardegnaSentieriTrackMediaJob::dispatch(
             $track->id,
-            SardegnaSentieriImageManifest::fromApiTrackResponse($response)
+            SardegnaSentieriImageManifest::fromApiTrackResponse($response),
+            SardegnaSentieriImageManifest::fromFiles($response->attachmentFiles),
+            SardegnaSentieriImageManifest::fromFiles($response->uploadedVideos),
         );
     }
 }

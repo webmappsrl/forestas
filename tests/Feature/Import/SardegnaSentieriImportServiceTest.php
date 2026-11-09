@@ -5,12 +5,12 @@ declare(strict_types=1);
 use App\Dto\Api\ApiPoiResponse;
 use App\Dto\Api\ApiTrackResponse;
 use App\Dto\Import\SardegnaSentieriImageManifest;
-use App\Enums\StatoValidazione;
 use App\Http\Clients\SardegnaSentieriClient;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiMediaJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackMediaJob;
+use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
@@ -316,7 +316,10 @@ it('crea un nuovo EcTrack dalla API con GPX', function () {
         ->and($track->properties)->not->toHaveKey('manual_data');
 });
 
-it('imposta stato_validazione tramite enum', function () {
+it('collega lo stato di validazione al termine della famiglia', function () {
+    sardegnaSentieriApp();
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
+
     $feature = minimalTrackFeature(75, [
         'properties' => [
             'gpx' => ['http://example.com/track.gpx'],
@@ -330,7 +333,7 @@ it('imposta stato_validazione tramite enum', function () {
 
     $track = (makeServiceWith($client))->importTrack(75);
 
-    expect($track->stato_validazione)->toBe(StatoValidazione::Validato->value);
+    expect($track->fresh()->term('validation-status')?->identifier)->toBe('validation-status-validated');
 });
 
 it('aggiorna un EcTrack esistente senza duplicati', function () {
@@ -551,6 +554,7 @@ it('non accoda job dei layer quando l import scrive le attività (oc:8827)', fun
 
 it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)', function () {
     $poi = EcPoi::factory()->create([
+        'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
         'properties' => ['out_source_feature_id' => '10'],
     ]);
 
@@ -564,6 +568,10 @@ it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)'
     $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
     (makeServiceWith($client))->importTrack(75);
 
+    // Il pivot lo scrive il job di fine batch (oc:8932), e scarta i POI oltre i 10 km dal
+    // tracciato: il POI della factory sta in un punto a caso, lo si porta sul tracciato.
+    DB::statement('UPDATE ec_pois SET geometry = ST_PointN(ST_GeometryN((SELECT geometry::geometry FROM ec_tracks LIMIT 1), 1), 1)::geography');
+    (new ResolveSardegnaSentieriRelationsJob)->handle();
     $track = EcTrack::first();
     expect($track->ecPois()->count())->toBe(1);
 
@@ -572,6 +580,7 @@ it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)'
     $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
     (makeServiceWith($client2))->importTrack(75);
 
+    (new ResolveSardegnaSentieriRelationsJob)->handle();
     expect($track->fresh()->ecPois()->count())->toBe(0);
 });
 

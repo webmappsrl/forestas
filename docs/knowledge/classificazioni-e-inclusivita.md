@@ -137,6 +137,28 @@ Le colonne che Forestas aggiunge a una tabella del package portano il prefisso `
 `forestas_inclusivity_*`): se il package aggiungesse una colonna omonima, il suo `ALTER TABLE`
 fallirebbe al deploy.
 
+## Lo stato di validazione è la famiglia `validation-status`
+
+Era la colonna `ec_tracks.stato_validazione` con l'enum `StatoValidazione`; con oc:8932 è una
+famiglia a scelta singola del modello unico, con sette termini (`validation-status-unverified`,
+`-not-walkable`, `-under-review`, `-pre-registration`, `-walkable`, `-validated`, `-certified`) e i
+nomi italiani di prima. Enum e colonna non esistono più.
+
+- **Come si legge**: `$track->term('validation-status')` (identifier e nome del termine), oppure
+  `terms['validation-status']` nell'indice Elasticsearch del percorso; nell'indice compare solo
+  se la famiglia è accesa nell'app, e lo fa `configure-taxonomy-terms`. Nel GeoJSON non c'è, come non c'era la colonna: non è fra le chiavi di `geojsonFlatProperties()`.
+- **Import**: i tid Drupal (4871, 4870, 4869, 4868, 4187, 4188, 4189) restano il contratto con la
+  sorgente e stanno in `SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`. La famiglia non
+  è fra quelle sostituite sempre: se Drupal non dice nessuno stato, quello già scritto resta; un
+  tid fuori mappa svuota la famiglia e finisce fra le anomalie come `missing_term`.
+- **Nova**: campo `Select` in cima alla scheda, colonna in lista e filtro propri
+  (`EcTrack::validationStatusField()`, `EcTrackValidationStatusFilter`). Il campo generico del
+  package per questa famiglia è tolto, altrimenti ci sarebbero due campi per lo stesso dato.
+- **Database esistenti** (UAT, dev, locale vecchio) hanno ancora la colonna: dopo
+  `sardegnasentieri:configure-taxonomy-terms` si lancia una volta `sardegnasentieri:move-validation-status`
+  (`--dry-run` per provare), che sposta i valori e toglie la colonna, e si fa un reindex. Quando
+  nessun database ha più la colonna, il comando si cancella.
+
 ## Le tassonomie di Forestas valgono sulle EC Track, non sui POI
 
 `ConfigureTaxonomyTermsCommand` le accende sull'app con

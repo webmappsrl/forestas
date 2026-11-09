@@ -90,7 +90,9 @@ class ImportSardegnaSentieriPoiJob implements ShouldQueue
 
         ImportSardegnaSentieriPoiMediaJob::dispatch(
             $poi->id,
-            SardegnaSentieriImageManifest::fromApiPoiResponse($response)
+            SardegnaSentieriImageManifest::fromApiPoiResponse($response),
+            SardegnaSentieriImageManifest::fromFiles($response->attachmentFiles),
+            SardegnaSentieriImageManifest::fromFiles($response->uploadedVideos),
         );
     }
 }

@@ -20,8 +20,9 @@ Gli altri due:
 - **«Ruolo»** (`app/Nova/Filters/EcTrackRuoloFilter.php`): tracce con almeno un ente in quel ruolo
   (tabella `enteables`, scritta dall'import di Sardegna Sentieri); le tracce senza enti non hanno
   un valore che le trovi;
-- **«Stato validazione»**: filtro del campo `Select` `stato_validazione`; le tracce senza stato non
-  hanno un valore che le trovi.
+- **«Stato validazione»** (`app/Nova/Filters/EcTrackValidationStatusFilter.php`): tracce con quel
+  termine della famiglia `validation-status` (oc:8932); le tracce senza stato non hanno un valore
+  che le trovi.
 
 Non ci sono il filtro **App** (il campo del package è reso non filtrabile in
 `App\Nova\EcTrack::fields()`; colonna, dettaglio e form restano, e sulle altre liste il filtro

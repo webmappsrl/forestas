@@ -140,8 +140,8 @@ it('il reset cancella le relazioni dei termini di tracce e POI e ricrea la tasso
     Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
     expect(DB::table('taxonomy_termables')->where('termable_type', EcTrack::class)->count())->toBe(0)
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(11)
-        ->and(TaxonomyTerm::count())->toBe(49);
+        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12)
+        ->and(TaxonomyTerm::count())->toBe(57);
 });
 
 it('il reset non cancella le relazioni dei termini di altri modelli', function () {
@@ -166,7 +166,7 @@ it('il reset non cancella le relazioni dei termini di altri modelli', function (
     $method->invoke($command);
 
     expect(DB::table('taxonomy_termables')->where('termable_type', Layer::class)->count())->toBe(1)
-        ->and(TaxonomyTerm::count())->toBe(49);
+        ->and(TaxonomyTerm::count())->toBe(57);
 });
 
 it('l import orario allinea i termini senza azzerarli', function () {
@@ -195,7 +195,7 @@ it('l import orario crea la tassonomia se manca', function () {
 
     Artisan::call('sardegnasentieri:import');
 
-    expect(TaxonomyTerm::taxonomies()->count())->toBe(11);
+    expect(TaxonomyTerm::taxonomies()->count())->toBe(12);
 });
 
 it('il reset non porta via le relazioni dei layer: niente da rifare a mano dopo l import notturno', function () {

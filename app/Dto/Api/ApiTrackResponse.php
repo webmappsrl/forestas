@@ -49,6 +49,14 @@ readonly class ApiTrackResponse
         public ?array $ente_istituzione_societa,
         /** @var array<string, mixed>|null GeoJSON geometry object */
         public ?array $geometryFallback,
+        /** @var list<array{url: string, title: string}> Allegati da copiare nella media library, con il titolo di Drupal */
+        public array $attachmentFiles = [],
+        /** @var list<array{url: string, title: string}> Video caricati su Drupal (non quelli di YouTube) */
+        public array $uploadedVideos = [],
+        /** @var list<array{uri: string, title: string}> Collegamenti esterni, in coda perche' aggiunti dopo */
+        public array $collegamenti = [],
+        /** @var list<string> nid dei POI citati da `field_punti_di_interesse` (itinerari) */
+        public array $punti_di_interesse = [],
     ) {}
 
     /**
@@ -102,6 +110,25 @@ readonly class ApiTrackResponse
             poi_correlati: is_array($props['poi_correlati'] ?? null) ? array_values(array_map('strval', $props['poi_correlati'])) : [],
             ente_istituzione_societa: isset($props['ente_istituzione_societa']) && is_array($props['ente_istituzione_societa']) ? $props['ente_istituzione_societa'] : null,
             geometryFallback: isset($feature['geometry']) && is_array($feature['geometry']) ? $feature['geometry'] : null,
+            attachmentFiles: self::namedFiles($props['attachment_files'] ?? null),
+            uploadedVideos: self::namedFiles($props['uploaded_videos'] ?? null),
+            collegamenti: is_array($props['collegamenti'] ?? null) ? array_values($props['collegamenti']) : [],
+            punti_di_interesse: is_array($props['punti_di_interesse'] ?? null) ? array_values(array_map('strval', $props['punti_di_interesse'])) : [],
         );
+    }
+
+    /**
+     * @return list<array{url: string, title: string}>
+     */
+    private static function namedFiles(mixed $rows): array
+    {
+        $files = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (is_array($row) && is_string($row['url'] ?? null)) {
+                $files[] = ['url' => $row['url'], 'title' => (string) ($row['title'] ?? '')];
+            }
+        }
+
+        return $files;
     }
 }

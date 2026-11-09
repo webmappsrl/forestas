@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\Import\CalculateNearbyTracksJob;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
+use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\RegistroCatastale\RegistroCatastaleImporter;
@@ -247,14 +249,16 @@ function assertCatenaAree(): void
 {
     Bus::assertChained([
         SyncTaxonomyWhereJob::class,
+        ResolveSardegnaSentieriRelationsJob::class,
         RecalculateSardegnaSentieriLayersJob::class,
+        CalculateNearbyTracksJob::class,
         RegenerateTaxonomyWhereOutputsJob::class,
     ]);
 
     Bus::assertDispatched(SyncTaxonomyWhereJob::class, function ($job) {
         return $job->queue === ImportSardegnaSentieriTrackJob::QUEUE
             && $job->chainQueue === ImportSardegnaSentieriTrackJob::QUEUE
-            && unserialize($job->chained[1])->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
+            && unserialize(end($job->chained))->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
     });
 }
 
