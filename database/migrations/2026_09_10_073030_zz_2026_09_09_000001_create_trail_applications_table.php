@@ -31,6 +31,16 @@ return new class extends Migration
             $table->text('name')->nullable();
             $table->jsonb('properties')->nullable();
 
+            // Colonna propria e non una chiave dentro `properties` (oc:8960):
+            // il GeoJSON del modello (GeoJsonService::getModelAsGeojson)
+            // riversa `properties` per intero nella Feature, e quella Feature
+            // viaggia verso il servizio DEM e verso il sentiero pubblicato.
+            // Qui dentro ci sono e-mail, nomi, codici fiscali e partite IVA
+            // dichiarati dal richiedente: tenerli fuori da `properties` li
+            // tiene fuori da ogni serializzazione, senza doversene ricordare
+            // caso per caso.
+            $table->jsonb('api_data')->nullable();
+
             // Perche' l'istanza e' stata respinta: lo scrive l'operatore
             // nell'azione «Respingi» e, con l'integrazione SUS, e' il testo
             // che torna al richiedente. Null finche' l'istanza non e'
@@ -62,7 +72,7 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE trail_applications
             ADD CONSTRAINT trail_applications_status_check
-            CHECK (status IN ('under_review', 'rejected', 'approved'))
+            CHECK (status IN ('under_compilation', 'under_review', 'rejected', 'approved'))
         ");
     }
 
