@@ -45,9 +45,11 @@ qui conta come entra nello shard.
 
 Vincoli:
 
-- Il plugin `wp-geohub` oggi legge gli shard dalla lista pubblica di `wm-types`
-  (`forestasuat` → `https://forestas.uat.maphub.it`): in locale legge i dati di UAT, non lo shard
-  locale. Le chiamate locali sono un lavoro successivo.
+- Il plugin della ricerca `wp-package` (oc:8952, al posto di `wp-geohub`) legge gli shard dalla lista
+  pubblica di `wm-types` e usa quello delle sue opzioni, scritte dall'init da `WP_PACKAGE_SHARD` e
+  `WP_PACKAGE_APP_ID` di `wp-forestas/.env` (in locale e su dev `forestasdev` e 1): anche in locale la
+  ricerca chiama l'API di uno shard pubblicato, non lo shard locale. Il browser chiama direttamente
+  `api/v2/elasticsearch` dello shard.
 - Un `wp-forestas/compose.yml` non valido fa fallire `docker compose up` dell'intero shard:
   `wordpress-up.sh` lo valida a ogni aggiornamento, così l'errore emerge subito e non al primo
   riavvio della macchina.
