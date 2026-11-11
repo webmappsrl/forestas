@@ -135,7 +135,9 @@ chi la cerca non la trova.
 Le colonne che Forestas aggiunge a una tabella del package portano il prefisso `forestas_`
 (`forestas_registry_code`, `forestas_survey_date`, `forestas_geographic_area`,
 `forestas_inclusivity_*`): se il package aggiungesse una colonna omonima, il suo `ALTER TABLE`
-fallirebbe al deploy.
+fallirebbe al deploy. Nel dettaglio pubblico della traccia escono dentro `properties.forestas`
+(`registry_code`, `survey_date`, `inclusivity`), non piatte: vedi
+[dettaglio-della-traccia-dati-forestas.md](dettaglio-della-traccia-dati-forestas.md).
 
 ## Lo stato di validazione è la famiglia `validation-status`
 
@@ -146,7 +148,8 @@ nomi italiani di prima. Enum e colonna non esistono più.
 
 - **Come si legge**: `$track->term('validation-status')` (identifier e nome del termine), oppure
   `terms['validation-status']` nell'indice Elasticsearch del percorso; nell'indice compare solo
-  se la famiglia è accesa nell'app, e lo fa `configure-taxonomy-terms`. Nel GeoJSON non c'è, come non c'era la colonna: non è fra le chiavi di `geojsonFlatProperties()`.
+  se la famiglia è accesa nell'app, e lo fa `configure-taxonomy-terms`; nel dettaglio della
+  traccia è in `properties.taxonomies['validation-status']` (oc:8959).
 - **Chi lo legge come percorribilità**: la pagina di ricerca del sito WordPress (oc:8952) ne ricava il filtro
   «Percorribilità» per fasce di identifier: Percorribili = `-walkable`, `-validated`, `-certified` (livelli 4–6),
   In revisione o parzialmente percorribili = `-under-review`, `-pre-registration` (2–3), Non percorribili =

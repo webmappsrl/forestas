@@ -1,15 +1,19 @@
 <?php
 
+use App\Jobs\Import\CalculateNearbyTracksChunkJob;
 use App\Jobs\Import\CalculateNearbyTracksJob;
+use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Models\EcTrack;
 use App\Services\Import\SardegnaSentieriImportService;
+use Illuminate\Bus\Batch;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Queue;
 use Wm\WmPackage\Jobs\Pbf\GenerateOptimizedPBFChainJob;
+use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Models\App;
 
 /**
@@ -34,6 +38,20 @@ function nearbyTrack(string $wkt): EcTrack
     ]));
 }
 
+/**
+ * Esegue il calcolo come in coda: il job accoda un batch di blocchi, qui eseguiti in ordine.
+ */
+function runNearby(): void
+{
+    Bus::fake([GenerateOptimizedPBFChainJob::class, RegenerateTaxonomyWhereOutputsJob::class]);
+    (new CalculateNearbyTracksJob)->handle();
+    Bus::assertBatched(function (PendingBatch $batch) {
+        $batch->jobs->each(fn (CalculateNearbyTracksChunkJob $job) => $job->handle());
+
+        return true;
+    });
+}
+
 function nearbyPairs(): array
 {
     return DB::table('ec_track_related_tracks')->get()
@@ -44,7 +62,7 @@ it('collega due percorsi che si toccano', function () {
     $a = nearbyTrack('9 40.5 0, 9.1 40.5 0');
     $b = nearbyTrack('9.1 40.5 0, 9.2 40.5 0');
 
-    (new CalculateNearbyTracksJob)->handle();
+    runNearby();
 
     expect(nearbyPairs())->toHaveCount(2);
     expect($a->relatedTracks()->pluck('ec_tracks.id')->all())->toBe([$b->id]);
@@ -56,7 +74,7 @@ it('non collega due percorsi a 2 km di distanza', function () {
     nearbyTrack('9 40.5 0, 9.1 40.5 0');
     nearbyTrack('9 40.518 0, 9.1 40.518 0');
 
-    (new CalculateNearbyTracksJob)->handle();
+    runNearby();
 
     expect(nearbyPairs())->toBe([]);
 });
@@ -66,7 +84,7 @@ it('lascia senza collegamenti un percorso isolato', function () {
     $b = nearbyTrack('9.1 40.5 0, 9.2 40.5 0');
     $isolated = nearbyTrack('8 39 0, 8.1 39 0');
 
-    (new CalculateNearbyTracksJob)->handle();
+    runNearby();
 
     expect(nearbyPairs())->toHaveCount(2);
     expect($isolated->relatedTracks()->count())->toBe(0);
@@ -77,62 +95,81 @@ it('usa il raggio configurato', function () {
     nearbyTrack('9 40.5 0, 9.1 40.5 0');
     nearbyTrack('9 40.501 0, 9.1 40.501 0');
 
-    (new CalculateNearbyTracksJob)->handle();
+    runNearby();
     expect(nearbyPairs())->toBe([]);
 
     config(['sardegnasentieri.nearby_tracks_radius_meters' => 200]);
-    (new CalculateNearbyTracksJob)->handle();
+    runNearby();
     expect(nearbyPairs())->toHaveCount(2);
 });
 
-it('lavora a blocchi senza cancellare il lavoro del blocco precedente', function () {
-    config(['sardegnasentieri.nearby_tracks_chunk_size' => 1]);
-    Queue::fake();
+it('svuota la tabella e accoda un batch con un blocco ogni chunk_size tracce', function () {
+    config(['sardegnasentieri.nearby_tracks_chunk_size' => 2]);
+    Bus::fake();
+    $a = nearbyTrack('9 40.5 0, 9.1 40.5 0');
+    $b = nearbyTrack('9.1 40.5 0, 9.2 40.5 0');
+    $c = nearbyTrack('8 39 0, 8.1 39 0');
+    DB::table('ec_track_related_tracks')->insert(['ec_track_id' => $a->id, 'related_track_id' => $c->id]);
 
+    (new CalculateNearbyTracksJob)->handle();
+
+    expect(nearbyPairs())->toBe([]);
+    Bus::assertBatched(fn (PendingBatch $batch) => $batch->queue() === ImportSardegnaSentieriTrackJob::QUEUE
+        && $batch->allowsFailures()
+        && $batch->jobs->map(fn ($job) => $job->trackIds)->all() === [[$a->id, $b->id], [$c->id]]);
+});
+
+it('rigenera file e indice solo quando sono finiti tutti i blocchi', function () {
+    // Prima la catena rigenerava dopo il primo blocco: i file delle tracce dei blocchi seguenti
+    // uscivano senza sentieri correlati fino al giro successivo (oc:8959).
+    Bus::fake();
+    nearbyTrack('9 40.5 0, 9.1 40.5 0');
+
+    (new CalculateNearbyTracksJob)->handle();
+
+    Bus::assertNotDispatched(RegenerateTaxonomyWhereOutputsJob::class);
+    Bus::assertBatched(function (PendingBatch $batch) {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $callback->getClosure()(Mockery::mock(Batch::class));
+        }
+
+        return true;
+    });
+    Bus::assertDispatched(RegenerateTaxonomyWhereOutputsJob::class, fn ($job) => $job->appId === SardegnaSentieriImportService::IMPORT_APP_ID
+        && $job->queue === ImportSardegnaSentieriTrackJob::QUEUE);
+});
+
+it('senza tracce rigenera subito, senza batch', function () {
+    Bus::fake();
+
+    (new CalculateNearbyTracksJob)->handle();
+
+    Bus::assertNothingBatched();
+    Bus::assertDispatched(RegenerateTaxonomyWhereOutputsJob::class);
+});
+
+it('un blocco non cancella il lavoro degli altri blocchi', function () {
     $a = nearbyTrack('9 40.5 0, 9.1 40.5 0');
     $b = nearbyTrack('9.1 40.5 0, 9.2 40.5 0');
     $c = nearbyTrack('8 39 0, 8.1 39 0');
 
-    // Primo blocco: solo la traccia $a, e si riaccoda.
-    (new CalculateNearbyTracksJob)->handle();
-    expect(nearbyPairs())->toHaveCount(2);
-    Queue::assertPushed(CalculateNearbyTracksJob::class, fn ($j) => $j->afterId === $a->id);
-
-    // Blocchi successivi: non svuotano la tabella.
-    (new CalculateNearbyTracksJob($a->id))->handle();
-    (new CalculateNearbyTracksJob($b->id))->handle();
+    (new CalculateNearbyTracksChunkJob([$a->id]))->handle();
+    (new CalculateNearbyTracksChunkJob([$b->id]))->handle();
+    (new CalculateNearbyTracksChunkJob([$c->id]))->handle();
 
     expect(nearbyPairs())->toHaveCount(2);
     expect($c->relatedTracks()->count())->toBe(0);
 });
 
-it('accoda il blocco successivo prima di fare il lavoro', function () {
-    config(['sardegnasentieri.nearby_tracks_chunk_size' => 1]);
-    Queue::fake();
-    $a = nearbyTrack('9 40.5 0, 9.1 40.5 0');
-    nearbyTrack('9.1 40.5 0, 9.2 40.5 0');
-
-    // Se il calcolo fallisce il blocco dopo e' gia' accodato.
-    DB::listen(function ($query) {
-        if (str_contains($query->sql, 'ST_DWithin')) {
-            throw new RuntimeException('calcolo interrotto');
-        }
-    });
-
-    expect(fn () => (new CalculateNearbyTracksJob)->handle())->toThrow(RuntimeException::class);
-
-    Queue::assertPushed(CalculateNearbyTracksJob::class, fn ($j) => $j->afterId === $a->id);
-});
-
 it('registra sul canale import il blocco saltato', function () {
     Log::shouldReceive('channel')->with('import')->andReturnSelf();
-    Log::shouldReceive('error')->once()->withArgs(fn ($m) => str_contains($m, 'dopo id 7'));
+    Log::shouldReceive('error')->once()->withArgs(fn ($m) => str_contains($m, 'da id 7 a id 9'));
 
-    (new CalculateNearbyTracksJob(7))->failed(new RuntimeException('boom'));
+    (new CalculateNearbyTracksChunkJob([7, 8, 9]))->failed(new RuntimeException('boom'));
 });
 
 it('non esegue due volte lo stesso blocco, ma non blocca i blocchi diversi', function () {
-    $job = new CalculateNearbyTracksJob(100);
+    $job = new CalculateNearbyTracksChunkJob([100, 101]);
     $middleware = $job->middleware();
 
     expect($middleware)->toHaveCount(1)
@@ -140,5 +177,5 @@ it('non esegue due volte lo stesso blocco, ma non blocca i blocchi diversi', fun
         ->and($middleware[0]->key)->toBe('sardegnasentieri-nearby-tracks-100')
         ->and($middleware[0]->releaseAfter)->toBeNull()
         ->and($middleware[0]->expiresAfter)->toBeGreaterThan($job->timeout)
-        ->and((new CalculateNearbyTracksJob(200))->middleware()[0]->key)->not->toBe($middleware[0]->key);
+        ->and((new CalculateNearbyTracksChunkJob([200]))->middleware()[0]->key)->not->toBe($middleware[0]->key);
 });

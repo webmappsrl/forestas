@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\TabsGroup;
 use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Nova\Fields\ImageCredits;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 /**
@@ -96,12 +97,12 @@ it('ha un solo campo per le immagini, non quello del package in piu\'', function
     expect($images)->toHaveCount(1);
 });
 
-it('permette di leggere e correggere la didascalia di una foto', function () {
-    // La didascalia arriva da Drupal nelle custom properties del media: senza questo campo il
-    // dato c'e' ma in Nova non si vede (oc:8932).
+it('permette di leggere e correggere didascalia, autore e credits di una foto', function () {
+    // Arrivano da Drupal nelle custom properties del media (oc:8932) e sono i campi del package,
+    // che li porta con la foto nel dettaglio (oc:8959).
     $custom = collect(($this->mediaFields)(new EcTrackResource($this->track))['default']->meta()['customPropertiesFields'] ?? []);
 
-    expect($custom->pluck('attribute')->all())->toContain('sardegnasentieri_caption');
+    expect($custom->pluck('attribute')->all())->toBe([ImageCredits::CAPTION, ImageCredits::AUTHOR, ImageCredits::CREDITS]);
 });
 
 it('non mette la didascalia su documenti e video, che non ne hanno', function () {
