@@ -147,6 +147,13 @@ nomi italiani di prima. Enum e colonna non esistono più.
 - **Come si legge**: `$track->term('validation-status')` (identifier e nome del termine), oppure
   `terms['validation-status']` nell'indice Elasticsearch del percorso; nell'indice compare solo
   se la famiglia è accesa nell'app, e lo fa `configure-taxonomy-terms`. Nel GeoJSON non c'è, come non c'era la colonna: non è fra le chiavi di `geojsonFlatProperties()`.
+- **Chi lo legge come percorribilità**: la pagina di ricerca del sito WordPress (oc:8952) ne ricava il filtro
+  «Percorribilità» per fasce di identifier: Percorribili = `-walkable`, `-validated`, `-certified` (livelli 4–6),
+  In revisione o parzialmente percorribili = `-under-review`, `-pre-registration` (2–3), Non percorribili =
+  `-not-walkable` (1). È la regola di Forestas finché non fornisce la percorribilità separata (scala 0–5,
+  oc:8783 e oc:8932): il valore unico di Drupal si copia tal quale anche sulla percorribilità, verde da 4 in su
+  (Google Doc «Osservazioni finali a CANVAS CLAUDE fase 2»). Rinominare un identifier o spostare un livello cambia
+  quel filtro: le fasce stanno in `forestas_search_track_facets()` del child di `wp-forestas`.
 - **Import**: i tid Drupal (4871, 4870, 4869, 4868, 4187, 4188, 4189) restano il contratto con la
   sorgente e stanno in `SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`. La famiglia non
   è fra quelle sostituite sempre: se Drupal non dice nessuno stato, quello già scritto resta; un
