@@ -20,7 +20,6 @@ uses(RefreshDatabase::class);
  * Didascalia delle foto: su Drupal è il testo alternativo dell'immagine,
  * quello che il sito mostra sotto la foto (oc:8932).
  */
-
 class CaptionFileDownloader implements Downloader
 {
     public function getTempFile(string $url): string
@@ -90,9 +89,9 @@ it('salva la didascalia che Drupal mostra sotto la foto', function () {
     $media = $ente->fresh()->getMedia('default');
 
     expect($media)->toHaveCount(1)
-        ->and($media[0]->custom_properties['sardegnasentieri_caption'])->toBe('Nuoro e Ortobene visti dal Monte Corrasi, Oliena')
-        ->and($media[0]->custom_properties['sardegnasentieri_autore'])->toBe('Gianluca Schirru')
-        ->and($media[0]->custom_properties['sardegnasentieri_credits'])->toBe('Agenzia Forestas')
+        ->and($media[0]->custom_properties['caption'])->toBe('Nuoro e Ortobene visti dal Monte Corrasi, Oliena')
+        ->and($media[0]->custom_properties['author'])->toBe('Gianluca Schirru')
+        ->and($media[0]->custom_properties['credits'])->toBe('Agenzia Forestas')
         // Il name resta quello di prima: il nome del file, non la didascalia.
         ->and($media[0]->name)->not->toBe('Nuoro e Ortobene visti dal Monte Corrasi, Oliena');
 });
@@ -108,13 +107,13 @@ it('non sovrascrive la didascalia con il nome del file quando manca', function (
     $media = $ente->fresh()->getMedia('default');
 
     expect($media)->toHaveCount(1)
-        ->and($media[0]->custom_properties['sardegnasentieri_caption'])->toBe('Didascalia vera');
+        ->and($media[0]->custom_properties['caption'])->toBe('Didascalia vera');
 
     // Senza didascalia fin dall'inizio, la chiave non c'è: niente nome del file al suo posto.
     $other = Ente::create(['sardegnasentieri_id' => '2', 'name' => ['it' => 'Altro'], 'properties' => []]);
     $sync->syncImportedImages($other, captionManifest('altra.jpg', ''));
 
-    expect($other->fresh()->getMedia('default')[0]->custom_properties)->not->toHaveKey('sardegnasentieri_caption');
+    expect($other->fresh()->getMedia('default')[0]->custom_properties)->not->toHaveKey('caption');
 });
 
 it('tiene una sola copia per file, quella con la didascalia', function () {
@@ -132,7 +131,7 @@ it('tiene una sola copia per file, quella con la didascalia', function () {
     foreach (['La didascalia buona', null] as $caption) {
         $props = ['sardegnasentieri_import' => true, 'sardegnasentieri_source_url' => $url];
         if ($caption !== null) {
-            $props['sardegnasentieri_caption'] = $caption;
+            $props['caption'] = $caption;
         }
         $ente->addMediaFromString('x')->usingFileName($file)->withCustomProperties($props)->toMediaCollection('default');
     }
@@ -144,5 +143,5 @@ it('tiene una sola copia per file, quella con la didascalia', function () {
     $media = $ente->fresh()->getMedia('default');
 
     expect($media)->toHaveCount(1)
-        ->and($media[0]->custom_properties['sardegnasentieri_caption'])->toBe('La didascalia buona');
+        ->and($media[0]->custom_properties['caption'])->toBe('La didascalia buona');
 });

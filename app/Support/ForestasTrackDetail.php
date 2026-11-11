@@ -8,6 +8,7 @@ use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Wm\WmPackage\Http\Resources\MediaResource;
 
 /**
  * `properties.forestas` nel dettaglio pubblico della traccia (oc:8959).
@@ -19,10 +20,17 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * `source_relations`, `zona_geografica`), il GPX di Drupal, che sparirà con il sito, e le chiavi
  * interne dell'import. Le chiavi vuote non escono.
  *
- * Il roadbook esce com'è: diventerà un blocco del dettaglio con un pezzo successivo.
+ * Il roadbook esce com'è: diventerà un blocco del dettaglio con un pezzo successivo. Didascalia,
+ * autore e credits delle foto non stanno qui ma con le foto (`feature_image`, `image_gallery`):
+ * li porta il package, dalle custom properties del media (`ImageCredits`, oc:8959).
  */
 class ForestasTrackDetail
 {
+    /**
+     * Il tipo di percorso (sentiero, itinerario, cammino…) nella card dei sentieri correlati.
+     */
+    private const ROUTE_TYPE_TAXONOMY = 'route-type';
+
     /**
      * @return array<string, mixed>
      */
@@ -46,7 +54,6 @@ class ForestasTrackDetail
             'registry_code' => $track->forestas_registry_code,
             'survey_date' => $track->forestas_survey_date?->format('Y-m-d'),
             'inclusivity' => self::inclusivity($track, $stored),
-            'image_credits' => self::imageCredits($track),
             'entities' => self::entities($track),
             'nearby_tracks' => self::nearbyTracks($track),
             'downloads' => self::downloads($track),
@@ -54,37 +61,12 @@ class ForestasTrackDetail
     }
 
     /**
-     * Didascalia, autore e credits delle foto, per id del media: Drupal li mostra sotto ogni foto e
-     * l'artifact di analisi chiede di esporli (la didascalia vale anche come testo alternativo).
-     * Non stanno nelle foto: `feature_image` e `image_gallery` le riscrive `MediaResource` del
-     * package con campi fissi, quindi il frontend li abbina per `id`. Li salva l'import di forestas
-     * con il prefisso `sardegnasentieri_`; i campi vuoti non escono, e nemmeno le foto senza dati.
-     *
-     * @return array<string, array<string, string>>
-     */
-    private static function imageCredits(EcTrack $track): array
-    {
-        $credits = [];
-        foreach ($track->getMedia() as $media) {
-            $item = array_filter([
-                'caption' => $media->getCustomProperty('sardegnasentieri_caption'),
-                'author' => $media->getCustomProperty('sardegnasentieri_autore'),
-                'credits' => $media->getCustomProperty('sardegnasentieri_credits'),
-            ], fn ($value) => is_string($value) && $value !== '');
-            if ($item !== []) {
-                $credits[(string) $media->id] = $item;
-            }
-        }
-
-        return $credits;
-    }
-
-    /**
      * Gli enti collegati, uno per ente con tutti i suoi ruoli (gestore, manutentore, rilevatore,
-     * operatore, complesso forestale): in `enteables` lo stesso ente ha una riga per ruolo. Il
-     * resto della scheda dell'ente lo restituisce l'API degli enti, a partire dall'id.
+     * operatore, complesso forestale): in `enteables` lo stesso ente ha una riga per ruolo. Solo
+     * l'id e i ruoli: nome e scheda dell'ente li dà l'API degli enti, mentre i ruoli dipendono dalla
+     * traccia e lì non ci sono (scrum del 2026-11-11).
      *
-     * @return list<array{id: int, name: array<string, string>, roles: list<string>}>
+     * @return list<array{id: int, roles: list<string>}>
      */
     private static function entities(EcTrack $track): array
     {
@@ -92,7 +74,7 @@ class ForestasTrackDetail
         /** @var Ente $ente */
         foreach ($track->enti as $ente) {
             $id = (int) $ente->id;
-            $entities[$id] ??= ['id' => $id, 'name' => $ente->getTranslations('name'), 'roles' => []];
+            $entities[$id] ??= ['id' => $id, 'roles' => []];
             $role = $ente->getRelationValue('pivot')?->getAttribute('ruolo');
             if (is_string($role) && $role !== '' && ! in_array($role, $entities[$id]['roles'], true)) {
                 $entities[$id]['roles'][] = $role;
@@ -103,21 +85,34 @@ class ForestasTrackDetail
     }
 
     /**
-     * I sentieri vicini calcolati dalla geometria (`CalculateNearbyTracksJob`, entro
-     * `sardegnasentieri.nearby_tracks_radius_meters`): `id`, `ref` e nome, per la mappa e i link
-     * della scheda. La distanza non è salvata, quindi non esce.
+     * I sentieri correlati, calcolati dalla geometria (`CalculateNearbyTracksJob`, entro
+     * `sardegnasentieri.nearby_tracks_radius_meters`): sono i «Sentieri correlati» della scheda,
+     * che su Drupal si inserivano a mano (scrum del 2026-11-11). Ogni elemento porta quello che
+     * mostra la card del carosello nel wireframe: foto, tipo di percorso, nome e codice, tempo e
+     * lunghezza. Tempo e lunghezza seguono la precedenza del dettaglio (manuale, OSM, DEM): i
+     * sentieri importati non li hanno finché non gira il DEM (oc:8641), e allora sono `null`.
      *
-     * @return list<array{id: int, ref: string|null, name: array<string, string>}>
+     * @return list<array<string, mixed>>
      */
     private static function nearbyTracks(EcTrack $track): array
     {
         $nearby = [];
         /** @var EcTrack $near */
-        foreach ($track->relatedTracks->sortBy('id') as $near) {
+        foreach ($track->relatedTracks()->with(['media', 'taxonomyTerms.parent'])->orderBy('ec_tracks.id')->get() as $near) {
+            $routeType = $near->term(self::ROUTE_TYPE_TAXONOMY);
+            $photo = $near->getMedia()->first();
             $nearby[] = [
                 'id' => (int) $near->id,
                 'ref' => $near->properties['ref'] ?? null,
                 'name' => $near->getTranslations('name'),
+                'route_type' => $routeType === null ? null : [
+                    'identifier' => $routeType->identifier,
+                    'name' => $routeType->getTranslations('name'),
+                ],
+                // Come `feature_image` del dettaglio: la prima foto, con gli stessi campi.
+                'feature_image' => $photo === null ? null : (new MediaResource($photo))->resolve(),
+                'distance' => $near->classifyField($near, 'distance')['currentValue'],
+                'duration_forward' => $near->classifyField($near, 'duration_forward')['currentValue'],
             ];
         }
 

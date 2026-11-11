@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\HasMedia;
+use Wm\WmPackage\Nova\Fields\ImageCredits;
 
 class SardegnaSentieriMediaSyncService
 {
@@ -99,15 +100,17 @@ class SardegnaSentieriMediaSyncService
         $customProps = [
             'sardegnasentieri_import' => true,
             'sardegnasentieri_source_url' => $url,
-            'sardegnasentieri_autore' => $item['autore'],
-            'sardegnasentieri_credits' => $item['credits'],
+            // Autore e credits con le chiavi del package, che li porta con la foto nel
+            // dettaglio e li fa correggere in Nova (oc:8959).
+            ImageCredits::AUTHOR => $item['autore'],
+            ImageCredits::CREDITS => $item['credits'],
         ];
         // La didascalia sta a parte dal `name`, che resta il nome del file. Se
         // Drupal non ne ha una, la chiave non si scrive e quella già salvata
         // non si tocca.
         $caption = trim((string) ($item['caption'] ?? ''));
         if ($caption !== '') {
-            $customProps['sardegnasentieri_caption'] = $caption;
+            $customProps[ImageCredits::CAPTION] = $caption;
         }
         $title = trim((string) ($item['title'] ?? ''));
         if ($title !== '') {
@@ -206,7 +209,7 @@ class SardegnaSentieriMediaSyncService
             }
 
             usort($copies, function ($a, $b) {
-                $captionOf = fn ($m) => trim((string) (($m->custom_properties ?? [])['sardegnasentieri_caption'] ?? '')) !== '' ? 0 : 1;
+                $captionOf = fn ($m) => trim((string) (($m->custom_properties ?? [])[ImageCredits::CAPTION] ?? '')) !== '' ? 0 : 1;
 
                 return [$captionOf($a), $a->id] <=> [$captionOf($b), $b->id];
             });

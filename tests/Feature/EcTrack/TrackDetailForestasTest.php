@@ -8,7 +8,10 @@ use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Wm\WmPackage\Http\Resources\EcTrackResource;
 use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\Nova\Fields\ImageCredits;
 
 /**
  * `properties.forestas` nel dettaglio della traccia (oc:8959): un oggetto pubblico costruito in
@@ -145,28 +148,28 @@ it('lascia invariato properties.forestas salvato nel DB', function () {
     expect($track->fresh()->properties['forestas'])->toBe(['source_id' => '1043', 'info_utili' => ['it' => ['x']]]);
 });
 
-it('mette didascalia, autore e credits delle foto in forestas.image_credits, per id del media', function () {
+it('nel file su AWS porta didascalia, autore e credits con le foto, non in forestas', function () {
     $track = forestasTrack();
     $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-    $first = $track->addMediaFromString($png)->usingFileName('a.png')
+    $photo = $track->addMediaFromString($png)->usingFileName('a.png')
         ->withCustomProperties([
-            'sardegnasentieri_caption' => 'Il Monte Corrasi',
-            'sardegnasentieri_autore' => 'Matteo Cara',
-            'sardegnasentieri_credits' => 'Comunità Montana',
+            ImageCredits::CAPTION => 'Il Monte Corrasi',
+            ImageCredits::AUTHOR => 'Matteo Cara',
+            ImageCredits::CREDITS => 'Comunità Montana',
         ])
         ->toMediaCollection('default');
-    $partial = $track->addMediaFromString($png)->usingFileName('b.png')
-        ->withCustomProperties(['sardegnasentieri_autore' => '', 'sardegnasentieri_credits' => 'Sardegna Digital Library'])
-        ->toMediaCollection('default');
-    $bare = $track->addMediaFromString($png)->usingFileName('c.png')->toMediaCollection('default');
 
-    // Le foto le scrive MediaResource del package, che non ha campi per questi dati: stanno in
-    // forestas e il frontend li abbina per id.
-    expect(detailForestas($track)['image_credits'])->toEqual([
-        (string) $first->id => ['caption' => 'Il Monte Corrasi', 'author' => 'Matteo Cara', 'credits' => 'Comunità Montana'],
-        (string) $partial->id => ['credits' => 'Sardegna Digital Library'],
-    ])
-        ->and(detailForestas($track)['image_credits'])->not->toHaveKey((string) $bare->id);
+    // Come lo scrive UpdateEcTrackAwsJob: EcTrackResource sulla classe di EC_TRACK_MODEL.
+    $class = config('wm-package.ec_track_model');
+    $file = json_decode((new EcTrackResource($class::find($track->id)))->toJson(), true)['properties'];
+
+    $credits = ['caption' => 'Il Monte Corrasi', 'author' => 'Matteo Cara', 'credits' => 'Comunità Montana'];
+    expect($class)->toBe(EcTrack::class)
+        ->and($file['feature_image'])->toMatchArray(['id' => $photo->id, ...$credits])
+        ->and($file['image_gallery'][0])->toMatchArray(['id' => $photo->id, ...$credits])
+        ->and($file['forestas'])->not->toHaveKey('image_credits')
+        ->and($file['forestas']['downloads'])->toHaveKey('geojson')
+        ->and($file)->not->toHaveKey('sardegnasentieri_id');
 });
 
 it('toglie dal dettaglio l\'id del nodo Drupal', function () {
@@ -177,7 +180,7 @@ it('toglie dal dettaglio l\'id del nodo Drupal', function () {
         ->and($track->fresh()->properties['sardegnasentieri_id'])->toBe('4516');
 });
 
-it('porta gli enti con tutti i loro ruoli, un elemento per ente', function () {
+it('porta gli enti con id e tutti i loro ruoli, un elemento per ente', function () {
     $track = forestasTrack();
     $ente = Ente::create(['sardegnasentieri_id' => '29', 'name' => ['it' => 'Comunità Montana'], 'properties' => []]);
     $other = Ente::create(['sardegnasentieri_id' => '17', 'name' => ['it' => 'Comune di Oliena'], 'properties' => []]);
@@ -186,23 +189,60 @@ it('porta gli enti con tutti i loro ruoli, un elemento per ente', function () {
     }
     $track->enti()->attach($other->id, ['ruolo' => 'operatore']);
 
+    // Il resto della scheda dell'ente lo dà l'API degli enti (scrum del 2026-11-11): qui solo
+    // l'id e i ruoli, che dipendono dalla traccia.
     expect(detailForestas($track)['entities'])->toEqualCanonicalizing([
-        ['id' => $ente->id, 'name' => ['it' => 'Comunità Montana'], 'roles' => ['gestore', 'manutentore']],
-        ['id' => $other->id, 'name' => ['it' => 'Comune di Oliena'], 'roles' => ['operatore']],
+        ['id' => $ente->id, 'roles' => ['gestore', 'manutentore']],
+        ['id' => $other->id, 'roles' => ['operatore']],
     ]);
 });
 
-it('porta i sentieri vicini con id, ref e nome', function () {
+it('porta nei sentieri correlati i dati della card: foto, tipo, nome, codice, tempo e lunghezza', function () {
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
     $track = forestasTrack();
     $near = forestasTrack();
-    $near->forceFill(['name' => ['it' => 'Vicino'], 'properties' => ['ref' => 'Z-NU-T-431B']])->saveQuietly();
+    $near->forceFill([
+        'name' => ['it' => 'Sarcerei – Lanusei'],
+        'properties' => [
+            'ref' => 'Z-NU-C-104',
+            'dem_data' => ['distance' => 11.3, 'duration_forward' => 225],
+            // Il valore manuale vince sul DEM, come nel dettaglio.
+            'manual_data' => ['distance' => 11.4],
+        ],
+    ])->saveQuietly();
+    $near->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'route-type-trail')->value('id'));
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    $photo = $near->addMediaFromString($png)->usingFileName('a.png')->toMediaCollection('default');
     DB::table('ec_track_related_tracks')->insert(['ec_track_id' => $track->id, 'related_track_id' => $near->id]);
 
-    $nearby = detailForestas($track)['nearby_tracks'];
+    $card = detailForestas($track)['nearby_tracks'][0];
 
-    expect($nearby)->toHaveCount(1)
-        ->and($nearby[0])->toMatchArray(['id' => $near->id, 'ref' => 'Z-NU-T-431B'])
-        ->and($nearby[0]['name']['it'])->toBe('Vicino');
+    expect($card)->toMatchArray([
+        'id' => $near->id,
+        'ref' => 'Z-NU-C-104',
+        'distance' => 11.4,
+        'duration_forward' => 225,
+    ])
+        ->and($card['name']['it'])->toBe('Sarcerei – Lanusei')
+        ->and($card['route_type']['identifier'])->toBe('route-type-trail')
+        ->and($card['route_type']['name']['it'])->toBe('Sentiero')
+        ->and($card['feature_image']['id'])->toBe($photo->id)
+        ->and($card['feature_image'])->toHaveKeys(['url', 'thumbnail', 'sizes']);
+});
+
+it('lascia a null nella card i dati che il sentiero correlato non ha', function () {
+    $track = forestasTrack();
+    $near = forestasTrack();
+    DB::table('ec_track_related_tracks')->insert(['ec_track_id' => $track->id, 'related_track_id' => $near->id]);
+
+    expect(detailForestas($track)['nearby_tracks'][0])->toMatchArray([
+        'id' => $near->id,
+        'ref' => null,
+        'route_type' => null,
+        'feature_image' => null,
+        'distance' => null,
+        'duration_forward' => null,
+    ]);
 });
 
 it('porta i link per scaricare la traccia in GeoJSON, GPX e KML', function () {

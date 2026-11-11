@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
+use App\Observers\RelatedTrackCardObserver;
+use App\Observers\RelatedTrackMediaObserver;
+use App\Observers\RelatedTrackRouteTypeObserver;
 use App\Policies\RegistroCatastaleRowPolicy;
 use App\Services\Import\Source\SardegnaSentieriDatabaseSource;
 use App\Services\Import\Source\SardegnaSentieriSource;
@@ -22,6 +26,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Models\TaxonomyTermable;
 use Wm\WmPackage\Models\Tile;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
@@ -75,6 +80,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Tile::class, TilePolicy::class);
         Gate::policy(RegistroCatastaleRow::class, RegistroCatastaleRowPolicy::class);
+
+        // Card dei sentieri correlati nei file delle tracce (oc:8959): quando cambia una traccia,
+        // la sua prima foto o il suo tipo di percorso, si riscrivono i file di chi la mostra.
+        EcTrack::observe(RelatedTrackCardObserver::class);
+        config('media-library.media_model')::observe(RelatedTrackMediaObserver::class);
+        TaxonomyTermable::observe(RelatedTrackRouteTypeObserver::class);
 
         // Branch API riservato al SUS (oc:8333). Registrato qui e non in
         // routes/api.php perche' bootstrap/app.php non carica quel file:

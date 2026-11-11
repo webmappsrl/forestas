@@ -6,6 +6,7 @@ namespace App\Jobs\Import;
 
 use App\Models\EcTrack;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
+use App\Support\RelatedTrackCards;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -70,7 +71,9 @@ class ImportSardegnaSentieriTrackMediaJob implements ShouldQueue
             return;
         }
 
-        $sync->syncImportedImages($track, $this->items);
+        // Senza aggiornare le card dei correlati foto per foto: a fine import si rigenerano tutti
+        // i file (oc:8959).
+        RelatedTrackCards::withoutRefresh(fn () => $sync->syncImportedImages($track, $this->items));
 
         // Subito dopo le foto e prima dei file pesanti: EcTrackResource deve includere gli URL media,
         // e lo scaricamento di allegati e video (fino a 78 MB) può portare il job a sforare il timeout:

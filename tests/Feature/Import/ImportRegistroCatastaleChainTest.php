@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Testing\Fakes\BatchFake;
 use Spatie\Permission\Models\Role;
-use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 
@@ -241,8 +240,9 @@ it('un giro che trova il lock occupato non esegue l importer', function () {
 });
 
 /**
- * La catena delle aree (oc:8880, oc:8827): sync di taxonomy_where, ricalcolo dei layer e poi reindex,
- * sulla coda dell'import, per l'app di Sardegna Sentieri. Parte su tutte le
+ * La catena delle aree (oc:8880, oc:8827): sync di taxonomy_where, ricalcolo dei layer e sentieri
+ * correlati, sulla coda dell'import; il reindex lo accoda il calcolo dei correlati a batch finito
+ * (oc:8959, `NearbyTracksTest`). Parte su tutte le
  * strade del `finally`, anche quelle che saltano anomalie e registro.
  */
 function assertCatenaAree(): void
@@ -252,13 +252,11 @@ function assertCatenaAree(): void
         ResolveSardegnaSentieriRelationsJob::class,
         RecalculateSardegnaSentieriLayersJob::class,
         CalculateNearbyTracksJob::class,
-        RegenerateTaxonomyWhereOutputsJob::class,
     ]);
 
     Bus::assertDispatched(SyncTaxonomyWhereJob::class, function ($job) {
         return $job->queue === ImportSardegnaSentieriTrackJob::QUEUE
-            && $job->chainQueue === ImportSardegnaSentieriTrackJob::QUEUE
-            && unserialize(end($job->chained))->appId === SardegnaSentieriImportService::IMPORT_APP_ID;
+            && $job->chainQueue === ImportSardegnaSentieriTrackJob::QUEUE;
     });
 }
 
