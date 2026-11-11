@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\ForestasTrackDetail;
 use App\Support\InclusivityScore;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -70,21 +71,29 @@ class EcTrack extends WmEcTrack
     ];
 
     /**
-     * Le colonne di Forestas ri-esposte piatte nel `properties` del GeoJSON, cosi' le chiavi
-     * spostate fuori da `properties` non spariscono dall'API (oc:8910). Le colonne vuote non
-     * compaiono. Lo legge `GeoJsonService::getModelAsGeojson()` del package.
+     * Il dettaglio pubblico della traccia con il `forestas` costruito in uscita
+     * (`ForestasTrackDetail`, oc:8959) al posto di quello salvato nel DB, che ha anche id di Drupal
+     * e chiavi interne dell'import; senza l'id del nodo Drupal.
      *
-     * @return array<string, mixed>
+     * Codice del registro, data del rilievo e inclusività stanno dentro `forestas` e non più piatti
+     * in `properties` («i dati propri di Forestas restano sotto forestas»): per questo non c'è più
+     * `geojsonFlatProperties()`, che li ri-esponeva fuori (oc:8910) e che il file su AWS non ha mai
+     * usato finché `EC_TRACK_MODEL` puntava al modello del package.
      */
-    public function geojsonFlatProperties(): array
+    public function getDetailGeojson(): ?array
     {
-        return array_filter([
-            'forestas_registry_code' => $this->forestas_registry_code,
-            'forestas_survey_date' => $this->forestas_survey_date?->format('Y-m-d'),
-            'forestas_inclusivity_physical' => $this->forestas_inclusivity_physical,
-            'forestas_inclusivity_aids' => $this->forestas_inclusivity_aids,
-            'forestas_inclusivity_digital' => $this->forestas_inclusivity_digital,
-        ], fn ($value) => $value !== null);
+        $geojson = parent::getDetailGeojson();
+        if (! is_array($geojson) || ! isset($geojson['properties']) || ! is_array($geojson['properties'])) {
+            return $geojson;
+        }
+
+        $forestas = ForestasTrackDetail::build($this);
+        // Vuoto resta un oggetto: un array PHP vuoto diventerebbe `[]` in JSON.
+        $geojson['properties']['forestas'] = $forestas === [] ? new \stdClass : $forestas;
+        // L'id del nodo Drupal serve all'import e a Nova, non al frontend: Drupal verrà spento.
+        unset($geojson['properties']['sardegnasentieri_id']);
+
+        return $geojson;
     }
 
     /**
