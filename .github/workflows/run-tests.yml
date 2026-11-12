@@ -65,6 +65,12 @@ jobs:
         run: php artisan config:clear
       - name: Optimize
         run: php artisan optimize
+      # `optimize` qui sopra verifica che la cache dell'applicazione si costruisca, ma
+      # congela la configurazione del .env di deploy (Telescope acceso, cache su
+      # database, nessun segreto JWT): lasciata li', i test la userebbero al posto di
+      # phpunit.xml e .env.testing. Si toglie prima di lanciarli.
+      - name: Clear caches before tests
+        run: php artisan optimize:clear
       - name: Prepare Log File
         run: mkdir -p storage/logs && touch storage/logs/test.log
       - name: Laravel Tests
