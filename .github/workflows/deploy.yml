@@ -1,0 +1,52 @@
+name: Deploy
+
+# Il deploy su un ambiente, chiamato da deploy-dev.yml e deploy-uat.yml. Si collega
+# al server via SSH e fa, sull'host, quello che prima si faceva a mano:
+#   git pull del branch, wm-package, scripts/deploy.sh nel container PHP, e
+#   scripts/wordpress-up.sh solo se il puntatore di wp-forestas e' cambiato.
+#
+# Ogni ambiente e' un environment di GitHub (Settings -> Environments) con:
+#   secret   SSH_HOST, SSH_USER, SSH_KEY (chiave privata di deploy)
+#   variabile APP_NAME (forestasdev, forestasuat), da cui i nomi dei container
+# L'environment `uat` ha in piu' l'approvazione obbligatoria (Required reviewers).
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy su ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_NAME: ${{ vars.APP_NAME }}
+          BRANCH: ${{ inputs.branch }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: APP_NAME,BRANCH
+          script: |
+            set -e
+            cd /var/www/html/forestas
+            WP_BEFORE=$(git rev-parse HEAD:wp-forestas)
+            git pull --ff-only origin "$BRANCH"
+            git submodule update --init wm-package
+            WP_AFTER=$(git rev-parse HEAD:wp-forestas)
+            git log --oneline -1
+            docker exec "php-$APP_NAME" bash scripts/deploy.sh
+            if [ "$WP_BEFORE" != "$WP_AFTER" ]; then
+              echo "Puntatore di wp-forestas cambiato: aggiorno WordPress"
+              git submodule update --init wp-forestas
+              bash scripts/wordpress-up.sh
+            fi

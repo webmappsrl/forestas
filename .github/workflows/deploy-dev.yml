@@ -1,0 +1,23 @@
+name: Deploy dev
+
+# A ogni push su develop: i test, poi il deploy su dev.forestas se passano.
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/run-tests.yml
+    secrets: inherit
+  deploy:
+    needs: [tests]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: dev
+      branch: develop
+    secrets: inherit
