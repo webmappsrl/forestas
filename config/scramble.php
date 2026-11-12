@@ -52,7 +52,8 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        'description' => <<<'MARKDOWN'
+        // {APP_URL} diventa l'indirizzo dell'ambiente su cui gira la pagina (locale, dev, collaudo).
+        'description' => str_replace('{APP_URL}', rtrim((string) env('APP_URL', ''), '/'), <<<'MARKDOWN'
         API di integrazione tra il **Catasto Sentieri** di Forestas e lo **Sportello Unico Sentieri** (SUS)
         della Regione Sardegna.
 
@@ -89,13 +90,165 @@ return [
         4. `GET {BASE_URL}/trail-applications/{id}` — legge a che punto e' la domanda, i dati tecnici
            e, a domanda approvata, il numero del sentiero.
 
-        `{BASE_URL}` e' `https://<dominio>/api/v1/sus`, dove il dominio e' quello su cui questa
-        documentazione e' pubblicata.
+        `{BASE_URL}` e' `{APP_URL}/api/v1/sus`.
 
         **Le chiamate che modificano una domanda rispondono solo com'e' andata l'azione; per leggerla
         c'e' una sola chiamata, la 4.** Non cambia nulla e si puo' ripetere quante volte si vuole: e'
         quella da usare per seguire una domanda nel tempo. Il numero del sentiero compare li', e solo
         a domanda approvata: durante l'istruttoria puo' ancora cambiare.
+
+        ## Come avviene la comunicazione, passo per passo
+
+        Il SUS chiama e il Catasto risponde: il Catasto non chiama mai il SUS. Per sapere come
+        procede una domanda dopo la trasmissione, il SUS la rilegge con la chiamata 4.
+
+        ```mermaid
+        sequenceDiagram
+            autonumber
+            participant SUS as SUS (portale della Regione)
+            participant API as Catasto Sentieri (queste API)
+            participant FOR as Istruttore Forestas
+
+            SUS->>API: POST /auth/login con le credenziali del client
+            API-->>SUS: 200 access_token, valido 60 minuti
+
+            Note over SUS,API: Fase 1 - creazione della domanda
+            SUS->>API: POST /trail-applications con i dati del modulo e il file del tracciato
+            alt modulo valido e tracciato leggibile
+                API-->>SUS: 201 id, dem_data, dem_status
+                Note right of API: la domanda nasce in compilazione (under_compilation)<br/>con il numero del sentiero già riservato, non mostrato
+            else modulo non valido o tracciato illeggibile
+                API-->>SUS: 422 errori campo per campo, nessuna domanda creata
+            end
+
+            Note over SUS,API: Fase 2 - allegati, uno per chiamata
+            loop per ogni documento e fotografia
+                SUS->>API: POST /trail-applications/id/attachments
+                API-->>SUS: 201 collection e count
+            end
+
+            Note over SUS,API: Fase 3 - trasmissione
+            SUS->>API: POST /trail-applications/id/confirm
+            alt fascicolo completo
+                API-->>SUS: 200 status under_review, already_confirmed false
+                Note right of API: da qui la domanda non accetta più allegati
+            else manca qualcosa
+                API-->>SUS: 422 error e missing (campi e allegati mancanti)
+                Note right of API: la domanda resta in compilazione:<br/>si completa e si richiama confirm
+            end
+
+            Note over API,FOR: Fase 4 - istruttoria, fuori da queste API
+            FOR->>API: approva o respinge la domanda
+
+            Note over SUS,API: Fase 5 - lettura dello stato, ripetibile
+            loop finché serve seguire la domanda
+                SUS->>API: GET /trail-applications/id
+                API-->>SUS: 200 status, dem_data, dem_status, code solo se approvata, rejection_reason solo se respinta
+            end
+        ```
+
+        | Passo | Il SUS chiede | Il Catasto risponde |
+        |---|---|---|
+        | Accesso | `POST /auth/login` | `200` con il token; alla scadenza si rinnova con `POST /auth/refresh` |
+        | 1. Creazione | `POST /trail-applications` con i dati del modulo e il file del tracciato | `201` con `id`, `dem_data` e `dem_status`. Se il calcolo dei dati tecnici non e' ancora pronto, `dem_status` e' `processing` e i dati si leggono dopo con la chiamata 4. Con un modulo non valido, `422` con gli errori campo per campo, e la domanda non viene creata |
+        | 2. Allegati | `POST /trail-applications/{id}/attachments`, un file per chiamata | `201` con la `collection` e quanti file contiene. Un documento caricato di nuovo sostituisce il precedente. Dopo la trasmissione, `409` |
+        | 3. Trasmissione | `POST /trail-applications/{id}/confirm` | `200` con `status` `under_review`. Se manca qualcosa, `422` con `missing`, e la domanda resta in compilazione. Ripetuta su una domanda gia' trasmessa risponde di nuovo `200`, con `already_confirmed` a `true` |
+        | 4. Istruttoria | — | L'istruttore Forestas approva o respinge la domanda nel Catasto: non passa da queste API |
+        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+
+        ## Gli allegati
+
+        Si caricano con la chiamata 2, uno per chiamata, indicando in `collection` dove va il file.
+        La traccia non e' fra questi: viaggia con la creazione, nel campo `geometry`.
+
+        | Campo del format | `collection` | Formati ammessi dal format | Serve per trasmettere |
+        |---|---|---|---|
+        | 67 — Relazione descrittiva | `report` | solo PDF | si' |
+        | 68 — Traccia GPS | — (si manda con la creazione, in `geometry`) | GPX o GeoJSON | si' |
+        | 69 — Tabella dati sentiero | `trail_data_sheet` | solo ZIP | si' |
+        | 70 — Documentazione fotografica | `photos` | immagini, da 1 a 5 | si', almeno una |
+        | 71 — Eventuali autorizzazioni | `authorizations` | PDF oppure ZIP | no |
+        | 72 — Piano di manutenzione | `maintenance_plan` | PDF oppure ZIP | si' |
+
+        Il limite del format e' di 5 MB per file. Un documento caricato di nuovo nella stessa
+        `collection` sostituisce il precedente; le fotografie invece si sommano, fino a cinque, e una
+        fotografia identica a una gia' caricata non viene contata due volte.
+
+        **I formati e il limite di 5 MB il Catasto oggi non li controlla ancora**: accetta qualunque
+        file. Vanno rispettati comunque, perche' il controllo verra' aggiunto e da quel momento un file
+        fuori formato sara' rifiutato.
+
+        ## I campi che diventano obbligatori
+
+        Alcuni campi sono obbligatori solo in base al valore di un altro. Se mancano, la creazione
+        risponde `422` indicando il campo:
+
+        | Se... | ...allora sono obbligatori |
+        |---|---|
+        | `soggetto_gestore` (campo 47) e' `third_party` | `soggetto_gestore_other` (48) |
+        | `soggetto_rilevatore` (campo 49) e' `other_surveyor` | `soggetto_rilevatore_other` (50) e `soggetto_rilevatore_email` (51) |
+        | `soggetto_manutentore` (campo 53) e' `other_legal_entity` | `soggetto_manutentore_other` (54) e `soggetto_manutentore_cf` (55) |
+        | `soggetto_custode_presente` (campo 57) e' `true` | `soggetto_custode` (58) |
+
+        ## Un esempio completo
+
+        Le stesse chiamate del diagramma, con `curl`. I valori sono di prova; `{BASE_URL}` e' quello
+        indicato sopra. Le richieste con file vanno in `multipart/form-data` (l'opzione `-F` di
+        `curl`): i campi strutturati, come `activities` e `difficulty`, viaggiano come stringa JSON.
+
+        ```bash
+        BASE_URL={APP_URL}/api/v1/sus
+
+        # Accesso: il token vale 60 minuti
+        TOKEN=$(curl -s -X POST "$BASE_URL/auth/login" -H 'Accept: application/json' \
+          -F email=<email del client> -F password=<password del client> | jq -r .access_token)
+
+        # 1. Creazione: risponde 201 con id, dem_data e dem_status
+        curl -X POST "$BASE_URL/trail-applications" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F name='Sentiero del Monte Arcosu' \
+          -F from='Case Marganai' -F to='Punta Perda Liana' \
+          -F distance=12.5 -F ascent=640 \
+          -F duration_forward=240 -F duration_backward=200 \
+          -F activities='["hiking","mtb"]' \
+          -F difficulty='{"hiking":"EE"}' \
+          -F existing_signage=good_condition \
+          -F proposed_managing_municipalities='["Domusnovas"]' \
+          -F municipality_email=protocollo@comune.example.it \
+          -F soggetto_gestore=forestas -F soggetto_rilevatore=applicant \
+          -F soggetto_manutentore=forestas -F soggetto_custode_presente=false \
+          -F last_survey_date=2026-10-20 -F maintenance_frequency_months=12 \
+          -F geometry=@tracciato.gpx
+
+        # 2. Allegati: uno per chiamata, ciascuno risponde 201
+        curl -X POST "$BASE_URL/trail-applications/42/attachments" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F collection=report -F file=@relazione.pdf
+        curl -X POST "$BASE_URL/trail-applications/42/attachments" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F collection=trail_data_sheet -F file=@tabella-dati.zip
+        curl -X POST "$BASE_URL/trail-applications/42/attachments" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F collection=photos -F file=@foto-1.jpg
+        curl -X POST "$BASE_URL/trail-applications/42/attachments" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F collection=maintenance_plan -F file=@piano-manutenzione.pdf
+
+        # 3. Trasmissione: 200 se completa, 422 con l'elenco di cio' che manca
+        curl -X POST "$BASE_URL/trail-applications/42/confirm" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json'
+
+        # 5. Lettura: si puo' ripetere quante volte serve
+        curl "$BASE_URL/trail-applications/42" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json'
+        ```
+
+        `42` sta per l'`id` restituito dalla creazione. Il pulsante «Prova una domanda completa», in
+        alto a destra in questa pagina, esegue la creazione con gli stessi valori.
+
+        **La specifica completa in formato OpenAPI** e' qui: [{APP_URL}/docs/api/sus.json]({APP_URL}/docs/api/sus.json). Si importa
+        in Postman o Insomnia per avere tutte le chiamate pronte, oppure si usa per generare il codice
+        del client.
 
         ### Le percorribilita' hanno nomi diversi da quelli del format
 
@@ -143,8 +296,7 @@ return [
         ## Ambienti
 
         Le prove di connessione si effettuano sull'ambiente di collaudo (UAT), con credenziali distinte
-        da quelle di esercizio. L'URL di base e' quello del dominio su cui questa documentazione e'
-        pubblicata.
+        da quelle di esercizio. L'URL di base e' `{APP_URL}/api/v1/sus`.
 
         ### Il collaudo si azzera ogni notte
 
@@ -152,7 +304,17 @@ return [
         da capo, e le domande create vengono cancellate.** Una domanda creata il pomeriggio la
         mattina dopo non esiste piu': le chiamate sul suo `id` rispondono `404`. Una prova va quindi
         svolta per intero — creazione, allegati, conferma — nella stessa giornata.
-        MARKDOWN,
+        MARKDOWN.((bool) env('SUS_TEST_TOOLS_ENABLED', false) ? <<<'MARKDOWN'
+
+
+        ### Approvare o respingere una domanda per prova
+
+        Su questo ambiente la pagina ha, sotto «Prova una domanda completa», due pulsanti: **Approva**
+        e **Respingi**. Decidono una domanda trasmessa (`under_review`) come farebbe l'istruttore
+        Forestas, cosi' si possono provare da soli tutti gli esiti della chiamata 4 — il numero del
+        sentiero a domanda approvata, il motivo a domanda respinta — e il `409` di una conferma fatta
+        dopo la decisione. **Non fanno parte di queste API** e non esistono in esercizio.
+        MARKDOWN : '')),
     ],
 
     'ui' => [
