@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.5.0](https://github.com/webmappsrl/forestas/compare/v1.4.0...v1.5.0) (2026-11-12)
+
+
+### Features
+
+* **ci:** deploy automatico su dev e sul collaudo con GitHub Actions ([#57](https://github.com/webmappsrl/forestas/issues/57)) ([6177f0d](https://github.com/webmappsrl/forestas/commit/6177f0d30a9e843603f999b1da7e2fa36fb156d7))
+* **oc:8959:** dati di Forestas nel dettaglio della traccia ([#51](https://github.com/webmappsrl/forestas/issues/51)) ([0598c96](https://github.com/webmappsrl/forestas/commit/0598c9641b70d74867650a4b9f6664cc4eba7b3a))
+* **oc:8960:** colonna api_data e stato in compilazione sulle istanze ([#46](https://github.com/webmappsrl/forestas/issues/46)) ([9719589](https://github.com/webmappsrl/forestas/commit/971958968456e55d42e350a9db9aa59d3de176d8))
+* **oc:8968:** il canale SUS monta le operazioni del fascicolo ([#52](https://github.com/webmappsrl/forestas/issues/52)) ([150b6cf](https://github.com/webmappsrl/forestas/commit/150b6cf1861a47047ab5180dd9cba99a19f00aeb))
+* **sus:** documentazione per chi integra e pulsanti di prova per approvare o respingere ([#53](https://github.com/webmappsrl/forestas/issues/53)) ([4440a32](https://github.com/webmappsrl/forestas/commit/4440a32d27ed3cf50d789022f68d364cb2e544c5))
+* **sus:** strumenti di prova completi e tracciato scaricabile nella pagina delle API ([#54](https://github.com/webmappsrl/forestas/issues/54)) ([4041098](https://github.com/webmappsrl/forestas/commit/4041098aacea7fea44609b0ef4b2dcadead5cde9))
+
+
+### Bug Fixes
+
+* **ci:** database dei test e permessi del controllo dello stile ([#56](https://github.com/webmappsrl/forestas/issues/56)) ([c07c54a](https://github.com/webmappsrl/forestas/commit/c07c54a96d790a208d3fa6e2e908b26039305393))
+* **deploy:** deploy_dev.sh aggiorna solo wm-package, prima della manutenzione ([0c63c5d](https://github.com/webmappsrl/forestas/commit/0c63c5de56020a57f0e1baa3e28a148bc565c553))
+
+
+### Miscellaneous Chores
+
+* **oc:8952:** filtro «Percorribilità» della ricerca, puntatore e documentazione ([#50](https://github.com/webmappsrl/forestas/issues/50)) ([d0aaf73](https://github.com/webmappsrl/forestas/commit/d0aaf73d69dd586376029785b919ed567f6a89ab))
+* **oc:8952:** puntatore di wp-forestas con i documenti della messa in opera su dev ([#49](https://github.com/webmappsrl/forestas/issues/49)) ([f12c8d3](https://github.com/webmappsrl/forestas/commit/f12c8d3a9617923e03d0845308849c282632c3ff))
+* **oc:8952:** puntatore di wp-forestas con la pagina di ricerca unica ([#48](https://github.com/webmappsrl/forestas/issues/48)) ([121d167](https://github.com/webmappsrl/forestas/commit/121d1673b4d922ba681342eb6b68538ab8c79f03))
+
 ## [1.4.0](https://github.com/webmappsrl/forestas/compare/v1.3.0...v1.4.0) (2026-11-05)
 
 
