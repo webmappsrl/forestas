@@ -147,8 +147,8 @@ class AppServiceProvider extends ServiceProvider
             // dentro l'`allOf` — e si lascia stare tutto il resto.
             foreach ($openApi->paths as $path) {
                 foreach ($path->operations as $operation) {
-                    foreach ($operation->requestBodyObject?->content ?? [] as $schema) {
-                        if (! $schema instanceof Schema || ! $schema->type instanceof AllOf) {
+                    foreach ($operation->requestBodyObject->content ?? [] as $schema) {
+                        if (! $schema->type instanceof AllOf) {
                             continue;
                         }
 
@@ -177,8 +177,8 @@ class AppServiceProvider extends ServiceProvider
 
             foreach ($openApi->paths as $path) {
                 foreach ($path->operations as $operation) {
-                    foreach ($operation->requestBodyObject?->content ?? [] as $schema) {
-                        if (! $schema instanceof Schema || ! $schema->type instanceof ObjectType) {
+                    foreach ($operation->requestBodyObject->content ?? [] as $schema) {
+                        if (! $schema->type instanceof ObjectType) {
                             continue;
                         }
 
@@ -204,13 +204,13 @@ class AppServiceProvider extends ServiceProvider
 
             $errorBody = fn (string $message) => Schema::fromType(
                 (new ObjectType)
-                    ->addProperty('error', (new StringType)->example($message))
+                    ->addProperty('error', (new StringType)->examples([$message]))
                     ->setRequired(['error'])
             );
 
             $messageBody = fn (string $message) => Schema::fromType(
                 (new ObjectType)
-                    ->addProperty('message', (new StringType)->example($message))
+                    ->addProperty('message', (new StringType)->examples([$message]))
                     ->setRequired(['message'])
             );
 

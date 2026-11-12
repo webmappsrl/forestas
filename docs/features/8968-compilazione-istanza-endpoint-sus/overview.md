@@ -92,4 +92,5 @@ Ricavati da git sul branch, esclusa la cartella della feature.
 - **Traduzioni** — `lang/en.json`, `lang/it.json`, `lang/it/validation.php`.
 - **Test** — `tests/Feature/Sus/SusApplicationRoutesTest.php`,
   `tests/Feature/Sus/SusRequestLogTest.php`.
+- **Documentazione** — `docs/knowledge/client-sus.md`.
 - **Altro** — `CLAUDE.md` e il puntatore del submodule `wm-package`.

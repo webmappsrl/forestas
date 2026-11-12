@@ -1,7 +1,9 @@
 # Il client SUS
 
-Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico Sentieri. Solo
-scaffolding: nessuna logica di business. (oc:8333)
+Branch `/api/v1/sus/*` autenticato JWT per l'integrazione con lo Sportello Unico dei Servizi
+(oc:8333). Da oc:8968 porta le quattro operazioni con cui il SUS presenta e rilegge una domanda di
+accatastamento; le operazioni stanno nel package, qui ci sono rotte, client e middleware (vedi
+[operazioni-del-fascicolo-e-canale-dell-ente.md](../../wm-package/docs/knowledge/operazioni-del-fascicolo-e-canale-dell-ente.md)).
 
 ## Stato attuale
 
@@ -13,8 +15,12 @@ che wm-package aggiungerà al gruppo `auth:api` restano escluse per costruzione.
 vivono **dentro** quel prefisso (`api/v1/sus/auth/login`, `api/v1/sus/auth/refresh`), quindi il
 client non ha mai bisogno di uscirne; le route di autenticazione del package rispondono 403.
 
-Verificato con `php artisan route:list --path=sus` (2026-09-12): login, refresh, ping e la
-documentazione su `docs/api/sus`.
+Verificato con `php artisan route:list --path=api/v1/sus` (2026-11-12): login, refresh, ping e le
+quattro rotte delle domande — creazione, allegati, conferma, lettura — più la documentazione su
+`docs/api/sus`. Tutto ciò che sta dopo il login richiede il ruolo `Sus`, `ping` e `refresh`
+compresi, e le rotte delle domande condividono un throttle di 30 chiamate al minuto. Chi non è il
+client riceve la stessa risposta su ogni rotta: `401` senza un token valido, `403` con il token di
+un altro utente, mai un `404` che dica se una domanda esiste (`bootstrap/app.php`).
 
 ### Creazione e rotazione si fanno da Nova
 
