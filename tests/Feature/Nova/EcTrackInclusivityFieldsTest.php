@@ -2,6 +2,7 @@
 
 use App\Models\EcPoi;
 use App\Models\EcTrack;
+use App\Models\User;
 use App\Nova\EcPoi as EcPoiResource;
 use App\Nova\EcTrack as EcTrackResource;
 use App\Services\Import\SardegnaSentieriImportService;
@@ -11,6 +12,7 @@ use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 uses(RefreshDatabase::class);
 
@@ -210,12 +212,12 @@ it('valida i tre valori lato server, non solo nel browser (oc:8910)', function (
 });
 
 it('l_endpoint Nova rifiuta un valore fuori scala (oc:8910)', function () {
-    $track = \Wm\WmPackage\Models\EcTrack::factory()->createQuietly([
+    $track = Wm\WmPackage\Models\EcTrack::factory()->createQuietly([
         'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
         'properties' => [],
     ]);
-    \Wm\WmPackage\Services\RolesAndPermissionsService::seedDatabase();
-    $user = \App\Models\User::factory()->create();
+    RolesAndPermissionsService::seedDatabase();
+    $user = User::factory()->create();
     $user->assignRole('Administrator');
 
     $this->actingAs($user)

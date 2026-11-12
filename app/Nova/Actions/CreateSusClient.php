@@ -3,6 +3,7 @@
 namespace App\Nova\Actions;
 
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Actions\ActionResponse;
 use Laravel\Nova\Fields\ActionFields;
+use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -68,7 +70,7 @@ class CreateSusClient extends Action
     }
 
     /**
-     * @return array<int, \Laravel\Nova\Fields\Field>
+     * @return array<int, Field>
      */
     public function fields(NovaRequest $request): array
     {
@@ -89,7 +91,7 @@ class CreateSusClient extends Action
         ];
     }
 
-    public function authorizedToSee(\Illuminate\Http\Request $request): bool
+    public function authorizedToSee(Request $request): bool
     {
         return $request->user()?->hasRole('Administrator') ?? false;
     }

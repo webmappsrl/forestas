@@ -7,6 +7,7 @@ namespace App\Nova\Actions;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Collection;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Fields\Select;
@@ -24,7 +25,7 @@ class ImportTaxonomyWhereFromLayersAction extends Action
         return __('Import TaxonomyWhere (Cadastral areas)');
     }
 
-    public function handle(ActionFields $fields, \Illuminate\Support\Collection $models): mixed
+    public function handle(ActionFields $fields, Collection $models): mixed
     {
         try {
             $result = app(TaxonomyWhereLayersImportService::class)->import(

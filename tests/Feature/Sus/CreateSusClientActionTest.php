@@ -3,7 +3,9 @@
 use App\Models\User;
 use App\Nova\Actions\CreateSusClient;
 use Illuminate\Support\Collection;
+use Laravel\Nova\Actions\ActionResponse;
 use Laravel\Nova\Fields\ActionFields;
+use Laravel\Nova\Http\Requests\NovaRequest;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -11,7 +13,7 @@ beforeEach(function () {
     Role::findOrCreate('Administrator', 'web');
 });
 
-function eseguiAzione(array $campi): Laravel\Nova\Actions\ActionResponse
+function eseguiAzione(array $campi): ActionResponse
 {
     $action = new CreateSusClient;
 
@@ -45,8 +47,8 @@ it('la password indicata permette il login sul branch SUS', function () {
 });
 
 it('suggerisce una password lunga e diversa a ogni apertura del form', function () {
-    $action = new App\Nova\Actions\CreateSusClient;
-    $richiesta = Laravel\Nova\Http\Requests\NovaRequest::create('/');
+    $action = new CreateSusClient;
+    $richiesta = NovaRequest::create('/');
 
     $suggerite = collect(range(1, 3))->map(function () use ($action, $richiesta) {
         $campo = collect($action->fields($richiesta))->firstWhere('attribute', 'password');
@@ -79,10 +81,10 @@ it('e visibile solo agli Administrator', function () {
 
     $action = new CreateSusClient;
 
-    $richiestaAdmin = Laravel\Nova\Http\Requests\NovaRequest::create('/');
+    $richiestaAdmin = NovaRequest::create('/');
     $richiestaAdmin->setUserResolver(fn () => $admin);
 
-    $richiestaEditor = Laravel\Nova\Http\Requests\NovaRequest::create('/');
+    $richiestaEditor = NovaRequest::create('/');
     $richiestaEditor->setUserResolver(fn () => $editor);
 
     expect($action->authorizedToSee($richiestaAdmin))->toBeTrue();
