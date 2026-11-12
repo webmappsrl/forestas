@@ -52,6 +52,7 @@ it('espone i dati di forestas con chiavi in inglese e senza le chiavi interne', 
         'created_at' => '2013-07-02 18:12:40',
         'updated_at' => '2024-03-20 15:58:28',
         'info_utili' => ['it' => ['<p>Segnaletica</p>']],
+        // Il roadbook salvato prima di oc:8959 non esce: è nei Blocchi Dettaglio.
         'roadbook' => ['it' => ['<p>Il percorso parte…</p>']],
         'video' => ['https://www.youtube.com/watch?v=abc'],
         // Interne o id di Drupal: non devono uscire.
@@ -71,7 +72,6 @@ it('espone i dati di forestas con chiavi in inglese e senza le chiavi interne', 
         'created_at' => '2013-07-02 18:12:40',
         'updated_at' => '2024-03-20 15:58:28',
         'useful_info' => ['it' => ['<p>Segnaletica</p>']],
-        'roadbook' => ['it' => ['<p>Il percorso parte…</p>']],
         'videos' => [['url' => 'https://www.youtube.com/watch?v=abc', 'title' => null]],
     ]);
 });
@@ -277,4 +277,17 @@ it('porta i link per scaricare la traccia in GeoJSON, GPX e KML', function () {
         'gpx' => route('default.api.ec.track.download.gpx', ['id' => $track->id]),
         'kml' => route('default.api.ec.track.download.kml', ['id' => $track->id]),
     ]);
+});
+
+it('porta nel file su AWS i Blocchi Dettaglio con il roadbook', function () {
+    $track = forestasTrack();
+    $blocks = [['box_type' => 'info', 'items' => [['title' => ['it' => 'Tappa 1'], 'content' => ['it' => '<p>Lasciata Nuxis…</p>']]]]];
+    $track->forceFill(['properties' => [...$track->properties, 'config_detail' => $blocks]])->saveQuietly();
+
+    $class = config('wm-package.ec_track_model');
+    $file = json_decode((new EcTrackResource($class::find($track->id)))->toJson(), true)['properties'];
+
+    // toEqual: jsonb riordina le chiavi.
+    expect($file['config_detail'])->toEqual($blocks)
+        ->and($file['forestas'])->not->toHaveKey('roadbook');
 });

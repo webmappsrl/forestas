@@ -108,6 +108,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             'data_rilievo' => $this->dataRilievo($record),
             'info_utili' => $this->accumulatedTexts($record, 'field_info_utili'),
             'roadbook' => $this->accumulatedTexts($record, 'field_roadbook'),
+            'roadbook_stages' => $this->ownTexts($record, 'field_roadbook'),
             'partenza' => $this->single($record, 'field_partenza', 'target_id'),
             'arrivo' => $this->single($record, 'field_arrivo', 'target_id'),
             'poi_correlati' => $this->references($record, 'field_poi_correlati'),
@@ -453,6 +454,31 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             }
             if ($accumulated !== []) {
                 $result[$key] = $accumulated;
+            }
+        }
+
+        return $result === [] ? null : $result;
+    }
+
+    /**
+     * I valori di un campo multiplo e tradotto propri di ogni lingua, senza accumularli come
+     * `accumulatedTexts()`: ogni lingua ha solo i suoi, e una lingua senza valori propri non c'è
+     * (sentiero 1266: l'inglese del roadbook non ha testi suoi). Serve alle tappe del roadbook nei
+     * Blocchi Dettaglio, dove la tappa N di una lingua è il suo paragrafo N (oc:8959).
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, list<string>>|null
+     */
+    private function ownTexts(array $record, string $field): ?array
+    {
+        $result = [];
+        foreach ($this->languages($record) as $key => $langcode) {
+            $values = [];
+            foreach ($this->items($record, $field, $langcode) as $item) {
+                $values[] = (string) $item['value'];
+            }
+            if ($values !== []) {
+                $result[$key] = $values;
             }
         }
 

@@ -14,7 +14,6 @@ da `App\Models\EcTrack::getDetailGeojson()`. Le tassonomie stanno invece in
   "created_at": "2013-07-02 18:12:40",
   "updated_at": "2024-03-20 15:58:28",
   "useful_info": {"it": ["…"], "en": ["…"]},
-  "roadbook": {"it": ["…"], "en": ["…"]},
   "videos": [
     {"url": "https://www.youtube.com/watch?v=…", "title": null},
     {"url": "https://…/media/74822/video.mp4", "title": "Il percorso"}
@@ -40,7 +39,7 @@ da `App\Models\EcTrack::getDetailGeojson()`. Le tassonomie stanno invece in
 | Chiave | Fonte |
 |---|---|
 | `url`, `created_at`, `updated_at` | `properties.forestas` salvato dall'import (pagina e date di Drupal) |
-| `useful_info`, `roadbook` | `properties.forestas.info_utili` e `roadbook` (traducibili, lista di testi per lingua) |
+| `useful_info` | `properties.forestas.info_utili` (traducibile, lista di testi per lingua) |
 | `videos` | `properties.forestas.video` (YouTube, `title` nullo) e la collection `videos` della media library |
 | `attachments` | collection `attachments` della media library; `title` = `custom_properties.sardegnasentieri_title`, `null` se manca |
 | `registry_code`, `survey_date` | colonne `forestas_registry_code`, `forestas_survey_date` |
@@ -64,6 +63,16 @@ uno. L'import non lo accoda: salva le tracce senza eventi, scarica le foto dentr
 
 I `related_pois` del dettaglio (chiave del package, da `ec_poi_ec_track`) sono i POI entro 1 km dalla
 traccia, dal più vicino, calcolati a fine import: vedi `dettaglio-del-poi-dati-forestas.md`.
+
+**Il roadbook sta nei Blocchi Dettaglio**, non in `forestas` (oc:8959): `properties.config_detail` (campo
+Nova «Detail Blocks» del package) ha un blocco `info` con una riga per tappa, titolo «Tappa N» e il
+paragrafo di Drupal come testo, come lo mostra sardegnasentieri.it. Lo scrive l'import
+(`App\Support\RoadbookBlock`) dai paragrafi propri di ogni lingua (`roadbook_stages` della fonte): titolo
+e testo di una tappa escono solo nelle lingue in cui ha un testo. È uno specchio di Drupal: l'import lo
+riscrive quando rilegge la traccia, gli altri blocchi aggiunti in Nova restano. Il blocco si riconosce
+dai titoli («Tappa N» o la traduzione), perché il package al salvataggio in Nova tiene solo `box_type` e
+`items`; un blocco creato a mano con righe «Tappa N» sarebbe preso per il roadbook. Esce nel file su AWS
+come `config_detail`.
 
 Didascalia, autore e credits delle foto non stanno in `forestas`: escono con le foto
 (`feature_image`, `image_gallery`), dal package (`wm-package/docs/knowledge/media-e-avatar.md`).
@@ -132,3 +141,6 @@ del package è `App\Models\EcTrack`, come su camminiditalia e maphub; la regola 
   una lista senza id, perché `JsonResource::filter()` rinumera gli array con chiavi tutte numeriche;
   e allo scrum del 2026-11-11 si è deciso di portare i crediti con le foto.
 - **Enti con id, nome e ruoli** (oc:8959, superata): il nome lo dà l'API degli enti.
+- **`forestas.roadbook`, lista di paragrafi per lingua** (oc:8959, superata): tolto da DB, dettaglio e
+  Nova; il roadbook è nei Blocchi Dettaglio (scrum del 2026-11-10). La lista ripeteva in ogni lingua i
+  paragrafi delle precedenti, come le vecchie API.

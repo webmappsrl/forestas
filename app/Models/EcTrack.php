@@ -52,7 +52,6 @@ class EcTrack extends WmEcTrack
         parent::__construct($attributes);
         $this->translatable = array_merge($this->translatable ?? [], [
             'properties->forestas->info_utili',
-            'properties->forestas->roadbook',
         ]);
     }
 

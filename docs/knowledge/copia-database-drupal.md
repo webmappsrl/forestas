@@ -379,6 +379,9 @@ Regole non documentate del modulo `api_webmapp`, ricavate confrontando le rispos
   ignoravano (sentiero 3636: `name.it` è il titolo inglese).
 - **Testi multipli tradotti accumulati** (`info_utili`, `roadbook`, `come_arrivare`): la seconda
   lingua riporta i valori della prima seguiti dai propri, anche quando non ne ha (sentiero 164).
+  Per il roadbook la fonte dà anche `roadbook_stages`, con i soli paragrafi propri di ogni lingua
+  (`ownTexts()`): da lì nascono le tappe dei Blocchi Dettaglio (oc:8959). Il `roadbook` accumulato
+  resta solo per il confronto con le API (`compare-source`).
 - **Riferimenti dalla lingua originale**: negli itinerari `zona_geografica` e
   `riferimento_operatori_guid` sono tradotti, e le API leggevano solo l'originale.
 - **`field_percorso` è una `FeatureCollection`**: le API davano la geometria della prima feature.

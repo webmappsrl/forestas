@@ -378,6 +378,55 @@ it('conserva il manual_data inserito da un operatore quando reimporta il sentier
     expect(EcTrack::first()->properties['manual_data'])->toEqual($operatorManual);
 });
 
+it('scrive il roadbook come blocco dei Blocchi Dettaglio e non più in forestas (oc:8959)', function () {
+    $client = mockSardegnaSentieriSource();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'gpx' => ['http://example.com/track.gpx'],
+        'roadbook' => ['it' => ['<p>Uno</p>', '<p>Due</p>'], 'en' => ['<p>Uno</p>', '<p>Due</p>', '<p>One</p>']],
+        'roadbook_stages' => ['it' => ['<p>Uno</p>', '<p>Due</p>'], 'en' => ['<p>One</p>']],
+    ]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    (makeServiceWith($client))->importTrack(75);
+
+    $properties = EcTrack::first()->properties;
+    expect($properties['forestas'])->not->toHaveKey('roadbook')
+        ->and($properties['config_detail'])->toHaveCount(1)
+        ->and($properties['config_detail'][0]['items'])->toEqual([
+            ['title' => ['it' => 'Tappa 1', 'en' => 'Stage 1'], 'content' => ['it' => '<p>Uno</p>', 'en' => '<p>One</p>']],
+            ['title' => ['it' => 'Tappa 2'], 'content' => ['it' => '<p>Due</p>']],
+        ]);
+});
+
+it('al reimport riscrive il blocco del roadbook e tiene quelli aggiunti in Nova (oc:8959)', function () {
+    $client = mockSardegnaSentieriSource();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'gpx' => ['http://example.com/track.gpx'],
+        'roadbook_stages' => ['it' => ['<p>Vecchio</p>']],
+    ]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    (makeServiceWith($client))->importTrack(75);
+
+    // Un blocco aggiunto a mano in Nova, dopo quello del roadbook.
+    $track = EcTrack::first();
+    $manual = ['box_type' => 'info', 'items' => [['title' => ['it' => 'Orari'], 'content' => ['it' => '<p>Sempre</p>']]]];
+    DB::table('ec_tracks')->where('id', $track->id)->update([
+        'properties' => DB::raw("jsonb_set(properties::jsonb, '{config_detail}', (properties::jsonb->'config_detail') || '".json_encode([$manual])."'::jsonb)::json"),
+    ]);
+
+    $client2 = mockSardegnaSentieriSource();
+    $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'roadbook_stages' => ['it' => ['<p>Nuovo</p>', '<p>Nuovo due</p>']],
+    ]]));
+    (makeServiceWith($client2))->importTrack(75);
+
+    $config = EcTrack::first()->properties['config_detail'];
+    expect($config)->toHaveCount(2)
+        ->and($config[0]['items'])->toHaveCount(2)
+        ->and($config[0]['items'][0]['content'])->toEqual(['it' => '<p>Nuovo</p>'])
+        ->and($config[1])->toEqual($manual);
+});
+
 // ---------------------------------------------------------------------------
 // GPX parsing — namespace (fix P2)
 // ---------------------------------------------------------------------------

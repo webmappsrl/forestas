@@ -17,7 +17,8 @@ use App\Services\Import\SardegnaSentieriMediaSyncService;
  * `source_relations`, `zona_geografica`), il GPX di Drupal, che sparirà con il sito, e le chiavi
  * interne dell'import. Le chiavi vuote non escono.
  *
- * Il roadbook esce com'è: diventerà un blocco del dettaglio con un pezzo successivo. Didascalia,
+ * Il roadbook non sta qui: è nei Blocchi Dettaglio (`properties.config_detail`, `RoadbookBlock`),
+ * un blocco con una riga per tappa scritto dall'import. Didascalia,
  * autore e credits delle foto non stanno qui ma con le foto (`feature_image`, `image_gallery`):
  * li porta il package, dalle custom properties del media (`ImageCredits`, oc:8959).
  */
@@ -37,7 +38,6 @@ class ForestasTrackDetail
             'created_at' => $stored['created_at'] ?? null,
             'updated_at' => $stored['updated_at'] ?? null,
             'useful_info' => $stored['info_utili'] ?? null,
-            'roadbook' => $stored['roadbook'] ?? null,
             'videos' => [
                 ...ForestasDetailParts::remoteVideos($stored['video'] ?? []),
                 ...ForestasDetailParts::files($track, SardegnaSentieriMediaSyncService::VIDEOS_COLLECTION),
