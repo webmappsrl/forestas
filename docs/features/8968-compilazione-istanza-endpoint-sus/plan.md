@@ -1,4 +1,5 @@
 > Ticket: oc:8968
+> Stato: seguito; il piano è il Task 11 di quello del package, e le sue divergenze sono annotate nelle note del package
 
 # La compilazione di un'istanza: il piano della parte di forestas
 

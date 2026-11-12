@@ -132,4 +132,9 @@ Nessuna da annotare qui: lo shard non ha un piano proprio, e le divergenze del T
 
 ## Follow-up
 
-Nessuno.
+- **2026-11-12 — Il reset notturno rende il canale non collaudabile su UAT**, rischio dell'overview
+  ancora aperto alla chiusura: un'istanza creata il pomeriggio non esiste più la mattina dopo, e
+  Engineering riceve `404` su un id che gli abbiamo dato noi. *Destinazione proposta, da decidere
+  dal dev:* un ticket per chi rilascia, da chiudere prima di consegnare l'ambiente a Engineering,
+  collegato al tag 709. È lo stesso follow-up annotato nelle
+  [note del package](../../../wm-package/docs/features/8968-compilazione-istanza-endpoint-sus/notes.md#follow-up).
