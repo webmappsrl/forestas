@@ -7,7 +7,9 @@ name: Deploy
 #
 # Ogni ambiente e' un environment di GitHub (Settings -> Environments) con:
 #   secret   SSH_HOST, SSH_USER, SSH_KEY (chiave privata di deploy)
-#   variabile APP_NAME (forestasdev, forestasuat), da cui i nomi dei container
+#   variabili APP_NAME (forestasdev, forestasuat), da cui i nomi dei container, e
+#   APP_URL (https://forestas.dev.maphub.it, https://forestas.uat.maphub.it) per lo
+#   smoke test
 # L'environment `uat` ha in piu' l'approvazione obbligatoria (Required reviewers).
 
 on:
@@ -50,3 +52,12 @@ jobs:
               git submodule update --init wp-forestas
               bash scripts/wordpress-up.sh
             fi
+
+      # Smoke test: dopo il deploy il sito risponde. Un deploy riuscito su un sito che
+      # non risponde conta come fallito, e Slack lo dice.
+      - name: Wait for app to be ready
+        run: sleep 15
+      - name: Health check /up
+        run: curl --fail --max-time 30 --retry 3 --retry-delay 5 "${{ vars.APP_URL }}/up"
+      - name: Check /docs/api/sus
+        run: curl --fail --max-time 30 --retry 3 --retry-delay 5 -o /dev/null "${{ vars.APP_URL }}/docs/api/sus"

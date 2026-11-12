@@ -17,7 +17,12 @@ Il workflow riutilizzabile `deploy.yml` si collega al server via SSH e fa, sull'
 1. `git pull --ff-only` del branch e `git submodule update --init wm-package`;
 2. `scripts/deploy.sh` nel container `php-<APP_NAME>`: dipendenze, `migrate --force`, cache,
    riavvio di Horizon, con il sito in manutenzione solo durante quei passi;
-3. `scripts/wordpress-up.sh`, solo se il puntatore di `wp-forestas` e' cambiato.
+3. `scripts/wordpress-up.sh`, solo se il puntatore di `wp-forestas` e' cambiato;
+4. uno smoke test: `/up` e `/docs/api/sus` devono rispondere.
+
+Alla fine, riuscito o no, l'esito arriva nel canale Slack (`notify-slack.yml`, come su maphub):
+test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
+`SLACK_NOTIFICATIONS_ENABLED=false`.
 
 ## Cosa non fa, e va fatto a mano
 
@@ -35,8 +40,13 @@ La fa un admin del repo su GitHub, Settings, Environments, creando `dev` e `uat`
 
 - **secret** `SSH_HOST` (l'indirizzo del server), `SSH_USER` (`root`, lo stesso utente con cui
   si fa il deploy a mano) e `SSH_KEY` (la chiave privata di deploy);
-- **variabile** `APP_NAME`: `forestasdev` per dev, `forestasuat` per il collaudo;
+- **variabili** `APP_NAME` (`forestasdev`, `forestasuat`) e `APP_URL`
+  (`https://forestas.dev.maphub.it`, `https://forestas.uat.maphub.it`);
 - solo per `uat`, **Required reviewers**: chi approva il deploy sul collaudo.
+
+In piu', a livello di repo (Settings, Secrets and variables, Actions), il secret
+`SLACK_WEBHOOK_URL`: il webhook dell'app Slack che notifica i deploy, lo stesso di maphub se il
+canale e' lo stesso.
 
 La chiave di deploy e' una coppia generata apposta, senza passphrase, una per ambiente: la
 pubblica va in `/root/.ssh/authorized_keys` del server, la privata nel secret `SSH_KEY`. Non si

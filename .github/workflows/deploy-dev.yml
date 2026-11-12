@@ -21,3 +21,15 @@ jobs:
       environment: dev
       branch: develop
     secrets: inherit
+
+  notify:
+    name: Notify Slack
+    needs: [tests, deploy]
+    if: always() && vars.SLACK_NOTIFICATIONS_ENABLED != 'false'
+    uses: ./.github/workflows/notify-slack.yml
+    with:
+      env_name: DEV
+      tests_result: ${{ needs.tests.result }}
+      deploy_result: ${{ needs.deploy.result }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
