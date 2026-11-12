@@ -2,10 +2,13 @@
 
 Dev e UAT si aggiornano da soli con GitHub Actions:
 
-| Ambiente | Server | Parte con | Approvazione |
-|---|---|---|---|
-| dev | `dev.forestas`, branch `develop` | ogni push su `develop` (`deploy-dev.yml`) | no |
-| UAT | `uat.forestas`, branch `main` | ogni push su `main` (`deploy-uat.yml`) | si', da chi e' indicato nell'environment `uat` |
+| Ambiente | Server | Parte con |
+|---|---|---|
+| dev | `dev.forestas`, branch `develop` | ogni push su `develop` (`deploy-dev.yml`) |
+| UAT | `uat.forestas`, branch `main` | ogni push su `main` (`deploy-uat.yml`) |
+
+Nessuno dei due chiede un'approvazione: e' una scelta. Se servisse, si aggiunge
+all'environment su GitHub (Settings, Environments, Required reviewers) senza toccare i workflow.
 
 Prima del deploy girano i test (`run-tests.yml`): se falliscono il deploy non parte. Tutti e due
 si lanciano anche a mano, da GitHub, Actions, il workflow e «Run workflow».
@@ -28,8 +31,8 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
 
 - **Le colonne scritte nelle migration di creazione gia' eseguite.** La regola del repo e' «si
   modifica la create della tabella»: `migrate` non riesegue una migration gia' eseguita, quindi su
-  un database esistente quelle colonne vanno aggiunte a mano, prima del deploy. Su UAT il
-  momento giusto e' prima di approvare.
+  un database esistente quelle colonne vanno aggiunte a mano, prima del deploy: per UAT, prima
+  del merge su `main`, perche' il deploy parte da solo.
 - **I rilasci di WordPress con passi propri**, come `applica --conferma` e `pagine --conferma` di
   `wp-forestas/bin/wordpress-config.sh`: vedi [messa-in-opera-wordpress-uat.md](messa-in-opera-wordpress-uat.md).
 - **Le variabili nuove nei `.env`** dei server.
@@ -42,7 +45,6 @@ La fa un admin del repo su GitHub, Settings, Environments, creando `dev` e `uat`
   si fa il deploy a mano) e `SSH_KEY` (la chiave privata di deploy);
 - **variabili** `APP_NAME` (`forestasdev`, `forestasuat`) e `APP_URL`
   (`https://forestas.dev.maphub.it`, `https://forestas.uat.maphub.it`);
-- solo per `uat`, **Required reviewers**: chi approva il deploy su UAT.
 
 In piu', a livello di repo (Settings, Secrets and variables, Actions), il secret
 `SLACK_WEBHOOK_URL`: il webhook dell'app Slack che notifica i deploy, lo stesso di maphub se il

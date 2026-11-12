@@ -10,7 +10,6 @@ name: Deploy
 #   variabili APP_NAME (forestasdev, forestasuat), da cui i nomi dei container, e
 #   APP_URL (https://forestas.dev.maphub.it, https://forestas.uat.maphub.it) per lo
 #   smoke test
-# L'environment `uat` ha in piu' l'approvazione obbligatoria (Required reviewers).
 
 on:
   workflow_call:
