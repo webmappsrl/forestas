@@ -50,6 +50,10 @@ jobs:
         uses: ramsey/composer-install@v2
       - name: Generate key
         run: php artisan key:generate
+      # public/vendor/nova non e' versionato: senza, le pagine di Nova rispondono 500
+      # (manca mix-manifest.json) invece dello stato che i test si aspettano.
+      - name: Publish Nova assets
+        run: php artisan nova:publish --force
       # .env.testing non e' versionato (contiene chiavi): la CI se lo genera,
       # come fa scripts/install.sh sulle macchine dei dev.
       - name: Prepare testing env
