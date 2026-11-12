@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Providers;   
+namespace App\Providers;
 
 use App\Http\Controllers\Api\Sus\SusTestDecisionController;
 use App\Models\EcTrack;
