@@ -52,7 +52,7 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        // {APP_URL} diventa l'indirizzo dell'ambiente su cui gira la pagina (locale, dev, collaudo).
+        // {APP_URL} diventa l'indirizzo dell'ambiente su cui gira la pagina (locale, dev, UAT).
         'description' => str_replace('{APP_URL}', rtrim((string) env('APP_URL', ''), '/'), <<<'MARKDOWN'
         API di integrazione tra il **Catasto Sentieri** di Forestas e lo **Sportello Unico Sentieri** (SUS)
         della Regione Sardegna.
