@@ -30,5 +30,14 @@ jobs:
       - name: Install composer dependencies
         uses: ramsey/composer-install@v2
 
+      # Larastan avvia l'applicazione per risolvere le facade sulle classi vere
+      # (JWTAuth::fromUser, per esempio). Senza un .env con chiave e segreto JWT
+      # l'avvio non costruisce quei servizi, e PHPStan segnala metodi che esistono.
+      - name: Prepare env
+        run: |
+          cp .env-deploy .env
+          php artisan key:generate --quiet
+          php artisan jwt:secret --force --quiet
+
       - name: Run PHPStan
         run: ./vendor/bin/phpstan --error-format=github
