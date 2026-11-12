@@ -154,24 +154,19 @@
                 maintenance_frequency_months: '12',
             };
 
-            const SAMPLE_GPX = [
-                // La dichiarazione XML si compone a pezzi: scritta per intero,
-                // il suo segno di apertura aprirebbe un tag PHP dentro questa
-                // Blade, e la pagina andrebbe in errore di sintassi.
-                '<' + '?xml version="1.0" encoding="UTF-8"?' + '>',
-                '<gpx version="1.1" creator="docs" xmlns="http://www.topografix.com/GPX/1/1">',
-                '  <trk><name>Tracciato di prova</name><trkseg>',
-                '    <trkpt lat="39.3167" lon="8.6333"/>',
-                '    <trkpt lat="39.3200" lon="8.6400"/>',
-                '    <trkpt lat="39.3250" lon="8.6480"/>',
-                '  </trkseg></trk>',
-                '</gpx>',
-            ].join('\n');
+            // Il tracciato e' lo stesso file che la pagina offre da scaricare
+            // (public/docs/sus/tracciato-di-prova.gpx): cade in un settore del
+            // catasto, quindi la creazione lo accetta.
+            const SAMPLE_GPX_URL = '/docs/sus/tracciato-di-prova.gpx';
 
             const panel = document.createElement('div');
             panel.style.cssText = [
-                'position:fixed', 'top:44px', 'right:16px', 'z-index:9999',
-                'max-width:380px', 'padding:10px 12px', 'border-radius:6px',
+                // In basso a sinistra, sopra la colonna di navigazione: a destra
+                // coprirebbe il pannello «Try it», dove si scrive il corpo. Il
+                // margine in basso lascia libera la barra di debug, dove c'e'.
+                'position:fixed', 'bottom:44px', 'left:16px', 'z-index:9999',
+                'max-width:340px', 'max-height:calc(100vh - 60px)', 'overflow:auto',
+                'padding:10px 12px', 'border-radius:6px',
                 'background:#fff', 'border:1px solid #d9dde3', 'color:#1f2933',
                 'font:13px/1.45 ui-sans-serif,system-ui,sans-serif',
                 'box-shadow:0 1px 4px rgba(0,0,0,.18)',
@@ -205,7 +200,14 @@
 
                 const form = new FormData();
                 Object.entries(SAMPLE).forEach(([key, value]) => form.append(key, value));
-                form.append('geometry', new Blob([SAMPLE_GPX], { type: 'application/gpx+xml' }), 'tracciato-di-prova.gpx');
+                try {
+                    const gpx = await (await window.fetch(SAMPLE_GPX_URL)).blob();
+                    form.append('geometry', new Blob([gpx], { type: 'application/gpx+xml' }), 'tracciato-di-prova.gpx');
+                } catch (e) {
+                    outcome.textContent = 'Non riesco a leggere il tracciato di prova: ' + e;
+                    run.disabled = false;
+                    return;
+                }
 
                 try {
                     const response = await window.fetch(SUS_PATH + 'trail-applications', {
@@ -214,10 +216,11 @@
                         body: form,
                     });
                     const body = await response.json();
+                    if (response.ok && body.id) { idInput.value = body.id; }
                     outcome.textContent = response.status + ' ' + response.statusText + '\n'
                         + JSON.stringify(body, null, 2)
                         + (response.ok && body.id
-                            ? '\n\nL\'id qui sopra si usa nelle due chiamate seguenti.'
+                            ? '\n\nL\'id ' + body.id + ' e\' gia\' nel campo qui sotto: ora carica gli allegati obbligatori e trasmetti.'
                             : '');
                 } catch (e) {
                     outcome.textContent = 'La chiamata non è partita: ' + e;
@@ -226,7 +229,104 @@
                 run.disabled = false;
             });
 
+            // --- Il resto della domanda: allegati obbligatori e trasmissione ---
+            // Sono chiamate vere delle API (/api/v1/sus), quindi ci sono sempre:
+            // il token lo aggiunge l'involucro di fetch qui sopra.
+            const field = (placeholder) => {
+                const input = document.createElement('input');
+                input.placeholder = placeholder;
+                input.style.cssText = 'width:100%;box-sizing:border-box;margin:0 0 6px;padding:5px 8px;border:1px solid #d9dde3;border-radius:5px;font:12px/1.3 ui-sans-serif,system-ui,sans-serif';
+                return input;
+            };
+            const button = (label, colour) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = 'margin:0 6px 6px 0;padding:5px 10px;border-radius:5px;cursor:pointer;font:600 12px/1.2 ui-sans-serif,system-ui,sans-serif;color:#fff;border:1px solid ' + colour + ';background:' + colour;
+                return b;
+            };
+
+            const flow = document.createElement('div');
+            flow.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb';
+            const idInput = field('id della domanda');
+            const attachAll = button('Carica gli allegati obbligatori', '#1f6feb');
+            const submit = button('Trasmetti', '#1f6feb');
+
+            // Un file di prova per ogni allegato che serve a trasmettere: la
+            // relazione (campo 67), la tabella dati (69), una fotografia (70) e il
+            // piano di manutenzione (72). Il contenuto e' minimo ma del tipo che il
+            // format chiede.
+            const pdf = (title) => new Blob(['%PDF-1.4\n% ' + title + '\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'], { type: 'application/pdf' });
+            const emptyZip = () => new Blob([new Uint8Array([0x50, 0x4b, 0x05, 0x06].concat(new Array(18).fill(0)))], { type: 'application/zip' });
+            const jpeg = () => {
+                const b64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+                return new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/jpeg' });
+            };
+            const REQUIRED_ATTACHMENTS = [
+                ['report', () => pdf('Relazione descrittiva'), 'relazione-di-prova.pdf'],
+                ['trail_data_sheet', emptyZip, 'tabella-dati-di-prova.zip'],
+                ['photos', jpeg, 'foto-di-prova.jpg'],
+                ['maintenance_plan', () => pdf('Piano di manutenzione'), 'piano-manutenzione-di-prova.pdf'],
+            ];
+
+            const readyId = () => {
+                const id = idInput.value.trim();
+                if (!token) { outcome.textContent = 'Fai prima il login: la prova usa il token di questa pagina.'; return null; }
+                if (!/^[0-9]+$/.test(id)) { outcome.textContent = 'Scrivi l\'id della domanda, quello restituito dalla creazione.'; return null; }
+                return id;
+            };
+
+            attachAll.addEventListener('click', async () => {
+                const id = readyId();
+                if (!id) { return; }
+                attachAll.disabled = true;
+                const lines = [];
+                for (const [collection, make, name] of REQUIRED_ATTACHMENTS) {
+                    outcome.textContent = lines.concat('Carico ' + collection + '…').join('\n');
+                    const form = new FormData();
+                    form.append('collection', collection);
+                    form.append('file', make(), name);
+                    try {
+                        const response = await window.fetch(SUS_PATH + 'trail-applications/' + id + '/attachments', {
+                            method: 'POST', headers: { Accept: 'application/json' }, body: form,
+                        });
+                        const body = await response.json();
+                        lines.push(collection + ': ' + response.status + ' ' + JSON.stringify(body));
+                    } catch (e) {
+                        lines.push(collection + ': la chiamata non è partita — ' + e);
+                    }
+                }
+                outcome.textContent = lines.join('\n') + '\n\nOra «Trasmetti» chiude la compilazione.';
+                attachAll.disabled = false;
+            });
+
+            submit.addEventListener('click', async () => {
+                const id = readyId();
+                if (!id) { return; }
+                try {
+                    const response = await window.fetch(SUS_PATH + 'trail-applications/' + id + '/confirm', {
+                        method: 'POST', headers: { Accept: 'application/json' },
+                    });
+                    const body = await response.json();
+                    outcome.textContent = response.status + ' ' + response.statusText + '\n' + JSON.stringify(body, null, 2);
+                } catch (e) {
+                    outcome.textContent = 'La chiamata non è partita: ' + e;
+                }
+            });
+
+            flow.appendChild(idInput);
+            flow.appendChild(attachAll);
+            flow.appendChild(submit);
+
+            const download = document.createElement('a');
+            download.href = SAMPLE_GPX_URL;
+            download.download = 'tracciato-di-prova.gpx';
+            download.textContent = 'Scarica il tracciato di prova (GPX)';
+            download.style.cssText = 'display:block;margin-top:6px;color:#1f6feb;font:12px/1.4 ui-sans-serif,system-ui,sans-serif';
+
             panel.appendChild(run);
+            panel.appendChild(download);
+            panel.appendChild(flow);
             panel.appendChild(outcome);
 
 @if (config('sus.test_tools'))
@@ -241,29 +341,14 @@
             note.textContent = 'Solo per le prove, non fa parte delle API: decide una domanda trasmessa come farebbe l\'istruttore.';
             note.style.cssText = 'margin-bottom:6px;color:#6b7280;font-size:12px';
 
-            const field = (placeholder, width) => {
-                const input = document.createElement('input');
-                input.placeholder = placeholder;
-                input.style.cssText = 'width:' + width + ';box-sizing:border-box;margin:0 0 6px;padding:5px 8px;border:1px solid #d9dde3;border-radius:5px;font:12px/1.3 ui-sans-serif,system-ui,sans-serif';
-                return input;
-            };
-            const idInput = field('id della domanda', '100%');
-            const reasonInput = field('motivo del rifiuto (serve solo per respingere)', '100%');
+            const reasonInput = field('motivo del rifiuto (serve solo per respingere)');
 
-            const action = (label, colour) => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.textContent = label;
-                button.style.cssText = 'margin-right:6px;padding:5px 10px;border-radius:5px;cursor:pointer;font:600 12px/1.2 ui-sans-serif,system-ui,sans-serif;color:#fff;border:1px solid ' + colour + ';background:' + colour;
-                return button;
-            };
-            const approve = action('Approva', '#0f7b45');
-            const reject = action('Respingi', '#b42318');
+            const approve = button('Approva', '#0f7b45');
+            const reject = button('Respingi', '#b42318');
 
             const send = async (verb, body) => {
-                const id = idInput.value.trim();
-                if (!token) { outcome.textContent = 'Fai prima il login: la prova usa il token di questa pagina.'; return; }
-                if (!/^[0-9]+$/.test(id)) { outcome.textContent = 'Scrivi l\'id della domanda, quello restituito dalla creazione.'; return; }
+                const id = readyId();
+                if (!id) { return; }
 
                 outcome.textContent = 'Invio in corso…';
                 try {
@@ -285,7 +370,6 @@
             reject.addEventListener('click', () => send('reject', { rejection_reason: reasonInput.value }));
 
             decide.appendChild(note);
-            decide.appendChild(idInput);
             decide.appendChild(reasonInput);
             decide.appendChild(approve);
             decide.appendChild(reject);
@@ -310,6 +394,29 @@
             };
             const showState = () => paint('Token attivo: le chiamate partono autenticate', true);
             paint('Nessun token: fai il login', false);
+
+            // Il riquadro e' fisso sopra la pagina: nasce chiuso, resta solo il
+            // pulsante che lo apre, e la scelta si ricorda (se il browser lo
+            // permette).
+            const STORAGE_KEY = 'sus-docs-tools-open';
+            const content = document.createElement('div');
+            while (panel.firstChild) { content.appendChild(panel.firstChild); }
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.style.cssText = 'display:block;width:100%;padding:2px 0;border:0;background:none;cursor:pointer;text-align:left;color:#1f2933;font:600 12px/1.4 ui-sans-serif,system-ui,sans-serif';
+            const setOpen = (open) => {
+                content.style.display = open ? 'block' : 'none';
+                content.style.marginTop = open ? '8px' : '0';
+                toggle.textContent = open ? 'Strumenti di prova ▾' : 'Strumenti di prova ▸';
+                panel.style.padding = open ? '10px 12px' : '4px 10px';
+                try { window.localStorage.setItem(STORAGE_KEY, open ? '1' : '0'); } catch (e) { /* senza storage resta solo per questa visita */ }
+            };
+            let startOpen = false;
+            try { startOpen = window.localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { startOpen = false; }
+            toggle.addEventListener('click', () => setOpen(content.style.display === 'none'));
+            panel.appendChild(toggle);
+            panel.appendChild(content);
+            setOpen(startOpen);
 
             const attach = () => { document.body.appendChild(badge); document.body.appendChild(panel); };
             if (document.body) { attach(); } else { document.addEventListener('DOMContentLoaded', attach); }

@@ -87,8 +87,9 @@ return [
         2. `POST {BASE_URL}/trail-applications/{id}/attachments` — carica un allegato, uno per chiamata;
         3. `POST {BASE_URL}/trail-applications/{id}/confirm` — dichiara conclusa la compilazione e
            trasmette la domanda all'istruttoria;
-        4. `GET {BASE_URL}/trail-applications/{id}` — legge a che punto e' la domanda, i dati tecnici
-           e, a domanda approvata, il numero del sentiero.
+        4. `GET {BASE_URL}/trail-applications/{id}` — legge la domanda: i dati dichiarati come il
+           Catasto li ha registrati, gli allegati caricati, a che punto e', i dati tecnici e, a domanda
+           approvata, il numero del sentiero.
 
         `{BASE_URL}` e' `{APP_URL}/api/v1/sus`.
 
@@ -143,7 +144,7 @@ return [
             Note over SUS,API: Fase 5 - lettura dello stato, ripetibile
             loop finché serve seguire la domanda
                 SUS->>API: GET /trail-applications/id
-                API-->>SUS: 200 status, dem_data, dem_status, code solo se approvata, rejection_reason solo se respinta
+                API-->>SUS: 200 submitted_data, attachments, status, dem_data, code solo se approvata, rejection_reason solo se respinta
             end
         ```
 
@@ -154,8 +155,42 @@ return [
         | 2. Allegati | `POST /trail-applications/{id}/attachments`, un file per chiamata | `201` con la `collection` e quanti file contiene. Un documento caricato di nuovo sostituisce il precedente. Dopo la trasmissione, `409` |
         | 3. Trasmissione | `POST /trail-applications/{id}/confirm` | `200` con `status` `under_review`. Se manca qualcosa, `422` con `missing`, e la domanda resta in compilazione. Ripetuta su una domanda gia' trasmessa risponde di nuovo `200`, con `already_confirmed` a `true` |
         | 4. Istruttoria | — | L'istruttore Forestas approva o respinge la domanda nel Catasto: non passa da queste API |
-        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con i dati dichiarati come il Catasto li ha registrati (`submitted_data`), quanti allegati ci sono per `collection` (`attachments`), lo `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
 
+        ## Gli strumenti di prova
+
+        Questa pagina permette di provare il canale per intero senza scrivere codice. In basso a
+        sinistra c'e' il pulsante **Strumenti di prova**: aprendolo compare un riquadro con i passi di
+        una domanda, nell'ordine in cui il SUS li fa.
+
+        Prima di tutto si fa il login: da **Auth → Login**, nel pannello di prova della chiamata, con
+        le credenziali del client. Il token restituito viene usato da solo da tutti i pulsanti e da
+        tutte le prove di questa pagina; la riga in alto a destra dice se e' attivo.
+
+        1. **Prova una domanda completa** — crea una domanda con valori di prova e il tracciato di
+           prova (chiamata 1). L'`id` restituito finisce da solo nel campo «id della domanda».
+        2. **Scarica il tracciato di prova (GPX)** — e' il file usato al passo 1: cade in un settore del
+           catasto, quindi la creazione lo accetta. Serve anche per le vostre prove interne.
+        3. **Carica gli allegati obbligatori** — carica un file di prova per ciascuno dei quattro
+           allegati che servono a trasmettere: relazione, tabella dati, una fotografia, piano di
+           manutenzione (chiamata 2, ripetuta quattro volte).
+        4. **Trasmetti** — chiude la compilazione (chiamata 3). Senza il passo 3 risponde `422` con
+           l'elenco di cio' che manca: e' un buon modo per vedere quell'errore.
+
+        I passi 1, 3 e 4 sono chiamate vere di queste API, le stesse descritte qui sotto: quello che
+        fanno i pulsanti si puo' rifare con il proprio codice. In ogni momento la chiamata 4, dal suo
+        pannello di prova, mostra la domanda: i dati dichiarati, gli allegati, lo stato.
+
+        MARKDOWN.((bool) env('SUS_TEST_TOOLS_ENABLED', false) ? <<<'MARKDOWN'
+        ### Approvare o respingere una domanda per prova
+
+        Su questo ambiente il riquadro ha anche **Approva** e **Respingi**, con il campo del motivo.
+        Decidono una domanda trasmessa (`under_review`) come farebbe l'istruttore Forestas, cosi' si
+        possono provare da soli tutti gli esiti della chiamata 4 — il numero del sentiero a domanda
+        approvata, il motivo a domanda respinta — e il `409` di una conferma fatta dopo la decisione.
+        **Non fanno parte di queste API** e non esistono in esercizio.
+
+        MARKDOWN : '').<<<'MARKDOWN'
         ## Gli allegati
 
         Si caricano con la chiamata 2, uno per chiamata, indicando in `collection` dove va il file.
@@ -164,7 +199,7 @@ return [
         | Campo del format | `collection` | Formati ammessi dal format | Serve per trasmettere |
         |---|---|---|---|
         | 67 — Relazione descrittiva | `report` | solo PDF | si' |
-        | 68 — Traccia GPS | — (si manda con la creazione, in `geometry`) | GPX o GeoJSON | si' |
+        | 68 — Traccia GPS | — (si manda con la creazione, in `geometry`). Per le prove: [tracciato-di-prova.gpx]({APP_URL}/docs/sus/tracciato-di-prova.gpx) | GPX o GeoJSON | si' |
         | 69 — Tabella dati sentiero | `trail_data_sheet` | solo ZIP | si' |
         | 70 — Documentazione fotografica | `photos` | immagini, da 1 a 5 | si', almeno una |
         | 71 — Eventuali autorizzazioni | `authorizations` | PDF oppure ZIP | no |
@@ -193,7 +228,9 @@ return [
         ## Un esempio completo
 
         Le stesse chiamate del diagramma, con `curl`. I valori sono di prova; `{BASE_URL}` e' quello
-        indicato sopra. Le richieste con file vanno in `multipart/form-data` (l'opzione `-F` di
+        indicato sopra. Il tracciato e' [tracciato-di-prova.gpx]({APP_URL}/docs/sus/tracciato-di-prova.gpx):
+        cade in un settore del catasto, quindi la creazione lo accetta, mentre un tracciato fuori da
+        ogni settore riceve `422`. Va bene anche per le vostre prove interne. Le richieste con file vanno in `multipart/form-data` (l'opzione `-F` di
         `curl`): i campi strutturati, come `activities` e `difficulty`, viaggiano come stringa JSON.
 
         ```bash
@@ -218,7 +255,7 @@ return [
           -F soggetto_gestore=forestas -F soggetto_rilevatore=applicant \
           -F soggetto_manutentore=forestas -F soggetto_custode_presente=false \
           -F last_survey_date=2026-10-20 -F maintenance_frequency_months=12 \
-          -F geometry=@tracciato.gpx
+          -F geometry=@tracciato-di-prova.gpx
 
         # 2. Allegati: uno per chiamata, ciascuno risponde 201
         curl -X POST "$BASE_URL/trail-applications/42/attachments" \
@@ -243,8 +280,10 @@ return [
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json'
         ```
 
-        `42` sta per l'`id` restituito dalla creazione. Il pulsante «Prova una domanda completa», in
-        alto a destra in questa pagina, esegue la creazione con gli stessi valori.
+        `42` sta per l'`id` restituito dalla creazione. Gli stessi passi si fanno dai pulsanti in alto
+        a destra in questa pagina: «Prova una domanda completa» esegue la creazione con questi valori e
+        mette l'`id` nel campo sotto, «Carica gli allegati obbligatori» carica un file di prova per
+        ciascuno dei quattro allegati che servono a trasmettere, «Trasmetti» chiude la compilazione.
 
         **La specifica completa in formato OpenAPI** e' qui: [{APP_URL}/docs/api/sus.json]({APP_URL}/docs/api/sus.json). Si importa
         in Postman o Insomnia per avere tutte le chiamate pronte, oppure si usa per generare il codice
@@ -304,17 +343,7 @@ return [
         da capo, e le domande create vengono cancellate.** Una domanda creata il pomeriggio la
         mattina dopo non esiste piu': le chiamate sul suo `id` rispondono `404`. Una prova va quindi
         svolta per intero — creazione, allegati, conferma — nella stessa giornata.
-        MARKDOWN.((bool) env('SUS_TEST_TOOLS_ENABLED', false) ? <<<'MARKDOWN'
-
-
-        ### Approvare o respingere una domanda per prova
-
-        Su questo ambiente la pagina ha, sotto «Prova una domanda completa», due pulsanti: **Approva**
-        e **Respingi**. Decidono una domanda trasmessa (`under_review`) come farebbe l'istruttore
-        Forestas, cosi' si possono provare da soli tutti gli esiti della chiamata 4 — il numero del
-        sentiero a domanda approvata, il motivo a domanda respinta — e il `409` di una conferma fatta
-        dopo la decisione. **Non fanno parte di queste API** e non esistono in esercizio.
-        MARKDOWN : '')),
+        MARKDOWN),
     ],
 
     'ui' => [
