@@ -1,0 +1,53 @@
+name: Notify Slack
+
+# L'esito di un deploy nel canale Slack, come su maphub: un messaggio con l'esito di
+# test e deploy, il commit, l'autore e il link alla run. Il webhook e' il secret
+# SLACK_WEBHOOK_URL del repo.
+
+on:
+  workflow_call:
+    inputs:
+      env_name:
+        required: true
+        type: string
+      tests_result:
+        required: true
+        type: string
+      deploy_result:
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [[ "${{ inputs.tests_result }}" == "success" && "${{ inputs.deploy_result }}" == "success" ]]; then
+            EMOJI="✅"
+            COLOR="good"
+            TEXT="Deploy ${{ inputs.env_name }} completato con successo"
+          else
+            EMOJI="❌"
+            COLOR="danger"
+            TEXT="Deploy ${{ inputs.env_name }} fallito (tests=${{ inputs.tests_result }}, deploy=${{ inputs.deploy_result }})"
+          fi
+          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"$EMOJI *Forestas ${{ inputs.env_name }}* — $TEXT\",
+              \"attachments\": [{
+                \"color\": \"$COLOR\",
+                \"fields\": [
+                  {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": true},
+                  {\"title\": \"Autore\", \"value\": \"${{ github.actor }}\", \"short\": true},
+                  {\"title\": \"Dettagli\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Vedi run>\", \"short\": false}
+                ]
+              }]
+            }"

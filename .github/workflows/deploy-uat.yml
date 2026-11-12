@@ -1,0 +1,38 @@
+name: Deploy collaudo
+
+# A ogni push su main: i test, poi il deploy sul collaudo dopo l'approvazione di
+# chi e' indicato nell'environment `uat`. L'approvazione e' il momento per i passi
+# a mano che il deploy non fa: le colonne scritte nelle migration di creazione gia'
+# eseguite, e i rilasci di WordPress con passi propri (vedi docs/howto/deploy-automatico.md).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-uat
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/run-tests.yml
+    secrets: inherit
+  deploy:
+    needs: [tests]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: uat
+      branch: main
+    secrets: inherit
+
+  notify:
+    name: Notify Slack
+    needs: [tests, deploy]
+    if: always() && vars.SLACK_NOTIFICATIONS_ENABLED != 'false'
+    uses: ./.github/workflows/notify-slack.yml
+    with:
+      env_name: COLLAUDO
+      tests_result: ${{ needs.tests.result }}
+      deploy_result: ${{ needs.deploy.result }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
