@@ -60,11 +60,11 @@ return new class extends Migration
         // deliberato (sottosentieri del modello CAI, oggi fuori scope): se un
         // domani vanno ammessi, si allenta il controllo applicativo senza una
         // migration su tabella popolata.
-        DB::statement('
+        DB::statement("
             ALTER TABLE trail_registry_codes
             ADD CONSTRAINT trail_registry_codes_number_check
             CHECK (number BETWEEN 0 AND 99)
-        ');
+        ");
 
         DB::statement("
             ALTER TABLE trail_registry_codes
