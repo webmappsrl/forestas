@@ -77,5 +77,8 @@
     "Caption": "Didascalia",
     "Images": "Immagini",
     "Documents": "Allegati",
-    "Videos": "Video"
+    "Videos": "Video",
+    "Application not found.": "Domanda non trovata.",
+    "Not found.": "Risorsa non trovata.",
+    "Access denied: a valid token of the channel client is required.": "Accesso non consentito: serve un token valido del client dello sportello."
 }

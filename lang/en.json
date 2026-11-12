@@ -75,5 +75,8 @@
     "Source vocabulary": "Source vocabulary",
     "Images": "Images",
     "Documents": "Documents",
-    "Videos": "Videos"
+    "Videos": "Videos",
+    "Application not found.": "Application not found.",
+    "Not found.": "Not found.",
+    "Access denied: a valid token of the channel client is required.": "Access denied: a valid token of the channel client is required."
 }

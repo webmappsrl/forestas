@@ -5,9 +5,8 @@ richiede `^8.2`), PostgreSQL + PostGIS, Nova 5.7.6, Elasticsearch 8, Redis, Hori
 
 ## Regole che precedono tutte le altre
 
-**Non eseguire mai `git commit` senza istruzione esplicita dell'utente.** Implementa, testa, poi
-fermati: è l'utente che controlla il codice e committa. Vale anche per i subagent, che vanno
-istruiti esplicitamente a non committare.
+**Nessun commit senza richiesta del dev.** Unica eccezione: la chiusura di `wm-plan`, dopo il
+primo commit del dev. I subagent non committano mai.
 
 **Il DB reale contiene dati importati da processi lunghi: distruggerli è inaccettabile.** Prima di
 lanciare la suite va verificato l'isolamento; se non è verificabile, non si lancia e si chiede

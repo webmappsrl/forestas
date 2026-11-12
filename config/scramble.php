@@ -49,7 +49,6 @@ return [
          */
         'version' => env('API_VERSION', '1.0.0'),
 
-
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
@@ -76,12 +75,51 @@ return [
 
         Il Catasto riceve aggiornamenti anche da variazioni d'ufficio, indipendenti dalle istanze SUS.
 
-        ## Stato attuale
+        ## Cosa c'e' oggi
 
-        Questa versione contiene **solo l'infrastruttura di accesso**: un endpoint di verifica della
-        connessione, piu' gli endpoint di autenticazione. Gli endpoint di preistruttoria e di
-        accatastamento definitivo saranno pubblicati qui, sullo stesso prefisso e con la stessa
-        autenticazione, quando il set minimo di dati sara' stato concordato fra le parti.
+        Oltre agli endpoint di autenticazione e di verifica della connessione, il canale ha le
+        chiamate con cui il SUS porta nel Catasto una domanda di accatastamento (procedura 02) e ne
+        segue l'esito:
+
+        1. `POST {BASE_URL}/trail-applications` — crea la domanda con i dati del modulo e il file del
+           tracciato, e restituisce l'`id` e i dati tecnici calcolati dal tracciato;
+        2. `POST {BASE_URL}/trail-applications/{id}/attachments` — carica un allegato, uno per chiamata;
+        3. `POST {BASE_URL}/trail-applications/{id}/confirm` — dichiara conclusa la compilazione e
+           trasmette la domanda all'istruttoria;
+        4. `GET {BASE_URL}/trail-applications/{id}` — legge a che punto e' la domanda, i dati tecnici
+           e, a domanda approvata, il numero del sentiero.
+
+        `{BASE_URL}` e' `https://<dominio>/api/v1/sus`, dove il dominio e' quello su cui questa
+        documentazione e' pubblicata.
+
+        **Le chiamate che modificano una domanda rispondono solo com'e' andata l'azione; per leggerla
+        c'e' una sola chiamata, la 4.** Non cambia nulla e si puo' ripetere quante volte si vuole: e'
+        quella da usare per seguire una domanda nel tempo. Il numero del sentiero compare li', e solo
+        a domanda approvata: durante l'istruttoria puo' ancora cambiare.
+
+        ### Le percorribilita' hanno nomi diversi da quelli del format
+
+        Il campo 36 del format elenca tre percorribilita' — «trek», «MTB», «Ippo» — ma in questa API
+        si scrivono con gli identificatori che il Catasto usa per le attivita': rispettivamente
+        `trekking`, `mtb` e `horse`. Il campo `activities` ne accetta altri quattro, che il Catasto
+        gestisce e il format non prevede: `hiking`, `accessible-trails`, `nordic-walking`,
+        `educational-trails`. Un valore fuori da questi sette e' rifiutato con `422`.
+
+                **La creazione non si corregge, si rifa.** Non esiste un endpoint che modifichi i dati di una
+        domanda gia' creata: e' una scelta, descritta nella pagina della chiamata.
+
+        ## Il format
+
+        I campi della domanda sono quelli del format concordato al tavolo tecnico, il foglio
+        «Format istanza accatastamento V» del file
+        [SUS-EVO_ANALOGHI_FORES_02_Format_Istanza accatastamento_VALIDATA_221026](https://drive.google.com/file/d/1xlzZ8ND3gmLGRjKWXsIjmaLE51semeGI/view).
+        Nella documentazione ogni parametro riporta il suo numero di campo, nella forma «campo 29 del
+        format — *Origine (da)*»: il numero e' quello della colonna «N. campo».
+
+        **Le unita' non sono quelle del format.** Il format chiede la lunghezza in metri e i tempi di
+        percorrenza nel formato `ORE:MINUTI`; nel payload di questa API la lunghezza (`distance`)
+        viaggia in **chilometri con un decimale** e i tempi (`duration_forward`, `duration_backward`)
+        in **minuti interi**.
 
         ## Come si accede
 
@@ -107,6 +145,13 @@ return [
         Le prove di connessione si effettuano sull'ambiente di collaudo (UAT), con credenziali distinte
         da quelle di esercizio. L'URL di base e' quello del dominio su cui questa documentazione e'
         pubblicata.
+
+        ### Il collaudo si azzera ogni notte
+
+        **Ogni giorno alle 06:00, ora italiana, il database del collaudo viene svuotato e ricaricato
+        da capo, e le domande create vengono cancellate.** Una domanda creata il pomeriggio la
+        mattina dopo non esiste piu': le chiamate sul suo `id` rispondono `404`. Una prova va quindi
+        svolta per intero — creazione, allegati, conferma — nella stessa giornata.
         MARKDOWN,
     ],
 

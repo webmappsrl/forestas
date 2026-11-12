@@ -23,8 +23,6 @@ class SusPingController extends Controller
      * @response array{client: array{id: int, name: string, email: string}, roles: string[], timestamp: string}
      */
     #[Response(status: 200, description: 'Connessione e autenticazione funzionanti.')]
-    #[Response(status: 401, description: 'Token assente, scaduto o non valido.', type: 'array{message: string}')]
-    #[Response(status: 403, description: "Token valido, ma l'utente non e' il client SUS.", type: 'array{message: string}')]
     public function __invoke(): JsonResponse
     {
         $client = auth('api')->user();
