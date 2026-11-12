@@ -70,8 +70,10 @@ accessibilità, qualunque sia». «Accessibile» non è un'attività né un camp
   `--reset`**, prima del batch: dove il reset notturno è attivo non va lanciato a mano, altrove
   una volta dopo il deploy (oc:8910);
 - **a fine batch dell'import** la catena è `SyncTaxonomyWhereJob` →
-  `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob` (reindex e file
-  AWS). Il job ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
+  `ResolveSardegnaSentieriRelationsJob` → `RecalculateSardegnaSentieriLayersJob` →
+  `CalculateNearbyTracksJob`, che a fine calcolo dei sentieri correlati accoda
+  `RegenerateTaxonomyWhereOutputsJob` (reindex e file AWS, oc:8959).
+  `RecalculateSardegnaSentieriLayersJob` ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
   `assignTracksByTaxonomy()`, POI solo sui layer delle aree, `properties.layers` allineato in modo
   sincrono, geometria e PBF una volta per layer e solo se qualcosa è cambiato;
 - **il reset notturno** non tronca più `taxonomy_activities`: le attività restano con il loro id,

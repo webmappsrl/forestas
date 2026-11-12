@@ -17,6 +17,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Wm\WmPackage\Nova\Fields\ImageCredits;
 
 /**
  * Confronta ciò che l'import legge dalle API di Drupal con ciò che legge
@@ -609,7 +610,7 @@ class CompareSardegnaSentieriSourceCommand extends Command
             }
             $rows[$nid]['media'][$item->collection_name][] = [
                 'url' => (string) ($props['sardegnasentieri_source_url'] ?? ''),
-                'caption' => (string) ($props['sardegnasentieri_caption'] ?? ''),
+                'caption' => (string) ($props[ImageCredits::CAPTION] ?? ''),
             ];
         }
 

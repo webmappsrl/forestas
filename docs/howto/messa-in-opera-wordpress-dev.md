@@ -41,6 +41,8 @@ Gli zip commerciali (`impreza.zip` in `wp-forestas/docker/themes/`, i due di WPM
   registra presso WPML e UpSolution (oc:8947);
 - `DRUPAL_SYNC=on`, `DRUPAL_DB_HOST=172.24.0.1`, `DRUPAL_DB_PORT=3307`, utente e password della
   copia uguali a quelli che usa `php-forestasdev`.
+- `WP_PACKAGE_SHARD=forestasdev`, `WP_PACKAGE_APP_ID=1` (ricerca unica, oc:8952);
+  `WP_PACKAGE_DIR` vuoto.
 
 Le password del database e dell'amministratore si generano sull'host (`openssl rand -hex 24`) e
 restano solo nel `.env`.
@@ -117,7 +119,9 @@ giro a mano in corso, quello del cron esce con «un'altra sincronizzazione» e c
 I file versionati arrivano sull'host solo con il puntatore di `wp-forestas` in `forestas`: un
 commit in `wp-forestas` non basta, serve anche l'aggiornamento del puntatore su `develop` di
 `forestas`. Sull'host non si fanno commit né `git pull` dentro il submodule. Dopo l'aggiornamento
-dello shard, `scripts/wordpress-up.sh`, come su UAT.
+dello shard, `scripts/wordpress-up.sh`, come su UAT. Il rilascio della ricerca unica (oc:8952) ha gli stessi passi di UAT
+([«Ricerca unica e plugin `wp-package`»](messa-in-opera-wordpress-uat.md#ricerca-unica-e-plugin-wp-package-oc8952)),
+compreso togliere a mano `wm-package` e il ritorno indietro.
 
 Per azzerare: `scripts/wordpress-reset.sh --conferma`, poi il passo 5 (o si aspetta il giro del
 cron) e la verifica. Su dev si può fare quando serve.

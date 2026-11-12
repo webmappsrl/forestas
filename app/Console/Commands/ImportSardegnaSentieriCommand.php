@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
-use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -271,8 +270,9 @@ class ImportSardegnaSentieriCommand extends Command
      * guardia: l'import salva con `saveQuietly()`, quindi nessun observer
      * scrive `properties.taxonomy_where`, e dopo un reset le tracce
      * resterebbero senza aree. Il sync e' quello dell'action Nova
-     * `SyncEcTaxonomyWhereAction`, seguito in catena dal reindex
-     * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`.
+     * `SyncEcTaxonomyWhereAction`, seguito dal reindex
+     * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`:
+     * lo accoda `CalculateNearbyTracksJob` quando tutti i suoi blocchi sono finiti.
      *
      * Con enti da importare il batch di POI e sentieri parte in catena dopo
      * il loro: dopo un `--reset` un sentiero il cui gestore non e' ancora
@@ -307,11 +307,13 @@ class ImportSardegnaSentieriCommand extends Command
                     // ai layer del percorso (oc:8932).
                     new ResolveSardegnaSentieriRelationsJob,
                     new RecalculateSardegnaSentieriLayersJob,
+                    // Ultimo della catena: accoda i blocchi in un batch e a batch finito
+                    // rigenera file delle tracce e indice (RegenerateTaxonomyWhereOutputsJob),
+                    // perche' i file portano i sentieri correlati (oc:8959).
                     new CalculateNearbyTracksJob,
-                    new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
                 ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
 
-                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e reindex accodati.");
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e correlati accodati; reindex a fine calcolo dei correlati.");
 
                 if (! $withNormalize) {
                     Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");

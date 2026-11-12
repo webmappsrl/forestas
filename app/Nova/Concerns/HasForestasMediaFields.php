@@ -7,7 +7,7 @@ namespace App\Nova\Concerns;
 use Ebess\AdvancedNovaMediaLibrary\Fields\Files;
 use Ebess\AdvancedNovaMediaLibrary\Fields\Images;
 use Ebess\AdvancedNovaMediaLibrary\Fields\Media;
-use Laravel\Nova\Fields\Text;
+use Wm\WmPackage\Nova\Fields\ImageCredits;
 
 /**
  * I tre campi media dei contenuti importati da Sardegna Sentieri, distinti per tipo di file
@@ -34,13 +34,11 @@ trait HasForestasMediaFields
     protected function forestasMediaFields(): array
     {
         return [
-            // La didascalia arriva da Drupal (`field_media_image_alt`) e vive nelle custom
-            // properties del media: senza questo campo il dato c'e' ma nessuno lo vede ne' lo
-            // corregge. Solo sulle immagini: allegati e video non ne hanno (oc:8932).
+            // Didascalia, autore e credits arrivano da Drupal e vivono nelle custom properties del
+            // media: sono i campi del package, che li porta con la foto nel dettaglio (oc:8959).
+            // Solo sulle immagini: allegati e video non ne hanno (oc:8932).
             $this->withForestasMediaOptions(Images::make(__('Images'), 'default'))
-                ->customPropertiesFields([
-                    Text::make(__('Caption'), 'sardegnasentieri_caption'),
-                ]),
+                ->customPropertiesFields(ImageCredits::fields()),
             $this->withForestasMediaOptions(Files::make(__('Documents'), 'attachments')),
             $this->withForestasMediaOptions(Files::make(__('Videos'), 'videos')),
         ];

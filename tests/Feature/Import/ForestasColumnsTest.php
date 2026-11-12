@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
-use Wm\WmPackage\Services\GeoJsonService;
 
 /**
  * Le colonne di Forestas su ec_tracks (oc:8910): l'import scrive quelle che vengono da Drupal e
@@ -94,7 +93,7 @@ it('non tocca le colonne dell\'inclusività a un reimport', function () {
         ->and($track->forestas_inclusivity_digital)->toBe(0);
 });
 
-it('ri-espone le colonne piatte nel GeoJSON', function () {
+it('espone le colonne dentro forestas nel dettaglio, non piatte (oc:8959)', function () {
     $track = importWithColumns();
     $track->forceFill([
         'forestas_inclusivity_physical' => 30,
@@ -102,15 +101,14 @@ it('ri-espone le colonne piatte nel GeoJSON', function () {
         'forestas_inclusivity_digital' => 0,
     ])->saveQuietly();
 
-    $geojson = GeoJsonService::make()->getModelAsGeojson($track->fresh());
+    $properties = $track->fresh()->getDetailGeojson()['properties'];
 
-    expect($geojson['properties'])->toMatchArray([
-        'forestas_registry_code' => 'SE-001',
-        'forestas_survey_date' => '2024-05-17',
-        'forestas_inclusivity_physical' => 30,
-        'forestas_inclusivity_aids' => 5,
-        'forestas_inclusivity_digital' => 0,
-    ]);
+    expect((array) $properties['forestas'])->toMatchArray([
+        'registry_code' => 'SE-001',
+        'survey_date' => '2024-05-17',
+    ])
+        ->and($properties['forestas']['inclusivity'])->toMatchArray(['physical' => 30, 'aids' => 5, 'digital' => 0])
+        ->and($properties)->not->toHaveKey('forestas_registry_code');
 });
 
 it('conserva i due testi liberi dell\'inclusività a un reimport', function () {

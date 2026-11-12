@@ -179,7 +179,7 @@ function shardMedia(object $model, string $collection, string $url, string $capt
         'disk' => 'local', 'conversions_disk' => 'local', 'size' => 1, 'manipulations' => '[]', 'generated_conversions' => '[]',
         'responsive_images' => '[]', 'order_column' => 1, 'app_id' => 1, 'geometry' => DB::raw("ST_GeomFromText('POINT Z(0 0 0)', 4326)"),
         'custom_properties' => json_encode(array_filter([
-            'sardegnasentieri_import' => true, 'sardegnasentieri_source_url' => $url, 'sardegnasentieri_caption' => $caption,
+            'sardegnasentieri_import' => true, 'sardegnasentieri_source_url' => $url, 'caption' => $caption,
         ])),
     ]);
 }
