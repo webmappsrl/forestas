@@ -62,6 +62,9 @@ Il job è unico per traccia finché non parte: un salvataggio in Nova che cambia
 uno. L'import non lo accoda: salva le tracce senza eventi, scarica le foto dentro
 `RelatedTrackCards::withoutRefresh()` e a fine giro rigenera tutti i file.
 
+I `related_pois` del dettaglio (chiave del package, da `ec_poi_ec_track`) sono i POI entro 1 km dalla
+traccia, dal più vicino, calcolati a fine import: vedi `dettaglio-del-poi-dati-forestas.md`.
+
 Didascalia, autore e credits delle foto non stanno in `forestas`: escono con le foto
 (`feature_image`, `image_gallery`), dal package (`wm-package/docs/knowledge/media-e-avatar.md`).
 

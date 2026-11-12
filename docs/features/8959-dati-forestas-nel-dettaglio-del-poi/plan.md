@@ -7,8 +7,8 @@
 
 **Architettura:** una rotta di forestas sostituisce `default.api.ec.poi.json` e carica
 `App\Models\EcPoi`; `App\Support\ForestasPoiDetail` costruisce `properties.forestas` in uscita come
-`ForestasTrackDetail`, con le parti comuni estratte. I percorsi vicini stanno in
-`ec_poi_nearby_tracks`, scritta per blocco nello stesso batch dei sentieri correlati.
+`ForestasTrackDetail`, con le parti comuni estratte. I percorsi del POI sono quelli collegati da
+Drupal in `ec_poi_ec_track`, ordinati per distanza.
 
 **Stack:** Laravel 12, PostGIS (`geography`), Pest su `forestas_testing`.
 
@@ -25,9 +25,8 @@
 
 ## Review Focus
 
-- POI senza geometria: escluso dal calcolo, dettaglio senza `nearby_tracks`, nessun errore.
+- POI senza percorsi collegati: `nearby_tracks` e `nearby_tracks_count` assenti, nessun errore.
 - POI con un solo ruolo o senza enti: `organizations` assente, non un oggetto vuoto.
-- Rilancio del batch mentre un blocco POI scrive: le righe degli altri POI restano.
 - `come_arrivare` salvato `null` o non array: `directions` assente, nessuna eccezione.
 - Rotta: `api/ec/poi/{id}` risolve al controller di forestas anche con `route:cache`.
 
@@ -51,30 +50,17 @@
 - [ ] Run: `vendor/bin/pest tests/Feature/EcTrack` — Expected: tutti verdi, nessun test cambiato.
 - [ ] Commit (istruzione per il dev): `refactor(oc:8959): parti comuni del dettaglio di tracce e POI`
 
-### Task 2: tabella dei percorsi vicini ai POI
+### Task 2: percorsi collegati al POI
 
-**Files:**
-- Create: `database/migrations/2026_11_12_000000_create_ec_poi_nearby_tracks_table.php`
-- Create: `app/Jobs/Import/CalculatePoiNearbyTracksChunkJob.php`
-- Modify: `app/Jobs/Import/CalculateNearbyTracksJob.php`, `app/Models/EcPoi.php`
-- Test: `tests/Feature/Import/NearbyTracksTest.php`
+> ⚠️ L'implementazione ha deviato da questo task: [notes.md](notes.md#task-2-percorsi-collegati-al-poi)
 
-**Interfaces — Produces:**
-- tabella `ec_poi_nearby_tracks` (`ec_poi_id`, `ec_track_id`, `distance` float, chiave primaria
-  sulla coppia, FK in cascata su entrambi)
-- `CalculatePoiNearbyTracksChunkJob(list<int> $poiIds)` (Batchable, coda di import,
-  `WithoutOverlapping` per primo id)
-- `App\Models\EcPoi::nearbyTracks(): BelongsToMany` (pivot `distance`, ordinato per distanza)
+> Rivisto il 12/11: niente tabella nuova né calcolo per vicinanza (decisione del dev). I percorsi
+> sono quelli di Drupal in `ec_poi_ec_track`; la distanza si calcola nella query.
 
-- [ ] Test che falliscono: un POI a ~30 m da una traccia ha la riga con la distanza; uno a ~6 km no;
-      il blocco riscrive solo i suoi POI (le righe di un altro POI restano); POI senza geometria
-      escluso; `CalculateNearbyTracksJob` accoda nello stesso batch anche i blocchi dei POI e non
-      svuota `ec_poi_nearby_tracks`.
-- [ ] Implementare: nel blocco, per ogni POI `ST_DWithin`/`ST_Distance` sulle tracce della stessa app
-      entro `sardegnasentieri.poi_nearby_tracks_radius_meters` (5000); poi in una transazione `delete` delle righe
-      dei POI del blocco e `insert` delle nuove.
-- [ ] Run: `vendor/bin/pest tests/Feature/Import/NearbyTracksTest.php` — Expected: verdi.
-- [ ] Commit: `feat(oc:8959): percorsi vicini ai POI calcolati nel batch dei correlati`
+**Files:** Modify `app/Models/EcPoi.php`; test nel Task 3.
+
+**Interfaces — Produces:** `App\Models\EcPoi::nearbyTracks(): BelongsToMany` su `ec_poi_ec_track`,
+con `distance_from_poi` (metri) e ordine per distanza.
 
 ### Task 3: dettaglio del POI
 
@@ -90,8 +76,9 @@
   - la rotta `default.api.ec.poi.json` risolve a `EcPoiDetailController`;
   - `GET api/ec/poi/{id}` dà `name`, `taxonomies` e le chiavi del package di oggi;
   - `properties.forestas` ha `url`, `code`, `created_at`, `updated_at`, `directions`, `videos`,
-    `attachments`, `organizations` (ruolo `operator`), `related_pois` (id dello shard),
-    `nearby_tracks` (card più `distance_from_poi`, ordinati, al massimo `poi_nearby_tracks_limit` = 10)
+    `attachments`, `organizations` (ruolo `operator`), `related_pois` (card: `id`, `name`, `feature_image`,
+    `addr_complete`, `elevation` solo se la quota della geometria non è zero),
+    `nearby_tracks` (card più `distance_from_poi`, ordinati, al massimo 10)
     e `nearby_tracks_count` (tutti quelli entro il raggio);
   - non ci sono `zona_geografica`, `source_relations`, `poi_correlati`, `allegati`, `video`,
     `come_arrivare`, `codice`, `out_source_feature_id`, `layers`; il DB non cambia;

@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Dto\Import\SardegnaSentieriImageManifest;
 use App\Enums\TipoEnte;
-use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Models\Ente;
@@ -282,8 +281,6 @@ class CompareSardegnaSentieriSourceCommand extends Command
         $pois = $this->shardRows('ec_pois', "COALESCE(properties->>'out_source_feature_id', properties->>'sardegnasentieri_id')", self::POI_MODELS);
         $enti = $this->shardRows('entes', 'sardegnasentieri_id', self::ENTE_MODELS, 'pagina_web_title, slug, drupal_created_at');
 
-        /** @var array<string, true> $trackPoiPairs */
-        $trackPoiPairs = [];
         /** @var array<string, true> $poiPoiPairs */
         $poiPoiPairs = [];
         $counts = ['related_url' => [0, 0], 'attachments' => [0, 0], 'videos' => [0, 0], 'caption' => [0, 0], 'immagini_enti' => [0, 0]];
@@ -295,10 +292,6 @@ class CompareSardegnaSentieriSourceCommand extends Command
                 $this->report("track {$nid} lettura", 'ok', $e->getMessage());
 
                 continue;
-            }
-
-            foreach (array_filter([$detail->partenza, $detail->arrivo, ...$detail->poi_correlati, ...$detail->punti_di_interesse], fn ($v) => $v !== null && $v !== '') as $poiNid) {
-                $trackPoiPairs[(string) $nid.':'.$poiNid] = true;
             }
 
             $this->compareShardNode('track', (string) $nid, $tracks, $detail->collegamenti, $detail->attachmentFiles, $detail->uploadedVideos,
@@ -314,9 +307,6 @@ class CompareSardegnaSentieriSourceCommand extends Command
                 continue;
             }
 
-            foreach ([...$detail->sentieri_collegati, ...$detail->itinerari_correlati] as $trackNid) {
-                $trackPoiPairs[$trackNid.':'.$nid] = true;
-            }
             // Reciproci, e senza i POI che citano se stessi (2516, 2701, 2901).
             foreach ($detail->poi_correlati as $relatedNid) {
                 if ((string) $relatedNid !== (string) $nid) {
@@ -338,7 +328,7 @@ class CompareSardegnaSentieriSourceCommand extends Command
             $this->compareShardEnte($db, (string) $nid, $enti, $counts);
         }
 
-        $this->compareShardLinks($tracks, $pois, $trackList, $poiList, $trackPoiPairs, $poiPoiPairs);
+        $this->compareShardLinks($pois, $poiList, $poiPoiPairs);
 
         foreach ($counts as $kind => [$source, $shard]) {
             $this->line("shard {$kind}: copia={$source} shard={$shard}");
@@ -461,61 +451,23 @@ class CompareSardegnaSentieriSourceCommand extends Command
     }
 
     /**
-     * I legami fra contenuti: coppie percorso-POI (`ec_poi_ec_track`) e
-     * POI-POI (`ec_poi_related_pois`), da Drupal contro lo shard. Le liste di
-     * Drupal (scritte sul percorso e sul POI) sono unite e reciproche. Una coppia
-     * con un nodo mai importato non si giudica; un legame a piu' di 10 km, misurati
-     * sulla geometria, lo shard lo scarta di proposito.
+     * I legami POI-POI (`ec_poi_related_pois`), da Drupal contro lo shard: le liste di Drupal sono
+     * unite e reciproche. Una coppia con un nodo mai importato non si giudica. I legami
+     * percorso-POI (`ec_poi_ec_track`) non si confrontano: dal 12/11 lo shard li calcola per
+     * vicinanza e non li prende piu' da Drupal (oc:8959).
      *
-     * @param  array<string, array<string, mixed>>  $tracks
      * @param  array<string, array<string, mixed>>  $pois
-     * @param  array<string, string>  $trackList
      * @param  array<string, string>  $poiList
-     * @param  array<string, true>  $trackPoiPairs  "nid percorso:nid POI"
      * @param  array<string, true>  $poiPoiPairs  "nid POI:nid POI"
      */
-    private function compareShardLinks(array $tracks, array $pois, array $trackList, array $poiList, array $trackPoiPairs, array $poiPoiPairs): void
+    private function compareShardLinks(array $pois, array $poiList, array $poiPoiPairs): void
     {
-        $trackNids = array_column($tracks, 'nid', 'id');
         $poiNids = array_column($pois, 'nid', 'id');
 
-        $shardTrackPoi = [];
-        foreach (DB::table('ec_poi_ec_track')->get(['ec_track_id', 'ec_poi_id']) as $row) {
-            if (isset($trackNids[$row->ec_track_id], $poiNids[$row->ec_poi_id])) {
-                $shardTrackPoi[$trackNids[$row->ec_track_id].':'.$poiNids[$row->ec_poi_id]] = true;
-            }
-        }
         $shardPoiPoi = [];
         foreach (DB::table('ec_poi_related_pois')->get(['ec_poi_id', 'related_poi_id']) as $row) {
             if (isset($poiNids[$row->ec_poi_id], $poiNids[$row->related_poi_id])) {
                 $shardPoiPoi[$poiNids[$row->ec_poi_id].':'.$poiNids[$row->related_poi_id]] = true;
-            }
-        }
-
-        $expectedTrackPoi = 0;
-        foreach ($trackPoiPairs as $pair => $_) {
-            [$trackNid, $poiNid] = explode(':', (string) $pair);
-            if (! isset($tracks[$trackNid], $pois[$poiNid])) {
-                continue;
-            }
-            if (! $this->selectedNid($trackNid) && ! $this->selectedNid($poiNid)) {
-                continue;
-            }
-            if (isset($shardTrackPoi[$pair])) {
-                $expectedTrackPoi++;
-
-                continue;
-            }
-            if ($this->isTooFar((int) $tracks[$trackNid]['id'], (int) $pois[$poiNid]['id'])) {
-                continue;
-            }
-            $expectedTrackPoi++;
-            $this->reportShard("legame track {$trackNid} poi {$poiNid}", 'presente', 'assente');
-        }
-        foreach ($shardTrackPoi as $pair => $_) {
-            [$trackNid, $poiNid] = explode(':', (string) $pair);
-            if (! isset($trackPoiPairs[$pair]) && ($this->selectedNid($trackNid) || $this->selectedNid($poiNid)) && isset($trackList[$trackNid], $poiList[$poiNid])) {
-                $this->reportShard("legame track {$trackNid} poi {$poiNid}", 'assente', 'presente');
             }
         }
 
@@ -537,24 +489,7 @@ class CompareSardegnaSentieriSourceCommand extends Command
             }
         }
 
-        $this->line("shard legami track-poi: copia={$expectedTrackPoi} shard=".count($shardTrackPoi));
         $this->line("shard legami poi-poi: copia={$expectedPoiPoi} shard=".count($shardPoiPoi));
-    }
-
-    /**
-     * Vero se la coppia sta oltre la soglia del job che scrive i legami: la
-     * costante e' la sua, per non divergere. Una coppia con una geometria
-     * assente non e' misurabile e il job la lascia in vigore (non la scarta),
-     * quindi qui si considera valida: attesa, e segnalata se manca.
-     */
-    private function isTooFar(int $trackId, int $poiId): bool
-    {
-        $distance = DB::scalar(
-            'SELECT ST_Distance(t.geometry::geography, p.geometry::geography) FROM ec_tracks t, ec_pois p WHERE t.id = ? AND p.id = ?',
-            [$trackId, $poiId],
-        );
-
-        return $distance !== null && (float) $distance > ResolveSardegnaSentieriRelationsJob::MAX_DISTANCE_METERS;
     }
 
     private function selectedNid(string $nid): bool
