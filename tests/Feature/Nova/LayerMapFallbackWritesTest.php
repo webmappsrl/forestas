@@ -2,7 +2,6 @@
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Jobs\UpdateLayerGeometryJob;
 use Wm\WmPackage\Models\App;

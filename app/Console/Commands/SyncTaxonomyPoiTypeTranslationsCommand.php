@@ -316,7 +316,6 @@ class SyncTaxonomyPoiTypeTranslationsCommand extends Command
         return [$newIt, $newEn];
     }
 
-    /** @param  string|null  ...$candidates */
     private function firstNonEmptyString(?string ...$candidates): string
     {
         foreach ($candidates as $candidate) {

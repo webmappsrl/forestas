@@ -33,7 +33,6 @@ function taxonomyWithTerms(): array
     return [$taxonomy, $trail];
 }
 
-
 it('rifiuta di cancellare una tassonomia che ha ancora termini (oc:8910)', function () {
     [$taxonomy, $trail] = taxonomyWithTerms();
 

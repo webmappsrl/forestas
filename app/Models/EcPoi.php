@@ -33,7 +33,7 @@ class EcPoi extends WmEcPoi
 
             return array_filter(
                 $value,
-                fn($translation) => $translation !== null && $translation !== ''
+                fn ($translation) => $translation !== null && $translation !== ''
             );
         }
 

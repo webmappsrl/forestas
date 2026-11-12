@@ -24,7 +24,7 @@ use Throwable;
  */
 #[Group(
     name: 'Auth',
-    description: "Come il client SUS ottiene e rinnova il token di accesso.",
+    description: 'Come il client SUS ottiene e rinnova il token di accesso.',
     weight: 1,
 )]
 class SusAuthController extends Controller
