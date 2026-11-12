@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\Api\Sus\SusTestDecisionController;
 use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
 use App\Observers\RelatedTrackCardObserver;
@@ -103,6 +104,20 @@ class AppServiceProvider extends ServiceProvider
             ->middleware('api')
             ->prefix('api/v1/sus')
             ->group(base_path('routes/sus.php'));
+
+        // Lo strumento di prova del canale (vedi config/sus.php): fuori da
+        // `api/v1/sus`, quindi fuori dalla documentazione e dal gruppo `api`,
+        // ma con lo stesso client. Dove `sus.test_tools` e' spento il
+        // controller risponde 404.
+        Route::name('sus.test.')
+            ->middleware(['auth:api', RoleMiddleware::class.':Sus'])
+            ->prefix('docs/api/sus/test/trail-applications')
+            ->group(function () {
+                Route::post('/{application}/approve', [SusTestDecisionController::class, 'approve'])
+                    ->whereNumber('application')->name('approve');
+                Route::post('/{application}/reject', [SusTestDecisionController::class, 'reject'])
+                    ->whereNumber('application')->name('reject');
+            });
 
         // oc:8333 — Scramble di default documenta TUTTE le route sotto /api,
         // incluse quelle registrate da wm-package (mobile app, ec/ugc, wallet,

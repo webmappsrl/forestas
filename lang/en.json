@@ -78,5 +78,6 @@
     "Videos": "Videos",
     "Application not found.": "Application not found.",
     "Not found.": "Not found.",
-    "Access denied: a valid token of the channel client is required.": "Access denied: a valid token of the channel client is required."
+    "Access denied: a valid token of the channel client is required.": "Access denied: a valid token of the channel client is required.",
+    "Only an application under review can be approved or rejected.": "Only an application under review can be approved or rejected."
 }

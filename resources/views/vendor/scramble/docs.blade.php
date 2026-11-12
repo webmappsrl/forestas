@@ -229,6 +229,69 @@
             panel.appendChild(run);
             panel.appendChild(outcome);
 
+@if (config('sus.test_tools'))
+            // Strumento di prova (config/sus.php): decide una domanda trasmessa
+            // come farebbe l'istruttore, per provare gli esiti della lettura.
+            // Le rotte sono fuori da /api/v1/sus, quindi il token si mette qui
+            // e non lo aggiunge l'involucro di fetch qui sopra.
+            const decide = document.createElement('div');
+            decide.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb';
+
+            const note = document.createElement('div');
+            note.textContent = 'Solo per le prove, non fa parte delle API: decide una domanda trasmessa come farebbe l\'istruttore.';
+            note.style.cssText = 'margin-bottom:6px;color:#6b7280;font-size:12px';
+
+            const field = (placeholder, width) => {
+                const input = document.createElement('input');
+                input.placeholder = placeholder;
+                input.style.cssText = 'width:' + width + ';box-sizing:border-box;margin:0 0 6px;padding:5px 8px;border:1px solid #d9dde3;border-radius:5px;font:12px/1.3 ui-sans-serif,system-ui,sans-serif';
+                return input;
+            };
+            const idInput = field('id della domanda', '100%');
+            const reasonInput = field('motivo del rifiuto (serve solo per respingere)', '100%');
+
+            const action = (label, colour) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = label;
+                button.style.cssText = 'margin-right:6px;padding:5px 10px;border-radius:5px;cursor:pointer;font:600 12px/1.2 ui-sans-serif,system-ui,sans-serif;color:#fff;border:1px solid ' + colour + ';background:' + colour;
+                return button;
+            };
+            const approve = action('Approva', '#0f7b45');
+            const reject = action('Respingi', '#b42318');
+
+            const send = async (verb, body) => {
+                const id = idInput.value.trim();
+                if (!token) { outcome.textContent = 'Fai prima il login: la prova usa il token di questa pagina.'; return; }
+                if (!/^[0-9]+$/.test(id)) { outcome.textContent = 'Scrivi l\'id della domanda, quello restituito dalla creazione.'; return; }
+
+                outcome.textContent = 'Invio in corso…';
+                try {
+                    const response = await window.fetch('/docs/api/sus/test/trail-applications/' + id + '/' + verb, {
+                        method: 'POST',
+                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                        body: JSON.stringify(body),
+                    });
+                    const json = await response.json();
+                    outcome.textContent = response.status + ' ' + response.statusText + '\n'
+                        + JSON.stringify(json, null, 2)
+                        + (response.ok ? '\n\nOra GET /trail-applications/' + id + ' mostra l\'esito.' : '');
+                } catch (e) {
+                    outcome.textContent = 'La chiamata non è partita: ' + e;
+                }
+            };
+
+            approve.addEventListener('click', () => send('approve', {}));
+            reject.addEventListener('click', () => send('reject', { rejection_reason: reasonInput.value }));
+
+            decide.appendChild(note);
+            decide.appendChild(idInput);
+            decide.appendChild(reasonInput);
+            decide.appendChild(approve);
+            decide.appendChild(reject);
+            panel.insertBefore(decide, outcome);
+@endif
+
             // Una riga di stato, non un comando: dice se le chiamate stanno
             // partendo autenticate. Senza, chi prova non ha modo di sapere
             // perche' una chiamata risponde 401.
