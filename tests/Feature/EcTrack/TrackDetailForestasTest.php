@@ -180,20 +180,44 @@ it('toglie dal dettaglio l\'id del nodo Drupal', function () {
         ->and($track->fresh()->properties['sardegnasentieri_id'])->toBe('4516');
 });
 
-it('porta gli enti con id e tutti i loro ruoli, un elemento per ente', function () {
+it('porta gli enti raggruppati per ruolo, con id e nome in tutte le lingue', function () {
     $track = forestasTrack();
-    $ente = Ente::create(['sardegnasentieri_id' => '29', 'name' => ['it' => 'Comunità Montana'], 'properties' => []]);
-    $other = Ente::create(['sardegnasentieri_id' => '17', 'name' => ['it' => 'Comune di Oliena'], 'properties' => []]);
+    $ente = Ente::create(['sardegnasentieri_id' => '29', 'slug' => 'comunita-montana', 'name' => ['it' => 'Comunità Montana', 'en' => 'Mountain Community'], 'properties' => []]);
+    $other = Ente::create(['sardegnasentieri_id' => '17', 'slug' => 'comune-di-oliena', 'name' => ['it' => 'Comune di Oliena'], 'properties' => []]);
     foreach (['gestore', 'manutentore'] as $role) {
         $track->enti()->attach($ente->id, ['ruolo' => $role]);
     }
-    $track->enti()->attach($other->id, ['ruolo' => 'operatore']);
+    $track->enti()->attach($other->id, ['ruolo' => 'manutentore']);
+    $track->enti()->attach($other->id, ['ruolo' => 'complesso_forestale']);
 
-    // Il resto della scheda dell'ente lo dà l'API degli enti (scrum del 2026-11-11): qui solo
-    // l'id e i ruoli, che dipendono dalla traccia.
-    expect(detailForestas($track)['entities'])->toEqualCanonicalizing([
-        ['id' => $ente->id, 'roles' => ['gestore', 'manutentore']],
-        ['id' => $other->id, 'roles' => ['operatore']],
+    // Il resto della scheda dell'ente lo dà l'API degli enti (scrum del 2026-11-11). I gruppi
+    // senza enti (qui rilevatore e operatore) non escono.
+    $organizations = detailForestas($track)['organizations'];
+
+    // toEqual: l'ordine delle lingue in `name` lo decide il JSON salvato; l'ordine dei gruppi si
+    // controlla a parte.
+    expect(array_keys($organizations))->toBe(['manager', 'maintainer', 'forest_complex'])
+        ->and($organizations)->toEqual([
+            'manager' => [
+                ['id' => $ente->id, 'slug' => 'comunita-montana', 'name' => ['it' => 'Comunità Montana', 'en' => 'Mountain Community']],
+            ],
+            'maintainer' => [
+                ['id' => $ente->id, 'slug' => 'comunita-montana', 'name' => ['it' => 'Comunità Montana', 'en' => 'Mountain Community']],
+                ['id' => $other->id, 'slug' => 'comune-di-oliena', 'name' => ['it' => 'Comune di Oliena']],
+            ],
+            'forest_complex' => [
+                ['id' => $other->id, 'slug' => 'comune-di-oliena', 'name' => ['it' => 'Comune di Oliena']],
+            ],
+        ])->and(detailForestas($track))->not->toHaveKey('entities');
+});
+
+it('porta con il nome salvato nel DB un ruolo di ente non previsto', function () {
+    $track = forestasTrack();
+    $ente = Ente::create(['sardegnasentieri_id' => '29', 'name' => ['it' => 'Comunità Montana'], 'properties' => []]);
+    $track->enti()->attach($ente->id, ['ruolo' => 'finanziatore']);
+
+    expect(detailForestas($track)['organizations'])->toBe([
+        'finanziatore' => [['id' => $ente->id, 'slug' => null, 'name' => ['it' => 'Comunità Montana']]],
     ]);
 });
 

@@ -54,34 +54,53 @@ class ForestasTrackDetail
             'registry_code' => $track->forestas_registry_code,
             'survey_date' => $track->forestas_survey_date?->format('Y-m-d'),
             'inclusivity' => self::inclusivity($track, $stored),
-            'entities' => self::entities($track),
+            'organizations' => self::organizations($track),
             'nearby_tracks' => self::nearbyTracks($track),
             'downloads' => self::downloads($track),
         ], fn ($value) => $value !== null && $value !== '' && $value !== []);
     }
 
     /**
-     * Gli enti collegati, uno per ente con tutti i suoi ruoli (gestore, manutentore, rilevatore,
-     * operatore, complesso forestale): in `enteables` lo stesso ente ha una riga per ruolo. Solo
-     * l'id e i ruoli: nome e scheda dell'ente li dà l'API degli enti, mentre i ruoli dipendono dalla
-     * traccia e lì non ci sono (scrum del 2026-11-11).
-     *
-     * @return list<array{id: int, roles: list<string>}>
+     * I ruoli di `enteables.ruolo` con la chiave inglese del gruppo, nell'ordine in cui escono.
      */
-    private static function entities(EcTrack $track): array
+    private const ORGANIZATION_ROLES = [
+        'gestore' => 'manager',
+        'manutentore' => 'maintainer',
+        'rilevatore' => 'surveyor',
+        'operatore' => 'operator',
+        'complesso_forestale' => 'forest_complex',
+    ];
+
+    /**
+     * Gli enti collegati, raggruppati per ruolo (gestore, manutentore, rilevatore, operatore,
+     * complesso forestale): in `enteables` lo stesso ente ha una riga per ruolo, quindi compare in
+     * ogni gruppo in cui ha un ruolo. Ogni ente porta id, slug e nome in tutte le lingue; il resto della
+     * scheda lo dà l'API degli enti, mentre i ruoli dipendono dalla traccia e lì non ci sono (scrum
+     * del 2026-11-11). La chiave è `organizations` e non `entities`: sono enti (comuni, complessi
+     * forestali, istituzioni, partner, associazioni), non «entità». I gruppi vuoti non escono; un
+     * ruolo non previsto esce con il nome salvato nel DB.
+     *
+     * @return array<string, list<array{id: int, slug: string|null, name: array<string, string>}>>
+     */
+    private static function organizations(EcTrack $track): array
     {
-        $entities = [];
+        $groups = array_fill_keys(array_values(self::ORGANIZATION_ROLES), []);
         /** @var Ente $ente */
-        foreach ($track->enti as $ente) {
-            $id = (int) $ente->id;
-            $entities[$id] ??= ['id' => $id, 'roles' => []];
+        foreach ($track->enti->sortBy('id') as $ente) {
             $role = $ente->getRelationValue('pivot')?->getAttribute('ruolo');
-            if (is_string($role) && $role !== '' && ! in_array($role, $entities[$id]['roles'], true)) {
-                $entities[$id]['roles'][] = $role;
+            if (! is_string($role) || $role === '') {
+                continue;
             }
+            $key = self::ORGANIZATION_ROLES[$role] ?? $role;
+            $id = (int) $ente->id;
+            if (in_array($id, array_column($groups[$key] ?? [], 'id'), true)) {
+                continue;
+            }
+            // Lo slug è l'indirizzo della scheda dell'ente nel sito (`/enti/<slug>`).
+            $groups[$key][] = ['id' => $id, 'slug' => $ente->slug, 'name' => $ente->getTranslations('name')];
         }
 
-        return array_values($entities);
+        return array_filter($groups);
     }
 
     /**

@@ -24,7 +24,9 @@ da `App\Models\EcTrack::getDetailGeojson()`. Le tassonomie stanno invece in
   "survey_date": "2022-08-04",
   "inclusivity": {"physical": 40, "aids": 30, "digital": 20, "score": 90, "class": "A1",
                   "independent_use": "…", "assistance": "…"},
-  "entities": [{"id": 29, "roles": ["gestore", "manutentore", "rilevatore"]}],
+  "organizations": {"manager": [{"id": 29, "slug": "comunita-montana-…", "name": {"it": "Comunità Montana…", "en": "…"}}],
+                    "maintainer": [{"id": 29, "name": {…}}, {"id": 17, "name": {…}}],
+                    "surveyor": [{"id": 29, "name": {…}}]},
   "nearby_tracks": [{"id": 48, "ref": "Z-NU-B-405", "name": {"it": "Scala 'e Pradu - Gasole (B 405)"},
                      "route_type": {"identifier": "route-type-trail", "name": {"it": "Sentiero"}},
                      "feature_image": {"id": 76228, "url": "…", "thumbnail": "…", "sizes": {…}, "caption": null, …},
@@ -43,7 +45,7 @@ da `App\Models\EcTrack::getDetailGeojson()`. Le tassonomie stanno invece in
 | `attachments` | collection `attachments` della media library; `title` = `custom_properties.sardegnasentieri_title`, `null` se manca |
 | `registry_code`, `survey_date` | colonne `forestas_registry_code`, `forestas_survey_date` |
 | `inclusivity` | colonne `forestas_inclusivity_*`, punteggio e classe da `InclusivityScore` (solo con tutti e tre i valori), `independent_use` e `assistance` scritti a mano in Nova |
-| `entities` | relazione `enti()` (`enteables`): un elemento per ente, con `id` e tutti i suoi `ruolo` in `roles`; nome e scheda dell'ente li dà l'API degli enti, che i ruoli non li ha perché dipendono dalla traccia |
+| `organizations` | relazione `enti()` (`enteables`), raggruppata per `ruolo`: `manager` (gestore), `maintainer` (manutentore), `surveyor` (rilevatore), `operator` (operatore), `forest_complex` (complesso forestale). Ogni ente ha `id`, `slug` (l'indirizzo della scheda, `/enti/<slug>`) e `name` in tutte le lingue, e compare in ogni gruppo in cui ha un ruolo; i gruppi vuoti non escono, un ruolo non previsto esce con il nome del DB. Il resto della scheda dell'ente lo dà l'API degli enti, che i ruoli non li ha perché dipendono dalla traccia. La chiave non è `entities` perché sono enti (comuni, complessi forestali, istituzioni, partner, associazioni), non «entità» |
 | `nearby_tracks` | i «Sentieri correlati» della scheda: relazione `relatedTracks()` (`ec_track_related_tracks`, scritta da `CalculateNearbyTracksJob`). Ogni elemento ha quello che mostra la card del carosello: `id`, `ref` (`properties.ref`), nome, `route_type` (termine di «Tipo percorso»), `feature_image` (la prima foto, stessi campi di quella del dettaglio), `distance` e `duration_forward` con la precedenza manuale > OSM > DEM del dettaglio. Un dato assente è `null`; la distanza fra i due sentieri non è salvata |
 | `downloads` | rotte `default.api.ec.track.download.geojson`, `.gpx`, `.kml` dello shard |
 

@@ -126,3 +126,15 @@ per le collection nei test, il test duplicato in `ForestasColumnsTest`.
   Test: `tests/Feature/EcTrack/RelatedTrackCardsRefreshTest.php`.
 - La morphMap del package risolve `App\Models\EcTrack` in `Wm\WmPackage\Models\EcTrack`: un
   controllo `is_a()` sulla classe del termable va fatto contro la classe del package.
+
+## Modifiche dopo il merge (2026-11-12)
+
+- **`entities` diventa `organizations`, raggruppata per ruolo** (richiesta del dev). «Entities» si
+  legge «entità», mentre sono enti: comuni, complessi forestali, istituzioni, partner e
+  associazioni. `organizations` li copre tutti, «ente governativo» no. I gruppi hanno chiavi in
+  inglese (`manager`, `maintainer`, `surveyor`, `operator`, `forest_complex`) e ogni ente porta
+  `id` e `name` in tutte le lingue. Cambia la decisione dello scrum delle 13:54, per cui il nome
+  lo dava solo l'API degli enti: ora esce anche qui. Un ruolo non previsto esce con il nome
+  salvato nel DB. Test in `tests/Feature/EcTrack/TrackDetailForestasTest.php`.
+- **Slug degli enti** (richiesta del dev, 2026-11-12): ogni ente di `organizations` porta anche
+  `slug`, l'indirizzo della sua scheda nel sito (`/enti/<slug>`); 93 enti su 93 lo hanno.
