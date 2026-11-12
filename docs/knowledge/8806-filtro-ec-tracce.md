@@ -20,8 +20,9 @@ Gli altri due:
 - **«Ruolo»** (`app/Nova/Filters/EcTrackRuoloFilter.php`): tracce con almeno un ente in quel ruolo
   (tabella `enteables`, scritta dall'import di Sardegna Sentieri); le tracce senza enti non hanno
   un valore che le trovi;
-- **«Stato validazione»**: filtro del campo `Select` `stato_validazione`; le tracce senza stato non
-  hanno un valore che le trovi.
+- **«Stato validazione»** (`app/Nova/Filters/EcTrackValidationStatusFilter.php`): tracce con quel
+  termine della famiglia `validation-status` (oc:8932); le tracce senza stato non hanno un valore
+  che le trovi.
 
 Non ci sono il filtro **App** (il campo del package è reso non filtrabile in
 `App\Nova\EcTrack::fields()`; colonna, dettaglio e form restano, e sulle altre liste il filtro
@@ -69,8 +70,10 @@ accessibilità, qualunque sia». «Accessibile» non è un'attività né un camp
   `--reset`**, prima del batch: dove il reset notturno è attivo non va lanciato a mano, altrove
   una volta dopo il deploy (oc:8910);
 - **a fine batch dell'import** la catena è `SyncTaxonomyWhereJob` →
-  `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob` (reindex e file
-  AWS). Il job ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
+  `ResolveSardegnaSentieriRelationsJob` → `RecalculateSardegnaSentieriLayersJob` →
+  `CalculateNearbyTracksJob`, che a fine calcolo dei sentieri correlati accoda
+  `RegenerateTaxonomyWhereOutputsJob` (reindex e file AWS, oc:8959).
+  `RecalculateSardegnaSentieriLayersJob` ricalcola i layer automatici dell'app che hanno attività o aree: `layerables` con
   `assignTracksByTaxonomy()`, POI solo sui layer delle aree, `properties.layers` allineato in modo
   sincrono, geometria e PBF una volta per layer e solo se qualcosa è cambiato;
 - **il reset notturno** non tronca più `taxonomy_activities`: le attività restano con il loro id,

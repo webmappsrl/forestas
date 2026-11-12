@@ -29,21 +29,27 @@ qui conta come entra nello shard.
   `config/` (oc:8717), purché gli zip siano già sull'host; le licenze le rimette dal suo `.env` solo
   su un indirizzo che non è `localhost`, quindi in locale il sito nasce senza licenze, come vuole il
   README di `wp-forestas`. Si perdono contenuti e uploads. Le pagine statiche (oc:8758), le news
-  (oc:8759), gli eventi e i «da sapere» (oc:8760) importati da Drupal non le rimette l'init: le crea `wp-forestas/bin/wordpress-config.sh
-  allinea`, che collega anche i menu e verifica lo stato; è il comando pensato per il cron giornaliero
-  su UAT (`wp-forestas/cron/allinea.crontab`, non ancora installato). Carte e zone geografiche di Drupal
-  restano fuori: arriveranno con il plugin che legge lo shard. I file dei media si scaricano dal sito pubblico di
-  Drupal: dopo lo spegnimento servirà una copia della cartella `sites/default/files`
-  (`DRUPAL_FILES_URL` nel `wp-forestas/.env`). In produzione i dati saranno permanenti. Questa è la
-  descrizione di riferimento: procedura di UAT e `wordpress-reset.sh` rimandano qui.
+  (oc:8759), gli eventi e i «da sapere» (oc:8760) importati da Drupal non le rimette l'init: le crea
+  `wp-forestas/bin/wordpress-config.sh allinea`, che collega anche i menu e verifica lo stato; è il
+  comando del cron giornaliero di UAT e di dev (`wp-forestas/cron/allinea.crontab`, che dice anche
+  dove è installato). Carte e zone geografiche di Drupal restano fuori: arriveranno con il plugin
+  che legge lo shard. I file dei media si scaricano dal sito pubblico di Drupal: dopo lo spegnimento
+  servirà una copia della cartella `sites/default/files` (`DRUPAL_FILES_URL` nel
+  `wp-forestas/.env`). In produzione i dati saranno permanenti. Questa è la descrizione di
+  riferimento: procedura di UAT e `wordpress-reset.sh` rimandano qui.
 - **UAT** (`https://wp.forestas.uat.maphub.it`): messa in opera, aggiornamenti e azzeramento in
   [docs/howto/messa-in-opera-wordpress-uat.md](../howto/messa-in-opera-wordpress-uat.md).
+- **Dev** (`https://wp.forestas.dev.maphub.it`): l'ambiente per le prove, senza licenze, che legge
+  la copia Drupal di UAT dal tunnel; differenze rispetto a UAT in
+  [docs/howto/messa-in-opera-wordpress-dev.md](../howto/messa-in-opera-wordpress-dev.md) (oc:8947).
 
 Vincoli:
 
-- Il plugin `wp-geohub` oggi legge gli shard dalla lista pubblica di `wm-types`
-  (`forestasuat` → `https://forestas.uat.maphub.it`): in locale legge i dati di UAT, non lo shard
-  locale. Le chiamate locali sono un lavoro successivo.
+- Il plugin della ricerca `wp-package` (oc:8952, al posto di `wp-geohub`) legge gli shard dalla lista
+  pubblica di `wm-types` e usa quello delle sue opzioni, scritte dall'init da `WP_PACKAGE_SHARD` e
+  `WP_PACKAGE_APP_ID` di `wp-forestas/.env` (in locale e su dev `forestasdev` e 1): anche in locale la
+  ricerca chiama l'API di uno shard pubblicato, non lo shard locale. Il browser chiama direttamente
+  `api/v2/elasticsearch` dello shard.
 - Un `wp-forestas/compose.yml` non valido fa fallire `docker compose up` dell'intero shard:
   `wordpress-up.sh` lo valida a ogni aggiornamento, così l'errore emerge subito e non al primo
   riavvio della macchina.

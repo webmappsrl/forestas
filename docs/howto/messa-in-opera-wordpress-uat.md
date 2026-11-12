@@ -111,6 +111,40 @@ il comando da mettere nel cron, ma solo su un sito con `config/` già applicata:
 riga del cron è in `wp-forestas/cron/allinea.crontab`, la procedura in
 `wp-forestas/docs/howto/cron-sincronizzazione-pagine.md`.
 
+### Ricerca unica e plugin `wp-package` (oc:8952)
+
+Al rilascio che porta la ricerca:
+
+1. Nel `wp-forestas/.env`, `WP_PACKAGE_SHARD` e `WP_PACKAGE_APP_ID` dello shard di UAT
+   (`WP_PACKAGE_DIR` resta vuoto: serve solo in locale), poi `scripts/wordpress-up.sh`. Nei log
+   dell'init: «scarico wp-package al commit …», «attivo il plugin wp-package», «imposto wmwp_shard
+   dal .env», «imposto wmwp_app_id dal .env». Finché il repo GitHub del plugin non esiste c'è solo
+   «AVVISO: wp-package non ancora pubblicato, nessun download», e `/cerca-nel-sito` mostra un campo di
+   ricerca semplice.
+2. `applica --conferma` (crea il template `template-pagina-ricerca`), poi `pagine --conferma` (crea
+   `/cerca-nel-sito` in italiano e in inglese), come per ogni rilascio di `config/`.
+3. Il vecchio plugin `wp-geohub` (cartella `wm-package`) resta installato: l'init non disinstalla niente.
+   Si toglie a mano:
+
+   ```bash
+   docker exec -u www-data wordpress-<APP_NAME> wp --path=/var/www/html plugin deactivate wm-package
+   docker exec -u www-data wordpress-<APP_NAME> wp --path=/var/www/html plugin delete wm-package
+   ```
+
+4. Verifica: `https://wp.forestas.uat.maphub.it/cerca-nel-sito/?search_api_fulltext=perda+liana` ha i
+   tab «Percorsi» e «Contenuti del sito» con i numeri, e la ricerca dell'header porta lì.
+
+Un aggiornamento del plugin arriva con il nuovo hash in `WP_PACKAGE_REF` (`init-wordpress.sh`) e
+`scripts/wordpress-up.sh`: l'init lo riscarica perché il commit è diverso da quello in `.wpf-ref`.
+
+**Tornare indietro** a un puntatore senza la ricerca: `pagine` non cancella le pagine tolte da
+`config/pagine.json`, quindi `/cerca-nel-sito` resterebbe e mostrerebbe lo shortcode `[forestas_search]`
+come testo. Si cancella la pagina nelle due lingue dal pannello (Pagine, cestino, «Elimina
+definitivamente»: da WP-CLI WPML non toglie la riga di traduzione), poi `applica --conferma` con il
+`config/` del puntatore vecchio. Il campo «Cerca nel sito» dell'header manda sempre a `?s=` (il `config/post.json`
+di oc:8952 aggiunge solo il template della pagina di ricerca): è il 302 del child nuovo, con il plugin attivo, a
+portarlo a `/cerca-nel-sito`; con il child vecchio resta la ricerca di WordPress.
+
 ## Azzerare WordPress
 
 ```bash
@@ -119,8 +153,9 @@ scripts/wordpress-reset.sh --conferma
 
 Cancella database e file di WordPress e lo ricrea da zero; non tocca gli altri volumi. Cosa ha il
 sito ricreato e cosa si perde: [WordPress nello shard](../knowledge/wordpress-nello-shard.md),
-«Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera nel
-README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu, non le
-pagine statiche di oc:8758, le news di oc:8759 né eventi e «da sapere» di oc:8760: le crea `wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron
-quando ci sarà), che collega anche i menu. Oggi il reset si lancia solo a mano: il ciclo giornaliero su
-UAT non è ancora attivo. **In produzione non va usato**.
+«Azzerare». Su UAT servono gli zip commerciali e le chiavi nel `wp-forestas/.env` (messa in opera
+nel README di `wp-forestas`). Dopo il reset l'init rimette configurazione, header, footer e menu,
+non le pagine statiche di oc:8758, le news di oc:8759 né eventi e «da sapere» di oc:8760: le crea
+`wp-forestas/bin/wordpress-config.sh allinea` (a mano, o il cron di
+`wp-forestas/cron/allinea.crontab`), che collega anche i menu. Oggi il reset si lancia solo a mano:
+il ciclo giornaliero su UAT non è ancora attivo. **In produzione non va usato**.

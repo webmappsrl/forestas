@@ -5,9 +5,8 @@ richiede `^8.2`), PostgreSQL + PostGIS, Nova 5.7.6, Elasticsearch 8, Redis, Hori
 
 ## Regole che precedono tutte le altre
 
-**Non eseguire mai `git commit` senza istruzione esplicita dell'utente.** Implementa, testa, poi
-fermati: è l'utente che controlla il codice e committa. Vale anche per i subagent, che vanno
-istruiti esplicitamente a non committare.
+**Nessun commit senza richiesta del dev.** Unica eccezione: la chiusura di `wm-plan`, dopo il
+primo commit del dev. I subagent non committano mai.
 
 **Il DB reale contiene dati importati da processi lunghi: distruggerli è inaccettabile.** Prima di
 lanciare la suite va verificato l'isolamento; se non è verificabile, non si lancia e si chiede
@@ -85,6 +84,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | Copia del DB Drupal | fonte dell'import; accesa dal compose su UAT, a mano in locale; come si interroga, schema Drupal, il record completo che l'import legge, come replica le API, da dove viene ogni campo | [docs/knowledge/copia-database-drupal.md](docs/knowledge/copia-database-drupal.md) |
 | WordPress nello shard | submodule `wp-forestas`, include nei compose, i due `.env`, aggiornare e azzerare WordPress | [docs/knowledge/wordpress-nello-shard.md](docs/knowledge/wordpress-nello-shard.md) |
 | Filtri della lista EC Tracce | layer con le tracce associate (regola a quattro passi), come l'import mette le tracce nei layer, aree catastali come multiselect, reset notturno e `layerables` | [docs/knowledge/8806-filtro-ec-tracce.md](docs/knowledge/8806-filtro-ec-tracce.md) |
+| Dettaglio della traccia: dati di Forestas | `properties.forestas` costruito in uscita (registro, inclusività, allegati, video, enti, sentieri correlati con i dati della card, download), crediti foto con le foto, chiavi tolte, `EC_TRACK_MODEL` | [docs/knowledge/dettaglio-della-traccia-dati-forestas.md](docs/knowledge/dettaglio-della-traccia-dati-forestas.md) |
 | Classificazioni e inclusività | come nascono famiglie e termini, mappatura dei termini Drupal, dati manuali e importati, punteggio e soglie, reindex | [docs/knowledge/classificazioni-e-inclusivita.md](docs/knowledge/classificazioni-e-inclusivita.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
@@ -99,6 +99,7 @@ customizzazione di Forestas.
 | Creare o ruotare il client SUS | [docs/howto/creazione-client-sus.md](docs/howto/creazione-client-sus.md) |
 | Accendere, caricare o raggiungere la copia del DB Drupal | [docs/howto/copia-database-drupal.md](docs/howto/copia-database-drupal.md) |
 | Mettere in opera, aggiornare o azzerare WordPress su UAT | [docs/howto/messa-in-opera-wordpress-uat.md](docs/howto/messa-in-opera-wordpress-uat.md) |
+| Mettere in opera, aggiornare o azzerare WordPress su dev | [docs/howto/messa-in-opera-wordpress-dev.md](docs/howto/messa-in-opera-wordpress-dev.md) |
 
 ## Ruoli
 

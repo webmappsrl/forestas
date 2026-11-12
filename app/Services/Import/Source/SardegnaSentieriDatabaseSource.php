@@ -7,6 +7,7 @@ namespace App\Services\Import\Source;
 use App\Dto\Api\ApiPoiResponse;
 use App\Dto\Api\ApiTrackResponse;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -97,6 +98,8 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             'description' => $this->bodyByLang($record, 'value'),
             'excerpt' => $this->bodyByLang($record, 'summary'),
             'allegati' => $this->documentUrls($record, 'field_allegati_media'),
+            'attachment_files' => $this->namedFiles($record, 'field_allegati_media', 'field_media_document'),
+            'uploaded_videos' => $this->namedFiles($record, 'field_video_media', 'field_media_video_file'),
             'gpx' => $this->documentUrls($record, 'field_gpx_media'),
             'video' => $this->videos($record),
             'immagine_principale' => $this->images($record, 'field_immagine_principale_media')[0] ?? null,
@@ -108,7 +111,9 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             'partenza' => $this->single($record, 'field_partenza', 'target_id'),
             'arrivo' => $this->single($record, 'field_arrivo', 'target_id'),
             'poi_correlati' => $this->references($record, 'field_poi_correlati'),
+            'punti_di_interesse' => $this->references($record, 'field_punti_di_interesse'),
             'ente_istituzione_societa' => $this->enti($record),
+            'collegamenti' => $this->links($record),
             'taxonomies' => array_filter([
                 'tipologia_sentieri' => $this->references($record, 'field_tipologia_sentiero'),
                 'tipologia_di_avvertenze' => $this->references($record, 'field_avvertenze_e_pericoli'),
@@ -144,12 +149,17 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             'addr_locality' => $this->single($record, 'field_localita'),
             'collegamenti' => $this->links($record),
             'come_arrivare' => $this->accumulatedTexts($record, 'field_come_arrivare'),
-            // Le API non esponevano gli allegati dei POI, anche se Drupal li ha.
-            'allegati' => [],
+            // Le API non esponevano gli allegati dei POI, anche se Drupal li ha:
+            // ora si leggono dalla copia del database (field_allegati_media).
+            'allegati' => $this->documentUrls($record, 'field_allegati_media'),
+            'attachment_files' => $this->namedFiles($record, 'field_allegati_media', 'field_media_document'),
+            'uploaded_videos' => $this->namedFiles($record, 'field_video_media', 'field_media_video_file'),
             'video' => $this->videos($record),
             'immagine_principale' => $this->images($record, 'field_immagine_principale_media')[0] ?? null,
             'galleria' => $this->images($record, 'field_galleria_media'),
             'poi_correlati' => $this->references($record, 'field_poi_correlati'),
+            'sentieri_collegati' => $this->references($record, 'field_sentieri_collegati'),
+            'itinerari_correlati' => $this->references($record, 'field_itinerari_correlati'),
             'ente_istituzione_societa' => $this->enti($record),
             'taxonomies' => array_filter([
                 'tipologia_poi' => $this->references($record, 'field_tipologia_poi'),
@@ -214,7 +224,27 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
         $contatti = $this->single($record, 'field_contatti');
         $imageUrl = $image === null ? null : DrupalValues::fileUrl((string) $image['entity']['uri']);
 
+        // L'immagine principale sta nel campo media nuovo (89 enti); il campo
+        // file vecchio resta come ripiego (41 enti, 50 hanno solo il nuovo).
+        // La galleria segue la principale, senza ripetere un file già preso.
+        $main = $this->images($record, 'field_immagine_principale_media')[0]
+            ?? ($imageUrl === null ? null : ['url' => $imageUrl, 'autore' => '', 'credits' => '', 'caption' => '']);
+        $images = [];
+        foreach ([...($main === null ? [] : [$main]), ...$this->images($record, 'field_galleria_media')] as $item) {
+            $images[$item['url']] ??= $item;
+        }
+
+        $links = $this->links($record);
+        $webTitle = trim((string) ($this->items($record, 'field_pagina_web')[0]['title'] ?? ''));
+        $alias = $this->aliasPath($record);
+        $slug = $alias === null ? null : (string) Arr::last(array_filter(explode('/', $alias), fn ($part) => $part !== ''));
+
         return array_filter([
+            'created' => DrupalValues::dateTime((int) $node['created']),
+            'slug' => $slug === '' ? null : $slug,
+            'pagina_web_title' => $webTitle === '' ? null : $webTitle,
+            'collegamenti' => $links === [] ? null : $links,
+            'immagini' => $images === [] ? null : array_values($images),
             'nid' => [['value' => $id]],
             'title' => [['value' => $node['title']]],
             'body' => $body === null ? null : [['value' => $body]],
@@ -506,23 +536,22 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     }
 
     /**
-     * I link appiattiti come facevano le API: uri e titolo, uno dopo l'altro,
-     * con il titolo spezzato su «, » e gli spazi lasciati come sono. Le API
-     * li leggevano in tutte le lingue.
+     * I collegamenti esterni del nodo come coppie indirizzo e titolo, nella
+     * lingua originale (come per gli enti). La scelta e' deliberata: i
+     * collegamenti in un'altra lingua esistono su un solo nodo (5106), con gli
+     * stessi indirizzi e titoli dell'italiano, quindi non si perde niente.
+     * Un collegamento senza indirizzo
+     * non porta niente e si scarta; il titolo puo' mancare.
      *
      * @param  array<string, mixed>  $record
-     * @return list<string>
+     * @return list<array{uri: string, title: string}>
      */
     private function links(array $record): array
     {
         $result = [];
-        foreach ($this->allItems($record, 'field_collegamenti') as $item) {
-            $titleParts = explode(', ', (string) $item['title']);
-
-            foreach ([$item['uri'], ...$titleParts] as $value) {
-                if ($value !== null && $value !== '') {
-                    $result[] = (string) $value;
-                }
+        foreach ($this->items($record, 'field_collegamenti') as $item) {
+            if (($item['uri'] ?? '') !== '') {
+                $result[] = ['uri' => (string) $item['uri'], 'title' => trim((string) ($item['title'] ?? ''))];
             }
         }
 
@@ -531,7 +560,8 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
 
     /**
      * Media di tipo documento (GPX, allegati) → URL dei file, nella lingua
-     * originale del nodo: le API non esponevano le traduzioni dei media.
+     * originale del nodo, con ripiego sull'inglese se vuota (vedi
+     * mediaReferences()).
      *
      * @param  array<string, mixed>  $record
      * @return list<string>
@@ -550,8 +580,35 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     }
 
     /**
+     * I file (documenti, video caricati) richiamati da un campo, ciascuno con
+     * il titolo che Drupal mostra: il nome del media, nella lingua del media.
+     * Passa da mediaItems(), quindi eredita il ripiego sull'inglese. L'URL è
+     * quello di fileUrl(), la chiave con cui il media sync riconosce un file
+     * già scaricato.
+     *
      * @param  array<string, mixed>  $record
-     * @return list<array{url: string, autore: string, credits: string}>
+     * @return list<array{url: string, title: string}>
+     */
+    private function namedFiles(array $record, string $field, string $fileField): array
+    {
+        $files = [];
+        foreach ($this->mediaItems($record, $field, $fileField) as [$media, $file]) {
+            $url = DrupalValues::fileUrl((string) $file['entity']['uri']);
+            if ($url === null || isset($files[$url])) {
+                continue;
+            }
+            $title = trim((string) ($media['translations'][$media['langcode'] ?? '']['name'] ?? ''));
+            $files[$url] = ['url' => $url, 'title' => $title];
+        }
+
+        return array_values($files);
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     *                                        La didascalia è il testo alternativo dell'immagine (`alt`): è quello che
+     *                                        Drupal mostra sotto la foto, mentre il nome del media è il nome del file.
+     * @return list<array{url: string, autore: string, credits: string, caption: string}>
      */
     private function images(array $record, string $field): array
     {
@@ -563,11 +620,31 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
                     'url' => $url,
                     'autore' => (string) ($this->items($media, 'field_autore')[0]['value'] ?? ''),
                     'credits' => (string) ($this->items($media, 'field_credits')[0]['value'] ?? ''),
+                    'caption' => trim((string) ($file['alt'] ?? '')),
                 ];
             }
         }
 
         return $images;
+    }
+
+    /**
+     * I media richiamati da un campo: quelli della lingua originale e, solo
+     * se quella non ne ha, quelli della traduzione inglese. Su Drupal alcuni
+     * file sono collegati solo all'inglese (nodi 75 e 1105: 37 immagini su
+     * 30 percorsi; allegati dei sentieri 173, 624, 1423) e senza ripiego
+     * il nuovo sito li perderebbe. Se la lingua originale ha qualcosa,
+     * l'inglese si ignora. Il record porta già tutte le lingue: nessuna
+     * query in più.
+     *
+     * @param  array<string, mixed>  $record
+     * @return list<array<string, mixed>>
+     */
+    private function mediaReferences(array $record, string $field): array
+    {
+        $items = $this->items($record, $field);
+
+        return $items !== [] ? $items : $this->items($record, $field, 'en');
     }
 
     /**
@@ -581,7 +658,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     private function mediaItems(array $record, string $field, string $fileField): array
     {
         $result = [];
-        foreach ($this->items($record, $field) as $item) {
+        foreach ($this->mediaReferences($record, $field) as $item) {
             $media = $item['entity'] ?? null;
             if ($media === null) {
                 continue;
@@ -603,7 +680,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     private function videos(array $record): array
     {
         $videos = [];
-        foreach ($this->items($record, 'field_video_media') as $item) {
+        foreach ($this->mediaReferences($record, 'field_video_media') as $item) {
             $media = $item['entity'] ?? null;
             foreach ($media === null ? [] : $this->items($media, 'field_media_oembed_video') as $video) {
                 $videos[] = (string) $video['value'];
@@ -648,6 +725,20 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
      */
     private function url(array $record): string
     {
+        $path = $this->aliasPath($record) ?? "/node/{$record['id']}";
+
+        // Le API davano l'alias codificato segmento per segmento
+        // (`san-nicol%C3%B2-…`, `pantaleo-%E2%80%93-…`).
+        return self::SITE_URL.implode('/', array_map('rawurlencode', explode('/', $path)));
+    }
+
+    /**
+     * L'alias del nodo, come lo sceglie il sito, o null se non ne ha.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function aliasPath(array $record): ?string
+    {
         // L'alias italiano, come il sito: anche per i nodi nati in inglese
         // (sentiero 3661). Se manca, quello della lingua originale; a parità,
         // il più recente.
@@ -656,11 +747,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
             ->sortBy([fn ($a, $b) => ($b['langcode'] === 'it') <=> ($a['langcode'] === 'it'), fn ($a, $b) => $b['id'] <=> $a['id']])
             ->first();
 
-        $path = $alias['alias'] ?? "/node/{$record['id']}";
-
-        // Le API davano l'alias codificato segmento per segmento
-        // (`san-nicol%C3%B2-…`, `pantaleo-%E2%80%93-…`).
-        return self::SITE_URL.implode('/', array_map('rawurlencode', explode('/', $path)));
+        return $alias['alias'] ?? null;
     }
 
     /**

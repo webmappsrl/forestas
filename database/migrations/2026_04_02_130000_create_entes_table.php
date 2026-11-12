@@ -17,6 +17,9 @@ return new class extends Migration
             $table->jsonb('description')->nullable();
             $table->jsonb('contatti')->nullable();
             $table->string('pagina_web')->nullable();
+            $table->string('pagina_web_title')->nullable();
+            $table->string('slug')->nullable();
+            $table->timestamp('drupal_created_at')->nullable();
             $table->string('tipo_ente')->nullable();
             $table->geography('geometry', 'pointz')->nullable();
             $table->jsonb('properties')->nullable();

@@ -12,6 +12,11 @@ paths:
   mentre la tabella resta piena di dati, e il SUS riceve 404. **Se il Catasto smette di rispondere
   senza motivo apparente, la causa va cercata qui per prima.** Una verifica automatica al deploy è
   stata valutata e scartata: rischio accettato consapevolmente (oc:8492)
+- **Non impostare `EC_TRACK_MODEL=Wm\WmPackage\Models\EcTrack` nel `.env`**: il package userebbe il
+  suo modello al posto di `App\Models\EcTrack`, e il dettaglio su AWS perderebbe `properties.forestas`
+  costruito da forestas, oltre a inclusività nell'indice e legami traccia-layer. La variabile va
+  tolta (default del package `App\Models\EcTrack`, come gli altri shard); su dev e UAT era
+  impostata (oc:8959)
 - **La licenza Nova è scaduta**: dalla 5.8.0 in poi le release rispondono HTTP 402. Sia forestas
   sia wm-package vanno tenuti su `laravel/nova 5.7.6` — `composer.json` esclude esplicitamente
   `5.7.7`. Il rinnovo diventa obbligatorio prima di passare a Laravel 13 (oc:8469)

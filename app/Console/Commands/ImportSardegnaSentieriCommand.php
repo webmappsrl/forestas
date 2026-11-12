@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Jobs\Import\CalculateNearbyTracksJob;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
 use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
+use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
@@ -24,7 +26,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
-use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -269,8 +270,9 @@ class ImportSardegnaSentieriCommand extends Command
      * guardia: l'import salva con `saveQuietly()`, quindi nessun observer
      * scrive `properties.taxonomy_where`, e dopo un reset le tracce
      * resterebbero senza aree. Il sync e' quello dell'action Nova
-     * `SyncEcTaxonomyWhereAction`, seguito in catena dal reindex
-     * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`.
+     * `SyncEcTaxonomyWhereAction`, seguito dal reindex
+     * (`RegenerateTaxonomyWhereOutputsJob`), come fa `wm:resync-taxonomy-where`:
+     * lo accoda `CalculateNearbyTracksJob` quando tutti i suoi blocchi sono finiti.
      *
      * Con enti da importare il batch di POI e sentieri parte in catena dopo
      * il loro: dopo un `--reset` un sentiero il cui gestore non e' ancora
@@ -301,11 +303,17 @@ class ImportSardegnaSentieriCommand extends Command
                 // leggere le tracce gia' aggiornate (oc:8827).
                 Bus::chain([
                     new SyncTaxonomyWhereJob,
+                    // I collegamenti prima dei layer: il pivot ha un observer che associa i POI
+                    // ai layer del percorso (oc:8932).
+                    new ResolveSardegnaSentieriRelationsJob,
                     new RecalculateSardegnaSentieriLayersJob,
-                    new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
+                    // Ultimo della catena: accoda i blocchi in un batch e a batch finito
+                    // rigenera file delle tracce e indice (RegenerateTaxonomyWhereOutputsJob),
+                    // perche' i file portano i sentieri correlati (oc:8959).
+                    new CalculateNearbyTracksJob,
                 ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
 
-                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e reindex accodati.");
+                Log::channel('import')->info("[sardegnasentieri:{$runId}] Sync aree catastali, layer e correlati accodati; reindex a fine calcolo dei correlati.");
 
                 if (! $withNormalize) {
                     Log::channel('import')->info("[sardegnasentieri:{$runId}] Import parziale (--only): anomalie e registro catastale non aggiornati.");
@@ -834,6 +842,11 @@ class ImportSardegnaSentieriCommand extends Command
 
         DB::statement('TRUNCATE TABLE ec_tracks RESTART IDENTITY CASCADE');
         $this->info('Truncated ec_tracks.');
+
+        // Tabella dei sentieri vicini: ha chiavi esterne verso ec_tracks, quindi la
+        // porta via il CASCADE; la riga resta esplicita per chiarezza (oc:8932).
+        DB::statement('TRUNCATE TABLE ec_track_related_tracks RESTART IDENTITY');
+        $this->info('Truncated ec_track_related_tracks.');
 
         DB::statement('TRUNCATE TABLE ec_pois RESTART IDENTITY CASCADE');
         $this->info('Truncated ec_pois.');

@@ -14,7 +14,7 @@ readonly class ApiPoiResponse
         public ?array $description,
         public ?string $addr_locality,
         public ?string $codice,
-        /** @var list<mixed> */
+        /** @var list<array{uri: string, title: string}> Collegamenti esterni */
         public array $collegamenti,
         /** @var array<string, string>|null {it: [HTML], en: [HTML]} */
         public ?array $come_arrivare,
@@ -34,6 +34,15 @@ readonly class ApiPoiResponse
         public array $poi_correlati,
         /** @var array<string, mixed>|null */
         public ?array $ente_istituzione_societa,
+        /** @var list<array{url: string, title: string}> Allegati da copiare nella media library, con il titolo di Drupal */
+        public array $attachmentFiles = [],
+        /** @var list<array{url: string, title: string}> Video caricati su Drupal (non quelli di YouTube) */
+        public array $uploadedVideos = [],
+        public ?string $created_at = null,
+        /** @var list<string> nid dei percorsi citati da `field_sentieri_collegati` */
+        public array $sentieri_collegati = [],
+        /** @var list<string> nid degli itinerari citati da `field_itinerari_correlati` */
+        public array $itinerari_correlati = [],
     ) {}
 
     /**
@@ -63,7 +72,7 @@ readonly class ApiPoiResponse
             addr_locality: self::optionalString($props['addr_locality'] ?? null),
             codice: self::optionalString($props['codice'] ?? null),
             collegamenti: is_array($props['collegamenti'] ?? null) ? array_values($props['collegamenti']) : [],
-            come_arrivare: isset($props['come_arrivare']) && is_array($props['come_arrivare']) ? array_map(fn($v) => is_array($v) ? implode('', $v) : (string) $v, $props['come_arrivare']) : null,
+            come_arrivare: isset($props['come_arrivare']) && is_array($props['come_arrivare']) ? array_map(fn ($v) => is_array($v) ? implode('', $v) : (string) $v, $props['come_arrivare']) : null,
             url: self::optionalString($props['url'] ?? null),
             updated_at: isset($props['updated_at']) ? (string) $props['updated_at'] : null,
             coordinates: is_array($coords) ? array_values(array_map('floatval', $coords)) : [],
@@ -74,6 +83,11 @@ readonly class ApiPoiResponse
             video: is_array($props['video'] ?? null) ? array_values($props['video']) : [],
             poi_correlati: is_array($props['poi_correlati'] ?? null) ? array_values(array_map('strval', $props['poi_correlati'])) : [],
             ente_istituzione_societa: isset($props['ente_istituzione_societa']) && is_array($props['ente_istituzione_societa']) ? $props['ente_istituzione_societa'] : null,
+            attachmentFiles: self::namedFiles($props['attachment_files'] ?? null),
+            uploadedVideos: self::namedFiles($props['uploaded_videos'] ?? null),
+            created_at: isset($props['created_at']) ? (string) $props['created_at'] : null,
+            sentieri_collegati: is_array($props['sentieri_collegati'] ?? null) ? array_values(array_map('strval', $props['sentieri_collegati'])) : [],
+            itinerari_correlati: is_array($props['itinerari_correlati'] ?? null) ? array_values(array_map('strval', $props['itinerari_correlati'])) : [],
         );
     }
 
@@ -87,5 +101,20 @@ readonly class ApiPoiResponse
         }
 
         return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @return list<array{url: string, title: string}>
+     */
+    private static function namedFiles(mixed $rows): array
+    {
+        $files = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (is_array($row) && is_string($row['url'] ?? null)) {
+                $files[] = ['url' => $row['url'], 'title' => (string) ($row['title'] ?? '')];
+            }
+        }
+
+        return $files;
     }
 }

@@ -35,8 +35,9 @@ sono relazioni fra tracciati e su un archivio gravemente incompleto non ne escon
 escono di sbagliate. In entrambi i casi il canale di log `import` registra quanti sono.
 
 **Le aree catastali invece si ricalcolano a ogni batch, senza soglia.** La callback `finally`
-accoda per prima la catena sync delle aree → reindex Elasticsearch, sulla coda
-`sardegnasentieri-import`; il dettaglio è nel docblock di `dispatchImportBatch()`. Non parte solo
+accoda per prima la catena sync delle aree → layer → sentieri correlati, sulla coda
+`sardegnasentieri-import`; il reindex Elasticsearch e i file delle tracce li accoda il calcolo dei
+correlati nel `finally` del proprio batch (oc:8959); il dettaglio è nel docblock di `dispatchImportBatch()`. Non parte solo
 quando non c'è un batch, cioè quando non c'è nessun job da importare.
 
 **I job di import hanno una coda tutta loro, `sardegnasentieri-import`.** Ogni job che completa ne

@@ -10,7 +10,6 @@ readonly class ForestasPoiData
 {
     public function __construct(
         public ?string $codice,
-        public array $collegamenti,
         public ?array $come_arrivare,
         public ?string $url,
         public ?string $updated_at,
@@ -18,13 +17,13 @@ readonly class ForestasPoiData
         public array $allegati,
         public array $video,
         public array $poi_correlati,
+        public ?string $created_at = null,
     ) {}
 
     public static function fromApiResponse(ApiPoiResponse $response): self
     {
         return new self(
             codice: $response->codice,
-            collegamenti: $response->collegamenti,
             come_arrivare: $response->come_arrivare,
             url: $response->url,
             updated_at: $response->updated_at,
@@ -32,6 +31,7 @@ readonly class ForestasPoiData
             allegati: $response->allegati,
             video: $response->video,
             poi_correlati: $response->poi_correlati,
+            created_at: $response->created_at,
         );
     }
 
@@ -39,9 +39,9 @@ readonly class ForestasPoiData
     {
         return [
             'codice' => $this->codice,
-            'collegamenti' => self::listToAssoc($this->collegamenti),
             'come_arrivare' => $this->come_arrivare,
             'url' => $this->url,
+            'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'zona_geografica' => self::listToAssoc($this->zona_geografica),
             'allegati' => self::listToAssoc($this->allegati),

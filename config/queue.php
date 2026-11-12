@@ -67,7 +67,12 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            // Più lungo del timeout di ogni supervisor di Horizon (il massimo è 600, del
+            // supervisor dell'import GeoHub del package): con un valore più corto un job ancora in
+            // corso torna disponibile e un secondo worker lo prende. Dentro un batch la copia
+            // scartata da WithoutOverlapping è contata come riuscita, e il batch dei sentieri
+            // correlati chiudeva prima che l'ultimo blocco avesse scritto (oc:8959).
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 660),
             'block_for' => null,
             'after_commit' => false,
         ],

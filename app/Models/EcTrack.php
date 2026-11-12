@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\ForestasTrackDetail;
 use App\Support\InclusivityScore;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Carbon;
 use Wm\WmPackage\Models\EcTrack as WmEcTrack;
@@ -17,6 +19,26 @@ use Wm\WmPackage\Models\EcTrack as WmEcTrack;
  */
 class EcTrack extends WmEcTrack
 {
+    /**
+     * Identifier della famiglia dello stato di validazione (oc:8932): era la colonna
+     * `stato_validazione`. Si legge con `$track->term(self::VALIDATION_STATUS_TAXONOMY)`.
+     */
+    public const VALIDATION_STATUS_TAXONOMY = 'validation-status';
+
+    /**
+     * L'identifier del termine dello stato di validazione, come attributo del modello.
+     *
+     * Serve a Nova: un `Select` con `displayUsingLabels()` legge l'attributo del modello e
+     * ignora il `resolveUsing()` del campo (`Field::resolveForDisplay()`), quindi senza questo
+     * accessore la scheda mostrava sempre un trattino anche con il termine assegnato. Scriverlo
+     * non fa niente: il valore vive in `taxonomy_termables`, e a salvarlo e' il `fillUsing()`
+     * del campo (oc:8932).
+     */
+    public function getValidationStatusAttribute(): ?string
+    {
+        return $this->exists ? $this->term(self::VALIDATION_STATUS_TAXONOMY)?->identifier : null;
+    }
+
     /**
      * Chiavi di `properties.forestas` che si compilano a mano in Nova: l'import le conserva.
      */
@@ -41,7 +63,6 @@ class EcTrack extends WmEcTrack
         'properties',
         'user_id',
         'osmid',
-        'stato_validazione',
         'forestas_registry_code',
         'forestas_survey_date',
         'forestas_inclusivity_physical',
@@ -50,21 +71,29 @@ class EcTrack extends WmEcTrack
     ];
 
     /**
-     * Le colonne di Forestas ri-esposte piatte nel `properties` del GeoJSON, cosi' le chiavi
-     * spostate fuori da `properties` non spariscono dall'API (oc:8910). Le colonne vuote non
-     * compaiono. Lo legge `GeoJsonService::getModelAsGeojson()` del package.
+     * Il dettaglio pubblico della traccia con il `forestas` costruito in uscita
+     * (`ForestasTrackDetail`, oc:8959) al posto di quello salvato nel DB, che ha anche id di Drupal
+     * e chiavi interne dell'import; senza l'id del nodo Drupal.
      *
-     * @return array<string, mixed>
+     * Codice del registro, data del rilievo e inclusività stanno dentro `forestas` e non più piatti
+     * in `properties` («i dati propri di Forestas restano sotto forestas»): per questo non c'è più
+     * `geojsonFlatProperties()`, che li ri-esponeva fuori (oc:8910) e che il file su AWS non ha mai
+     * usato finché `EC_TRACK_MODEL` puntava al modello del package.
      */
-    public function geojsonFlatProperties(): array
+    public function getDetailGeojson(): ?array
     {
-        return array_filter([
-            'forestas_registry_code' => $this->forestas_registry_code,
-            'forestas_survey_date' => $this->forestas_survey_date?->format('Y-m-d'),
-            'forestas_inclusivity_physical' => $this->forestas_inclusivity_physical,
-            'forestas_inclusivity_aids' => $this->forestas_inclusivity_aids,
-            'forestas_inclusivity_digital' => $this->forestas_inclusivity_digital,
-        ], fn ($value) => $value !== null);
+        $geojson = parent::getDetailGeojson();
+        if (! is_array($geojson) || ! isset($geojson['properties']) || ! is_array($geojson['properties'])) {
+            return $geojson;
+        }
+
+        $forestas = ForestasTrackDetail::build($this);
+        // Vuoto resta un oggetto: un array PHP vuoto diventerebbe `[]` in JSON.
+        $geojson['properties']['forestas'] = $forestas === [] ? new \stdClass : $forestas;
+        // L'id del nodo Drupal serve all'import e a Nova, non al frontend: Drupal verrà spento.
+        unset($geojson['properties']['sardegnasentieri_id']);
+
+        return $geojson;
     }
 
     /**
@@ -96,5 +125,20 @@ class EcTrack extends WmEcTrack
         return $this->morphToMany(Ente::class, 'enteable')
             ->using(Enteable::class)
             ->withPivot('ruolo');
+    }
+
+    /**
+     * Sentieri vicini, calcolati dalla geometria da CalculateNearbyTracksJob (oc:8932).
+     * La vicinanza e' simmetrica: ogni coppia ha due righe, una per verso, quindi la relazione
+     * funziona da entrambe le parti. Sola lettura: il job riscrive la tabella a ogni import.
+     */
+    public function relatedTracks(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'ec_track_related_tracks',
+            'ec_track_id',
+            'related_track_id'
+        );
     }
 }

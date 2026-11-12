@@ -73,5 +73,13 @@
     "Assistance availability": "Disponibilità di assistenza",
     "Inclusivity score": "Punteggio di inclusività",
     "Inclusivity class": "Classe di inclusività",
-    "Source vocabulary": "Vocabolario di origine"
+    "Source vocabulary": "Vocabolario di origine",
+    "Caption": "Didascalia",
+    "Images": "Immagini",
+    "Documents": "Allegati",
+    "Videos": "Video",
+    "Application not found.": "Domanda non trovata.",
+    "Not found.": "Risorsa non trovata.",
+    "Access denied: a valid token of the channel client is required.": "Accesso non consentito: serve un token valido del client dello sportello.",
+    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere."
 }
