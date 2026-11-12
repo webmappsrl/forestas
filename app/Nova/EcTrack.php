@@ -74,6 +74,7 @@ class EcTrack extends WmNovaEcTrack
                 // Il tab Accessibility del package (14 chiavi ITACA) qui non è valorizzato da
                 // nessuna sorgente: serve agli shard che importano da GeoHub (oc:8910).
                 Tab::make(__('DEM'), $this->getDemTabFields()),
+                Tab::make(__('Style'), $this->getStyleTabFields()),
             ]),
             BelongsToMany::make('EcPois', 'ecPois', EcPoi::class)->searchable()->collapsedByDefault(),
             // SOLA LETTURA, e deve restare cosi', per i punti di interesse come per i sentieri
