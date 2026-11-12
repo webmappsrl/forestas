@@ -71,13 +71,8 @@ Toscana». È `routes/sus.php` di forestas a dare al canale il nome del cliente.
 
 ## Rischi
 
-- **Su UAT il canale non è collaudabile finché esiste il reset notturno.** `--reset` tronca
-  `trail_applications`, e la regola del repo lo dice: «finché il reset notturno esiste, un'istanza
-  presentata su collaudo non sopravvive alla notte». Questo canale è fatto di chiamate distanti nel
-  tempo: Engineering crea un'istanza il pomeriggio e la mattina dopo riceve 404 su un id che gli
-  abbiamo dato noi. Non è codice di questo ticket — è una condizione da soddisfare prima di
-  consegnare l'ambiente, e va in mano a chi rilascia. Ancora aperto alla chiusura: spostato fra i
-  [follow-up delle note](notes.md#follow-up), con la destinazione proposta.
+- Il reset notturno di UAT, che tronca `trail_applications`, non è un rischio: è il comportamento
+  del collaudo, documentato nella pagina delle API ([config/scramble.php](../../../config/scramble.php)).
 - Gli altri rischi stanno nell'overview del package, perché riguardano il codice che vive lì.
 
 ## Out of scope

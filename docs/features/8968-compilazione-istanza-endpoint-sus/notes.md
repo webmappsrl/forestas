@@ -138,3 +138,5 @@ Nessuna da annotare qui: lo shard non ha un piano proprio, e le divergenze del T
   dal dev:* un ticket per chi rilascia, da chiudere prima di consegnare l'ambiente a Engineering,
   collegato al tag 709. È lo stesso follow-up annotato nelle
   [note del package](../../../wm-package/docs/features/8968-compilazione-istanza-endpoint-sus/notes.md#follow-up).
+  *Deciso dal dev, 2026-11-12:* non è un rischio. È il comportamento del collaudo, documentato
+  nella pagina delle API; nessuna destinazione.
