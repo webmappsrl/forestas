@@ -5,13 +5,25 @@ on: [pull_request, workflow_call, workflow_dispatch]
 jobs:
   laravel-tests:
     runs-on: ubuntu-latest
+    # Il database dei test e' il container qui sotto. I valori sono scritti per
+    # esteso: in `services.env` GitHub Actions non espande `${VAR}`, e Postgres
+    # riceveva come nome utente la stringa letterale `${DB_USERNAME}`, rifiutandola.
+    # Queste variabili valgono per ogni passo e hanno la precedenza su .env e
+    # .env.testing, che puntano all'host `db` dei container locali.
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: forestas_testing
+      DB_USERNAME: forestas
+      DB_PASSWORD: forestas
     services:
       db:
         image: postgis/postgis:17-3.5-alpine
         env:
-          POSTGRES_PASSWORD: ${DB_PASSWORD}
-          POSTGRES_DB: ${DB_DATABASE}
-          POSTGRES_USER: ${DB_USERNAME}
+          POSTGRES_PASSWORD: forestas
+          POSTGRES_DB: forestas_testing
+          POSTGRES_USER: forestas
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
@@ -46,9 +58,7 @@ jobs:
           php artisan key:generate --env=testing --quiet
           php artisan jwt:secret --env=testing --force --quiet
       - name: Migrate
-        run: php artisan migrate
-        env:
-          PGPASSWORD: ${DB_PASSWORD}
+        run: php artisan migrate --force
       - name: Check wm-package stub vs schema DB
         run: php artisan wm-package:publish-missing-migrations --with=trail_registry --dry-run
       - name: Clear the config cache
