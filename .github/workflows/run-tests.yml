@@ -5,13 +5,25 @@ on: [pull_request, workflow_call, workflow_dispatch]
 jobs:
   laravel-tests:
     runs-on: ubuntu-latest
+    # Il database dei test e' il container qui sotto. I valori sono scritti per
+    # esteso: in `services.env` GitHub Actions non espande `${VAR}`, e Postgres
+    # riceveva come nome utente la stringa letterale `${DB_USERNAME}`, rifiutandola.
+    # Queste variabili valgono per ogni passo e hanno la precedenza su .env e
+    # .env.testing, che puntano all'host `db` dei container locali.
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: forestas_testing
+      DB_USERNAME: forestas
+      DB_PASSWORD: forestas
     services:
       db:
         image: postgis/postgis:17-3.5-alpine
         env:
-          POSTGRES_PASSWORD: ${DB_PASSWORD}
-          POSTGRES_DB: ${DB_DATABASE}
-          POSTGRES_USER: ${DB_USERNAME}
+          POSTGRES_PASSWORD: forestas
+          POSTGRES_DB: forestas_testing
+          POSTGRES_USER: forestas
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
@@ -38,6 +50,10 @@ jobs:
         uses: ramsey/composer-install@v2
       - name: Generate key
         run: php artisan key:generate
+      # public/vendor/nova non e' versionato: senza, le pagine di Nova rispondono 500
+      # (manca mix-manifest.json) invece dello stato che i test si aspettano.
+      - name: Publish Nova assets
+        run: php artisan nova:publish --force
       # .env.testing non e' versionato (contiene chiavi): la CI se lo genera,
       # come fa scripts/install.sh sulle macchine dei dev.
       - name: Prepare testing env
@@ -46,15 +62,19 @@ jobs:
           php artisan key:generate --env=testing --quiet
           php artisan jwt:secret --env=testing --force --quiet
       - name: Migrate
-        run: php artisan migrate
-        env:
-          PGPASSWORD: ${DB_PASSWORD}
+        run: php artisan migrate --force
       - name: Check wm-package stub vs schema DB
         run: php artisan wm-package:publish-missing-migrations --with=trail_registry --dry-run
       - name: Clear the config cache
         run: php artisan config:clear
       - name: Optimize
         run: php artisan optimize
+      # `optimize` qui sopra verifica che la cache dell'applicazione si costruisca, ma
+      # congela la configurazione del .env di deploy (Telescope acceso, cache su
+      # database, nessun segreto JWT): lasciata li', i test la userebbero al posto di
+      # phpunit.xml e .env.testing. Si toglie prima di lanciarli.
+      - name: Clear caches before tests
+        run: php artisan optimize:clear
       - name: Prepare Log File
         run: mkdir -p storage/logs && touch storage/logs/test.log
       - name: Laravel Tests

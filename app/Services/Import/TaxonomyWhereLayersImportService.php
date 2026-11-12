@@ -53,12 +53,14 @@ class TaxonomyWhereLayersImportService
         foreach ($features as $feature) {
             if (! is_array($feature)) {
                 $counters['errors']++;
+
                 continue;
             }
 
             $layerId = $feature['properties']['layer_id'] ?? null;
             if ($layerId === null || $layerId === '') {
                 $counters['skipped_missing_layer_id']++;
+
                 continue;
             }
 
@@ -66,12 +68,14 @@ class TaxonomyWhereLayersImportService
             $layer = $layersById[$externalLayerId] ?? null;
             if (! is_array($layer)) {
                 $counters['skipped_missing_match']++;
+
                 continue;
             }
 
             $geometry = $feature['geometry'] ?? null;
             if (! is_array($geometry)) {
                 $counters['skipped_invalid_geometry']++;
+
                 continue;
             }
 
@@ -140,7 +144,6 @@ class TaxonomyWhereLayersImportService
     }
 
     /**
-     * @param  mixed  $layers
      * @return array<string, array<string, mixed>>
      */
     private function indexLayersById(mixed $layers): array

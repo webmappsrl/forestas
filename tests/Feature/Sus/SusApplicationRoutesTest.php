@@ -105,7 +105,8 @@ it('risponde al 404 di una domanda con error, senza il namespace del package', f
         ->assertNotFound()
         ->assertExactJson(['error' => __('Application not found.')]);
 
-    expect($response->getContent())->not->toContain('WmPackage')->not->toContain('999999');
+    expect($response->getContent())->not->toContain('WmPackage');
+    expect($response->getContent())->not->toContain('999999');
 });
 
 it('risponde allo stesso modo a una domanda d ufficio e a un identificatore inesistente', function () {

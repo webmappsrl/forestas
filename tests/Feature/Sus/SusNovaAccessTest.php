@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
-use App\Models\User;
 
 it('nega l accesso a Nova al client SUS', function () {
     Role::findOrCreate('Sus', 'web');

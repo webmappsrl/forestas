@@ -9,6 +9,10 @@ on:
 jobs:
   php-code-styling:
     runs-on: ubuntu-latest
+    # Il commit delle correzioni sul branch della PR richiede la scrittura: il
+    # token di Actions, per default, ha solo la lettura, e il push riceveva 403.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code

@@ -88,8 +88,8 @@ it('decide solo una domanda in istruttoria: le altre rispondono 409 con lo stato
         ->assertStatus(409)
         ->assertJsonPath('status', $status->value);
 })->with([
-    'in compilazione' => TrailApplicationStatus::UnderCompilation,
-    'gia respinta' => TrailApplicationStatus::Rejected,
+    'in compilazione' => [TrailApplicationStatus::UnderCompilation],
+    'gia respinta' => [TrailApplicationStatus::Rejected],
 ]);
 
 it('non tocca le domande create d ufficio in Nova', function () {

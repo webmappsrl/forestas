@@ -18,7 +18,6 @@ class TaxonomyWhere extends WmTaxonomyWhere
         return __('Where');
     }
 
-
     public function actions(NovaRequest $request): array
     {
         return [

@@ -2,6 +2,8 @@
 
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use App\Services\RegistroCatastale\RegistroCatastaleImporter;
+use App\Services\RegistroCatastale\RegistroCatastaleReadException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -129,7 +131,7 @@ it('se il foglio non si legge non scrive sui sentieri', function () {
     $track = writerTrack();
     Http::fake(['docs.google.com/*' => Http::response('', 500)]);
 
-    expect(fn () => app(RegistroCatastaleImporter::class)->run())->toThrow(\App\Services\RegistroCatastale\RegistroCatastaleReadException::class)
+    expect(fn () => app(RegistroCatastaleImporter::class)->run())->toThrow(RegistroCatastaleReadException::class)
         ->and(writerProperties($track))->not->toHaveKey('manual_data');
 });
 
@@ -137,12 +139,12 @@ it('scrive updated_at con il fuso dell\'app, non quello della sessione del datab
     $track = writerTrack();
     writerFakeSheet(['lunghezza' => '4.200', 'origine' => 'S.S. 125', 'meta' => 'Iscacari']);
 
-    \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-03-10 15:30:00', config('app.timezone')));
+    Carbon::setTestNow(Carbon::parse('2026-03-10 15:30:00', config('app.timezone')));
 
     try {
         app(RegistroCatastaleImporter::class)->run();
     } finally {
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
     }
 
     expect(DB::table('ec_tracks')->where('id', $track->id)->value('updated_at'))->toBe('2026-03-10 15:30:00');

@@ -23,7 +23,9 @@ qui conta come entra nello shard.
   inizializzare il volume**, e WordPress si ferma dicendo quali variabili mancano.
 - **Aggiornare solo WordPress:** `scripts/wordpress-up.sh`, sull'host. I file compose li legge dalla
   label `com.docker.compose.project.config_files` del container `php-${APP_NAME}`.
-  `scripts/deploy_dev.sh` non può farlo: gira dentro il container PHP, dove Docker non c'è.
+  `scripts/deploy.sh` non può farlo: gira dentro il container PHP, dove Docker non c'è. Il deploy
+  automatico (`.github/workflows/deploy.yml`) lo lancia sull'host quando cambia il puntatore di
+  `wp-forestas`.
 - **Azzerare:** `scripts/wordpress-reset.sh --conferma`, che tocca solo i volumi di WordPress. Il
   sito ricreato ha già temi, plugin e configurazione, che `wp-forestas` rimette dagli zip e da
   `config/` (oc:8717), purché gli zip siano già sull'host; le licenze le rimette dal suo `.env` solo

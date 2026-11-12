@@ -93,7 +93,7 @@ class RegistroCatastaleTrackWriter
         if ($write->manual !== []) {
             $json = json_encode($write->manual);
             $changed += DB::update(
-                "update {$table} set properties = jsonb_set(coalesce(properties, '{}'::jsonb), '{manual_data}', ".self::MANUAL." || ?::jsonb), updated_at = ? where id = ? and not (".self::MANUAL." @> ?::jsonb)",
+                "update {$table} set properties = jsonb_set(coalesce(properties, '{}'::jsonb), '{manual_data}', ".self::MANUAL.' || ?::jsonb), updated_at = ? where id = ? and not ('.self::MANUAL.' @> ?::jsonb)',
                 [$json, $now, $write->trackId, $json],
             );
         }
