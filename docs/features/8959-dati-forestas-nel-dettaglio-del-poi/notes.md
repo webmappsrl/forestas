@@ -42,6 +42,17 @@ Quello che ne segue:
 - Nessuno. La colonna `geometry` di `ec_pois` è `NOT NULL`: un POI senza geometria non può esistere,
   il test relativo è stato tolto.
 
+## Modifiche dopo il commit (2026-11-13)
+
+- **Il nid di Drupal in `forestas.sardegnasentieri_id`**, con lo stesso nome delle tracce (decisione
+  del dev): nel dettaglio lo costruisce `ForestasPoiDetail` da `out_source_feature_id`, o dal vecchio
+  `sardegnasentieri_id` (0 POI su 976 in locale); nessuno dei due esce più fuori da `forestas`. Per
+  `pois.geojson`, che il package scrive con il `forestas` salvato, l'import salva il nid anche nel
+  `forestas` del POI (`ForestasPoiData`). Allineare tutto il `forestas` di `pois.geojson` a quello
+  del dettaglio è rimandato: le strade senza modifiche al package (sostituire `StorageService`
+  nel container, salvare la forma pubblica nel DB, riscrivere il file dopo il job) sono state
+  valutate e il dev ha deciso di non procedere per ora.
+
 ## Follow-up
 
 - Avvisare Rubens: `entities` → `organizations`, `related_pois` e `nearby_tracks` nel dettaglio del POI.

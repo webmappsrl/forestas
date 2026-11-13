@@ -138,3 +138,25 @@ per le collection nei test, il test duplicato in `ForestasColumnsTest`.
   salvato nel DB. Test in `tests/Feature/EcTrack/TrackDetailForestasTest.php`.
 - **Slug degli enti** (richiesta del dev, 2026-11-12): ogni ente di `organizations` porta anche
   `slug`, l'indirizzo della sua scheda nel sito (`/enti/<slug>`); 93 enti su 93 lo hanno.
+
+## Modifiche dopo il merge (2026-11-13)
+
+- **`properties.layer_name`** (richiesta del dev dopo la call del mattino): il nome, in tutte le
+  lingue, del layer di tipologia della traccia, cioè il primo per id fra i suoi layer che filtra
+  per termini di «Tipo percorso». Il WordPress lo usa come nome del cammino: in Drupal il cammino
+  esiste solo come prefisso del titolo (CMSB, C100T, CSJ), e il dev non ha voluto toccare i dati.
+  Oggi i cammini stanno tutti in «Cammini di Sardegna»; quando ognuno avrà il suo layer la chiave
+  porterà il nome del cammino senza cambiare forma. Test in `TrackDetailForestasTest.php`.
+- **Il nid di Drupal torna** (richiesta del WordPress, decisione del dev sul nome e sulla
+  posizione): `forestas.sardegnasentieri_id` nel dettaglio della traccia e del POI, e
+  `sardegnasentieri_id` nell'indice Elasticsearch, fuori da `forestas` perché il `_source` è
+  piatto. Il WordPress lo usa come chiave stabile della traccia: l'id dello shard su dev e UAT
+  cambia a ogni reset notturno. Rovescia la scelta dello scrum del 2026-11-11, che lo aveva tolto
+  perché «Drupal verrà spento». Gli altri id di Drupal restano fuori.
+- **Niente distanza fra sentieri correlati** (scartata con il dev): allo scrum era stata citata come
+  campo a parte, accanto a `distance`, che è la lunghezza del correlato. Né il sito attuale (la card
+  del correlato mostra tempo e lunghezza del correlato: C 501 A, «15 minuti, 400 m», gli stessi
+  valori della sua pagina) né il wireframe (le card dei «Sentieri correlati» delle schede sentiero,
+  cammino e itinerario) mostrano una distanza fra due sentieri. Inoltre i correlati sono entro 50 m
+  (`nearby_tracks_radius_meters`), quindi la distanza minima sarebbe quasi sempre 0. L'unica
+  distanza del wireframe è quella fra POI e percorso, già in `distance_from_poi`.
