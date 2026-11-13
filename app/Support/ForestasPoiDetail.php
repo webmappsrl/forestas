@@ -12,8 +12,9 @@ use Wm\WmPackage\Http\Resources\MediaResource;
 /**
  * `properties.forestas` nel dettaglio pubblico del POI (oc:8959), come `ForestasTrackDetail` per
  * le tracce: si costruisce in uscita, il `properties.forestas` salvato nel DB resta com'è (lo usano
- * import e Nova), le chiavi sono in inglese e restano fuori gli id di Drupal (`poi_correlati`,
- * `source_relations`, `zona_geografica`) e le chiavi interne dell'import. Le chiavi vuote non escono.
+ * import e Nova), le chiavi sono in inglese, il nid esce come `sardegnasentieri_id` e restano fuori
+ * gli altri id di Drupal (`poi_correlati`, `source_relations`, `zona_geografica`) e le chiavi
+ * interne dell'import. Le chiavi vuote non escono.
  */
 final class ForestasPoiDetail
 {
@@ -31,6 +32,11 @@ final class ForestasPoiDetail
         $tracks = self::nearbyTracks($poi);
 
         return array_filter([
+            // Il nid di Drupal con lo stesso nome delle tracce (oc:8959). L'import lo salva in
+            // `out_source_feature_id`, la chiave del package; i POI più vecchi in `sardegnasentieri_id`.
+            'sardegnasentieri_id' => $poi->properties['out_source_feature_id']
+                ?? $poi->properties['sardegnasentieri_id']
+                ?? null,
             'url' => $stored['url'] ?? null,
             'code' => $stored['codice'] ?? null,
             'created_at' => $stored['created_at'] ?? null,

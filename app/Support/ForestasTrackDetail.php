@@ -13,9 +13,9 @@ use App\Services\Import\SardegnaSentieriMediaSyncService;
  * Si costruisce in uscita: il `properties.forestas` salvato nel DB resta com'è, perché lo usano
  * import, Nova e job (`source_relations`, `source_id`, `updated_at`…). Nel file pubblico vanno solo
  * i dati che il frontend usa, con chiavi in inglese (scrum del 2026-11-11: «se il front-end non
- * consuma quel dato, non metterlo»). Restano fuori gli id di Drupal (`source_id`,
- * `source_relations`, `zona_geografica`), il GPX di Drupal, che sparirà con il sito, e le chiavi
- * interne dell'import. Le chiavi vuote non escono.
+ * consuma quel dato, non metterlo»). Il nid della traccia esce come `sardegnasentieri_id`; restano
+ * fuori gli altri id di Drupal (`source_id`, `source_relations`, `zona_geografica`), il GPX di
+ * Drupal, che sparirà con il sito, e le chiavi interne dell'import. Le chiavi vuote non escono.
  *
  * Il roadbook non sta qui: è nei Blocchi Dettaglio (`properties.config_detail`, `RoadbookBlock`),
  * un blocco con una riga per tappa scritto dall'import. Didascalia,
@@ -32,6 +32,9 @@ class ForestasTrackDetail
         $stored = (array) ($track->properties['forestas'] ?? []);
 
         return array_filter([
+            // Il nid di Drupal: chiave stabile della traccia per il WordPress, perché l'id dello
+            // shard su dev e UAT cambia a ogni reset notturno (oc:8959). Stesso nome nei POI.
+            'sardegnasentieri_id' => $track->properties['sardegnasentieri_id'] ?? null,
             // Indirizzo della pagina su Drupal e date della scheda: l'artifact di analisi li dà come
             // già usati dal WordPress.
             'url' => $stored['url'] ?? null,

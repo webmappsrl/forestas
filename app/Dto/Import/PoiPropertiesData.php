@@ -28,7 +28,7 @@ readonly class PoiPropertiesData extends EcPoiPropertiesData
             description: $response->description,
             out_source_feature_id: (string) $externalId,
             addr_complete: $response->addr_locality,
-            forestas: ForestasPoiData::fromApiResponse($response),
+            forestas: ForestasPoiData::fromApiResponse($response, $externalId),
         );
     }
 

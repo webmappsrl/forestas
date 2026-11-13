@@ -131,6 +131,24 @@ it('costruisce forestas in uscita con chiavi in inglese e senza id di Drupal', f
         ->and($poi->fresh()->properties['forestas'])->toHaveKey('poi_correlati');
 });
 
+it('porta l\'id del nodo Drupal in forestas.sardegnasentieri_id, come le tracce', function () {
+    $poi = detailPoi(['out_source_feature_id' => '137']);
+
+    $properties = poiDetail($poi)['properties'];
+
+    expect($properties['forestas']['sardegnasentieri_id'])->toBe('137')
+        ->and($properties)->not->toHaveKeys(['out_source_feature_id', 'sardegnasentieri_id']);
+});
+
+it('legge il nid anche dai POI salvati con il vecchio nome sardegnasentieri_id', function () {
+    $poi = detailPoi(['sardegnasentieri_id' => '138']);
+
+    $properties = poiDetail($poi)['properties'];
+
+    expect($properties['forestas']['sardegnasentieri_id'])->toBe('138')
+        ->and($properties)->not->toHaveKey('sardegnasentieri_id');
+});
+
 it('non rompe con come_arrivare salvato null', function () {
     $poi = detailPoi(['forestas' => ['come_arrivare' => null, 'codice' => 'X']]);
 

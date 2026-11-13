@@ -36,8 +36,9 @@ class EcPoiDetailController extends Controller
         $forestas = ForestasPoiDetail::build($poi);
         // Vuoto resta un oggetto: un array PHP vuoto diventerebbe `[]` in JSON.
         $properties['forestas'] = $forestas === [] ? new \stdClass : $forestas;
-        // L'id del nodo Drupal serve all'import; i layer riguardano le app, non la scheda.
-        unset($properties['out_source_feature_id'], $properties['layers']);
+        // Il nid di Drupal esce in `forestas.sardegnasentieri_id`, con lo stesso nome delle tracce;
+        // i layer riguardano le app, non la scheda.
+        unset($properties['out_source_feature_id'], $properties['sardegnasentieri_id'], $properties['layers']);
 
         $geojson['properties'] = $properties;
 

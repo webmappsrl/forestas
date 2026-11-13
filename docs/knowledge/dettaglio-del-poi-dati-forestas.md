@@ -12,10 +12,23 @@ portano il `forestas` salvato.
 
 La risposta parte da `getGeojson()` del package e aggiunge `name`, `taxonomies` (stessa forma di
 `pois.geojson`) e `properties.forestas` costruito in uscita da `App\Support\ForestasPoiDetail`; toglie
-`out_source_feature_id` (id del nodo Drupal) e `layers`.
+`out_source_feature_id`, `sardegnasentieri_id` e `layers`.
+
+**Il nid di Drupal esce ovunque come `forestas.sardegnasentieri_id`, come nelle tracce** (oc:8959,
+decisione del dev): è la chiave stabile con cui il WordPress aggancia segnalazioni e recensioni,
+perché l'id dello shard su dev e UAT cambia a ogni reset notturno. Nel DB l'import lo salva in
+`properties.out_source_feature_id`, la chiave del package (i POI più vecchi in
+`properties.sardegnasentieri_id`), e da oc:8959 anche in `properties.forestas.sardegnasentieri_id`:
+- nel dettaglio, `ForestasPoiDetail` lo legge da `out_source_feature_id`, o dal vecchio nome;
+- in `pois.geojson`, che il package scrive con il `forestas` salvato così com'è e senza un punto in
+  cui lo shard possa aggiungere dati, arriva dal `forestas` salvato, quindi solo dopo che l'import
+  ha riscritto il POI (dev e UAT: reset notturno; altrove `sardegnasentieri:import --force`). Lì
+  esce anche `out_source_feature_id`, fuori da `forestas`, perché il package mette nel file tutte le
+  `properties` del POI.
 
 ```json
 "forestas": {
+  "sardegnasentieri_id": "137",
   "url": "https://www.sardegnasentieri.it/da-vedere/nuraghe-serbissi-osini",
   "code": "C-521A Nuraghe", "created_at": "…", "updated_at": "…",
   "directions": {"it": "…"},

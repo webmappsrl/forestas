@@ -78,10 +78,27 @@ Didascalia, autore e credits delle foto non stanno in `forestas`: escono con le 
 (`feature_image`, `image_gallery`), dal package (`wm-package/docs/knowledge/media-e-avatar.md`).
 
 Le chiavi vuote non escono; `downloads` c'è sempre, quindi una traccia senza altri dati ha solo
-quella. Allegati, video e link per scaricare hanno l'indirizzo dello shard, non di Drupal. Dal
-dettaglio è tolto anche `properties.sardegnasentieri_id`, l'id del nodo Drupal: resta nel DB per
-import e Nova. **Il `properties.forestas` salvato nel DB non cambia**: lo usano import,
+quella. Allegati, video e link per scaricare hanno l'indirizzo dello shard, non di Drupal.
+**Il `properties.forestas` salvato nel DB non cambia**: lo usano import,
 Nova e `ResolveSardegnaSentieriRelationsJob` (`source_relations`).
+
+Fuori da `forestas`, il dettaglio aggiunge `properties.layer_name`: il nome, con tutte le
+traduzioni, del layer di tipologia della traccia, cioè il primo per id fra i suoi layer che filtra
+per termini di «Tipo percorso» (`route-type`): «Cammini di Sardegna», «Itinerari», «Sentieri». I
+layer delle aree e «Sentieri Accessibili» non contano. Se la traccia non sta in nessun layer di
+tipologia la chiave non esce. Il WordPress lo usa come nome del cammino: oggi i cammini stanno
+tutti in un layer solo, e quando ne avranno uno ciascuno la chiave porterà il nome del cammino
+senza cambiare forma (decisione del dev, oc:8959).
+
+L'id del nodo Drupal esce come `forestas.sardegnasentieri_id`, e con lo stesso nome, piatto, nel
+`_source` di ogni traccia dell'indice Elasticsearch (`App\Models\EcTrack::toSearchableArray()`,
+`null` se la traccia non viene da Drupal); fuori da `forestas` non esce. È la chiave stabile della
+traccia per il WordPress: l'id dello shard su dev e UAT cambia a ogni reset notturno, e con il nid
+il WordPress aggancia segnalazioni e recensioni, importa quelle ricevute da Drupal (che indicano il
+sentiero con il nid) e tiene stabili gli slug delle pagine con lo stesso nome. All'inizio di oc:8959
+era stato tolto dal dettaglio perché «Drupal verrà spento»: è tornato su richiesta del WordPress,
+con lo stesso nome nei POI (decisione del dev) — vedi
+[dettaglio-del-poi-dati-forestas.md](dettaglio-del-poi-dati-forestas.md).
 
 **Funziona solo con `EC_TRACK_MODEL` sul modello di forestas.** Il file su AWS lo scrive
 `UpdateEcTrackAwsJob` del package, che ricarica la traccia con `config('wm-package.ec_track_model')`:
@@ -121,7 +138,10 @@ del package è `App\Models\EcTrack`, come su camminiditalia e maphub; la regola 
 - **Via gli id di Drupal e le chiavi interne** (oc:8959, scrum del 2026-11-11): `source_id`,
   `source_relations`, `zona_geografica`, `gpx` (il file Drupal, che sparirà: il GPX lo genera lo
   shard, oc:8953), `skip_dem_jobs`, `classificazioni_anomale`, `enti_mancanti`,
-  `deleted_from_source`; fuori da `forestas`, `sardegnasentieri_id`.
+  `deleted_from_source`; fuori da `forestas`, `sardegnasentieri_id`, poi rimesso (sotto).
+- **`sardegnasentieri_id` torna, in `forestas` e nell'indice** (oc:8959, 2026-11-13): il WordPress
+  lo usa come chiave stabile della traccia, perché l'id dello shard su dev e UAT cambia a ogni
+  reset notturno. Stesso nome nei POI. Gli altri id di Drupal restano fuori.
 - **I POI vicini non ci sono** (oc:8959): i POI del dettaglio sono un pezzo a parte, dai dati di
   `pois.geojson`.
 - **`EC_TRACK_MODEL` al modello di forestas** (oc:8959): è il default del package e degli altri

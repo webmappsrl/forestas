@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Http\Resources\EcTrackResource;
 use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Nova\Fields\ImageCredits;
 
@@ -168,16 +169,29 @@ it('nel file su AWS porta didascalia, autore e credits con le foto, non in fores
         ->and($file['feature_image'])->toMatchArray(['id' => $photo->id, ...$credits])
         ->and($file['image_gallery'][0])->toMatchArray(['id' => $photo->id, ...$credits])
         ->and($file['forestas'])->not->toHaveKey('image_credits')
-        ->and($file['forestas']['downloads'])->toHaveKey('geojson')
-        ->and($file)->not->toHaveKey('sardegnasentieri_id');
+        ->and($file['forestas']['downloads'])->toHaveKey('geojson');
 });
 
-it('toglie dal dettaglio l\'id del nodo Drupal', function () {
+it('porta l\'id del nodo Drupal in forestas.sardegnasentieri_id, non fuori', function () {
     $track = forestasTrack();
     $track->forceFill(['properties' => [...$track->properties, 'sardegnasentieri_id' => '4516']])->saveQuietly();
 
-    expect($track->fresh()->getDetailGeojson()['properties'])->not->toHaveKey('sardegnasentieri_id')
+    $properties = $track->fresh()->getDetailGeojson()['properties'];
+
+    expect($properties['forestas']['sardegnasentieri_id'])->toBe('4516')
+        ->and($properties)->not->toHaveKey('sardegnasentieri_id')
         ->and($track->fresh()->properties['sardegnasentieri_id'])->toBe('4516');
+});
+
+it('porta nell\'indice Elasticsearch l\'id del nodo Drupal', function () {
+    $track = forestasTrack();
+    $track->forceFill(['properties' => [...$track->properties, 'sardegnasentieri_id' => '4516']])->saveQuietly();
+
+    expect($track->fresh()->toSearchableArray()['sardegnasentieri_id'])->toBe('4516');
+});
+
+it('mette null nell\'indice se la traccia non viene da Drupal', function () {
+    expect(forestasTrack()->toSearchableArray())->toHaveKey('sardegnasentieri_id', null);
 });
 
 it('porta gli enti raggruppati per ruolo, con id e nome in tutte le lingue', function () {
@@ -290,4 +304,27 @@ it('porta nel file su AWS i Blocchi Dettaglio con il roadbook', function () {
     // toEqual: jsonb riordina le chiavi.
     expect($file['config_detail'])->toEqual($blocks)
         ->and($file['forestas'])->not->toHaveKey('roadbook');
+});
+
+it('porta in layer_name il nome del layer di tipologia della traccia, in tutte le lingue', function () {
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms');
+    $track = forestasTrack();
+    $walks = Layer::factory()->createQuietly(['name' => ['it' => 'Cammini di Sardegna', 'en' => 'Walks of Sardinia'], 'properties' => []]);
+    $walks->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'route-type-walk')->value('id'));
+    // Un layer d'area e uno per inclusività non sono il layer di appartenenza.
+    $area = Layer::factory()->createQuietly(['name' => ['it' => 'Area D (Sud-OVEST)'], 'properties' => []]);
+    $accessible = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri Accessibili'], 'properties' => []]);
+    $accessible->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'inclusivity-difficulty-at')->value('id'));
+    foreach ([$area, $accessible, $walks] as $layer) {
+        DB::table('layerables')->insert(['layer_id' => $layer->id, 'layerable_type' => 'App\\Models\\EcTrack', 'layerable_id' => $track->id]);
+    }
+
+    expect($track->fresh()->getDetailGeojson()['properties']['layer_name'])
+        ->toBe(['it' => 'Cammini di Sardegna', 'en' => 'Walks of Sardinia']);
+});
+
+it('non mette layer_name se la traccia non sta in un layer di tipologia', function () {
+    $track = forestasTrack();
+
+    expect($track->fresh()->getDetailGeojson()['properties'])->not->toHaveKey('layer_name');
 });
