@@ -333,7 +333,6 @@ class EcTrack extends WmNovaEcTrack
             Text::make('Creato il', 'properties->forestas->created_at')->readonly(),
             NovaTabTranslatable::make([
                 Tiptap::make('Info utili', 'properties->forestas->info_utili')->readonly(),
-                Tiptap::make('Roadbook', 'properties->forestas->roadbook')->readonly(),
             ])->hideFromIndex(),
             ...$this->forestasMediaFields(),
         ];

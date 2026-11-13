@@ -18,9 +18,10 @@ readonly class ForestasPoiData
         public array $video,
         public array $poi_correlati,
         public ?string $created_at = null,
+        public ?string $sardegnasentieri_id = null,
     ) {}
 
-    public static function fromApiResponse(ApiPoiResponse $response): self
+    public static function fromApiResponse(ApiPoiResponse $response, ?int $externalId = null): self
     {
         return new self(
             codice: $response->codice,
@@ -32,12 +33,17 @@ readonly class ForestasPoiData
             video: $response->video,
             poi_correlati: $response->poi_correlati,
             created_at: $response->created_at,
+            sardegnasentieri_id: $externalId === null ? null : (string) $externalId,
         );
     }
 
     public function toArray(): array
     {
         return [
+            // Il nid di Drupal, con il nome delle tracce (oc:8959): `pois.geojson` porta il
+            // `forestas` salvato così com'è, e il package non ha un punto in cui aggiungerlo in
+            // uscita. `out_source_feature_id`, fuori da `forestas`, resta per import e package.
+            'sardegnasentieri_id' => $this->sardegnasentieri_id,
             'codice' => $this->codice,
             'come_arrivare' => $this->come_arrivare,
             'url' => $this->url,

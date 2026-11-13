@@ -65,9 +65,24 @@ class CalculateNearbyTracksJob implements ShouldQueue
             ->values()
             ->all();
 
+        // I collegamenti fra POI e percorsi, per vicinanza, nello stesso batch: la rigenerazione nel
+        // `finally` arriva dopo anche loro. `ec_poi_ec_track` non si svuota qui: la riscrive ogni
+        // blocco per i suoi POI, perché il dettaglio del POI la legge dal vivo (oc:8959).
+        $poiIds = DB::table('ec_pois')
+            ->where('app_id', SardegnaSentieriImportService::IMPORT_APP_ID)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+        $poiChunks = $poiIds->chunk($chunkSize)
+            ->map(fn ($chunk) => new CalculatePoiTracksChunkJob($chunk->values()->all()))
+            ->values()
+            ->all();
+        $chunks = [...$chunks, ...$poiChunks];
+
         Log::channel('import')->info(sprintf(
-            '[sardegnasentieri] Sentieri vicini: %d tracce in %d blocchi.',
+            '[sardegnasentieri] Sentieri vicini e percorsi dei POI: %d tracce e %d POI in %d blocchi.',
             $ids->count(),
+            $poiIds->count(),
             count($chunks)
         ));
 

@@ -30,4 +30,21 @@ return [
 
     'nearby_tracks_chunk_size' => 50,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Raggio dei percorsi collegati ai POI (oc:8959)
+    |--------------------------------------------------------------------------
+    |
+    | Distanza in metri, dal tratto più vicino, entro cui un percorso è collegato a
+    | un POI in `ec_poi_ec_track`: sono i percorsi del POI e, nell'altro verso, i
+    | POI correlati della traccia. Sostituisce i collegamenti scritti su Drupal.
+    | 1 km (decisione del dev del 12/11): in locale 4.283 collegamenti, 5,6 per
+    | traccia, contro i 2.452 di Drupal (3,2 per traccia; 300 m ne darebbero
+    | altrettanti). Separato dai 50 m dei sentieri correlati fra tracce. Lo usano i
+    | blocchi di CalculatePoiTracksChunkJob, nel batch dei sentieri correlati.
+    |
+    */
+
+    'poi_tracks_radius_meters' => 1000,
+
 ];
