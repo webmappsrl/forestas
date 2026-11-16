@@ -19,7 +19,6 @@ it('converts allegati list to associative array in toArray', function () {
         codice: null,
         data_rilievo: null,
         info_utili: null,
-        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -43,7 +42,6 @@ it('converts video list to associative array in toArray', function () {
         codice: null,
         data_rilievo: null,
         info_utili: null,
-        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -67,7 +65,6 @@ it('converts gpx list to associative array in toArray', function () {
         codice: null,
         data_rilievo: null,
         info_utili: null,
-        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -88,7 +85,6 @@ it('converts zona_geografica list to associative array in toArray', function () 
         codice: null,
         data_rilievo: null,
         info_utili: null,
-        roadbook: null,
     );
 
     $result = $data->toArray();
@@ -109,7 +105,6 @@ it('preserves skip_dem_jobs in toArray', function () {
         codice: null,
         data_rilievo: null,
         info_utili: null,
-        roadbook: null,
         skip_dem_jobs: true,
     );
 

@@ -233,46 +233,21 @@ it('non segnala niente se lo shard ha tutti i dati portati dalla copia', functio
     );
 
     $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])
-        ->expectsOutputToContain('shard legami track-poi: copia=1 shard=1')
         ->expectsOutputToContain('Nessuna differenza.')
         ->assertExitCode(0);
 });
 
-it('segnala uno scarto nei collegamenti fra contenuti', function () {
+it('non confronta i legami percorso-POI, che lo shard calcola per vicinanza', function () {
     $track = shardTrack(10);
-    $poi = shardPoi(20);
+    shardPoi(20);
     $other = shardPoi(21);
     $track->ecPois()->sync([$other->id]);
 
-    shardSources(
-        [10 => compareTrack(10, ['poi_correlati' => ['20']])],
-        [20 => comparePoi(20), 21 => comparePoi(21)],
-    );
+    shardSources([10 => compareTrack(10, ['poi_correlati' => ['20']])], [20 => comparePoi(20), 21 => comparePoi(21)]);
 
     $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])
-        ->expectsOutputToContain('legame track 10 poi 20: copia=presente shard=assente')
-        ->expectsOutputToContain('legame track 10 poi 21: copia=assente shard=presente')
-        ->assertExitCode(1);
-});
-
-it('non segnala un legame oltre i 10 km, che lo shard scarta di proposito', function () {
-    shardTrack(10);
-    shardPoi(20, 'POINT(10.5 40.0)');
-
-    shardSources([10 => compareTrack(10, ['poi_correlati' => ['20']])], [20 => comparePoi(20)]);
-
-    $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])->assertExitCode(0);
-});
-
-it('legge i legami dei POI verso i percorsi dal DTO', function () {
-    shardTrack(10);
-    shardPoi(20);
-
-    shardSources([10 => compareTrack(10)], [20 => comparePoi(20, ['sentieri_collegati' => ['10']])]);
-
-    $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])
-        ->expectsOutputToContain('legame track 10 poi 20: copia=presente shard=assente')
-        ->assertExitCode(1);
+        ->doesntExpectOutputToContain('legame track')
+        ->assertExitCode(0);
 });
 
 it('segnala un allegato presente su Drupal e assente nello shard', function () {
@@ -391,17 +366,6 @@ it('nel confronto con le API ignora i campi che solo la copia porta', function (
     $this->artisan('sardegnasentieri:compare-source', ['--only' => 'tracks'])
         ->doesntExpectOutputToContain('track 14')
         ->assertExitCode(0);
-});
-
-it('legge dal percorso i punti di interesse di un itinerario', function () {
-    shardTrack(10);
-    shardPoi(20);
-
-    shardSources([10 => compareTrack(10, ['punti_di_interesse' => ['20']])], [20 => comparePoi(20)]);
-
-    $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])
-        ->expectsOutputToContain('legame track 10 poi 20: copia=presente shard=assente')
-        ->assertExitCode(1);
 });
 
 it('si aspetta i collegamenti fra POI reciproci e ignora chi cita se stesso', function () {

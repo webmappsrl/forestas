@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\Api\EcPoiDetailController;
 use App\Http\Controllers\Api\Sus\SusTestDecisionController;
 use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
@@ -96,6 +97,14 @@ class AppServiceProvider extends ServiceProvider
         EcTrack::observe(RelatedTrackCardObserver::class);
         config('media-library.media_model')::observe(RelatedTrackMediaObserver::class);
         TaxonomyTermable::observe(RelatedTrackRouteTypeObserver::class);
+
+        // Dettaglio del POI di Forestas (oc:8959): sostituisce la rotta del package con lo stesso
+        // URI e nome. Registrata qui, dopo il package: la rotta registrata per ultima vince, e
+        // tiene la posizione di quella del package fra le altre rotte dei POI.
+        Route::middleware('api')
+            ->prefix('api')
+            ->get('ec/poi/{id}', [EcPoiDetailController::class, 'show'])
+            ->name('default.api.ec.poi.json');
 
         // Branch API riservato al SUS (oc:8333). Registrato qui e non in
         // routes/api.php perche' bootstrap/app.php non carica quel file:

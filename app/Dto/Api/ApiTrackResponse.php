@@ -57,6 +57,14 @@ readonly class ApiTrackResponse
         public array $collegamenti = [],
         /** @var list<string> nid dei POI citati da `field_punti_di_interesse` (itinerari) */
         public array $punti_di_interesse = [],
+        /**
+         * I paragrafi del roadbook propri di ogni lingua, senza quelli delle lingue precedenti che
+         * `roadbook` accumula come le vecchie API: ne nascono le tappe dei Blocchi Dettaglio
+         * (oc:8959).
+         *
+         * @var array<string, list<string>>|null
+         */
+        public ?array $roadbook_stages = null,
     ) {}
 
     /**
@@ -114,6 +122,7 @@ readonly class ApiTrackResponse
             uploadedVideos: self::namedFiles($props['uploaded_videos'] ?? null),
             collegamenti: is_array($props['collegamenti'] ?? null) ? array_values($props['collegamenti']) : [],
             punti_di_interesse: is_array($props['punti_di_interesse'] ?? null) ? array_values(array_map('strval', $props['punti_di_interesse'])) : [],
+            roadbook_stages: isset($props['roadbook_stages']) && is_array($props['roadbook_stages']) ? $props['roadbook_stages'] : null,
         );
     }
 

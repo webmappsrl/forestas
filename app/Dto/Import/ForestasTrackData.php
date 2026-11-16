@@ -20,7 +20,6 @@ readonly class ForestasTrackData
         public ?string $codice,
         public ?string $data_rilievo,
         public ?array $info_utili,
-        public ?array $roadbook,
         public bool $skip_dem_jobs = true,
     ) {}
 
@@ -38,7 +37,6 @@ readonly class ForestasTrackData
             codice: $response->codice,
             data_rilievo: $response->data_rilievo,
             info_utili: $response->info_utili,
-            roadbook: $response->roadbook,
         );
     }
 
@@ -54,7 +52,6 @@ readonly class ForestasTrackData
             'updated_at' => $this->updated_at,
             'zona_geografica' => self::listToAssoc($this->zona_geografica),
             'info_utili' => $this->info_utili,
-            'roadbook' => $this->roadbook,
             'skip_dem_jobs' => $this->skip_dem_jobs,
         ];
     }

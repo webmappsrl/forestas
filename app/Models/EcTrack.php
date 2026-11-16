@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Carbon;
 use Wm\WmPackage\Models\EcTrack as WmEcTrack;
+use Wm\WmPackage\Models\Layer;
 
 /**
  * @property Carbon|null $forestas_survey_date
@@ -52,7 +53,6 @@ class EcTrack extends WmEcTrack
         parent::__construct($attributes);
         $this->translatable = array_merge($this->translatable ?? [], [
             'properties->forestas->info_utili',
-            'properties->forestas->roadbook',
         ]);
     }
 
@@ -73,7 +73,7 @@ class EcTrack extends WmEcTrack
     /**
      * Il dettaglio pubblico della traccia con il `forestas` costruito in uscita
      * (`ForestasTrackDetail`, oc:8959) al posto di quello salvato nel DB, che ha anche id di Drupal
-     * e chiavi interne dell'import; senza l'id del nodo Drupal.
+     * e chiavi interne dell'import.
      *
      * Codice del registro, data del rilievo e inclusività stanno dentro `forestas` e non più piatti
      * in `properties` («i dati propri di Forestas restano sotto forestas»): per questo non c'è più
@@ -90,21 +90,52 @@ class EcTrack extends WmEcTrack
         $forestas = ForestasTrackDetail::build($this);
         // Vuoto resta un oggetto: un array PHP vuoto diventerebbe `[]` in JSON.
         $geojson['properties']['forestas'] = $forestas === [] ? new \stdClass : $forestas;
-        // L'id del nodo Drupal serve all'import e a Nova, non al frontend: Drupal verrà spento.
+        // Il nid di Drupal esce dentro `forestas` (`ForestasTrackDetail`), come nei POI.
         unset($geojson['properties']['sardegnasentieri_id']);
+        $layerName = $this->typologyLayerName();
+        if ($layerName !== null) {
+            $geojson['properties']['layer_name'] = $layerName;
+        }
 
         return $geojson;
     }
 
     /**
+     * Il nome, in tutte le lingue, del layer di appartenenza della traccia (oc:8959): quello di
+     * tipologia, filtrato da un termine di «Tipo percorso» («Cammini di Sardegna», «Itinerari»,
+     * «Sentieri»), non quelli delle aree né «Sentieri Accessibili», che filtra per inclusività. Il
+     * WordPress lo mostra accanto al tipo nella scheda di una tappa. Oggi i cammini stanno tutti in
+     * «Cammini di Sardegna»; quando ogni cammino avrà il suo layer la regola va rivista.
+     *
+     * @return array<string, string>|null
+     */
+    private function typologyLayerName(): ?array
+    {
+        /** @var Layer $layer */
+        foreach ($this->associatedLayers()->with('taxonomyTerms')->orderBy('layers.id')->get() as $layer) {
+            if ($layer->terms('route-type')->isNotEmpty()) {
+                return $layer->getTranslations('name');
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Aggiunge punteggio e classe di inclusività: derivati, non in colonna. Se i tre valori non
      * sono tutti presenti le chiavi restano null (sentiero non misurato).
+     *
+     * Aggiunge anche `sardegnasentieri_id`, l'id del nodo Drupal (oc:8959), che nel dettaglio
+     * della traccia sta in `forestas.sardegnasentieri_id`: è la chiave stabile con cui il WordPress
+     * aggancia segnalazioni e recensioni, perché l'id dello shard su dev e UAT cambia a ogni reset
+     * notturno. Nell'indice è piatto come gli altri campi, perché il `_source` non ha `forestas`.
      */
     public function toSearchableArray()
     {
         $inclusivity = InclusivityScore::for($this);
 
         return array_merge(parent::toSearchableArray(), [
+            'sardegnasentieri_id' => $this->properties['sardegnasentieri_id'] ?? null,
             'inclusivity_score' => $inclusivity['score'] ?? null,
             'inclusivity_class' => $inclusivity['class'] ?? null,
         ]);

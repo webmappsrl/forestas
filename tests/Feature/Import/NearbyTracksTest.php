@@ -46,7 +46,7 @@ function runNearby(): void
     Bus::fake([GenerateOptimizedPBFChainJob::class, RegenerateTaxonomyWhereOutputsJob::class]);
     (new CalculateNearbyTracksJob)->handle();
     Bus::assertBatched(function (PendingBatch $batch) {
-        $batch->jobs->each(fn (CalculateNearbyTracksChunkJob $job) => $job->handle());
+        $batch->jobs->each(fn ($job) => $job->handle());
 
         return true;
     });
@@ -116,7 +116,7 @@ it('svuota la tabella e accoda un batch con un blocco ogni chunk_size tracce', f
     expect(nearbyPairs())->toBe([]);
     Bus::assertBatched(fn (PendingBatch $batch) => $batch->queue() === ImportSardegnaSentieriTrackJob::QUEUE
         && $batch->allowsFailures()
-        && $batch->jobs->map(fn ($job) => $job->trackIds)->all() === [[$a->id, $b->id], [$c->id]]);
+        && $batch->jobs->whereInstanceOf(CalculateNearbyTracksChunkJob::class)->map(fn ($job) => $job->trackIds)->values()->all() === [[$a->id, $b->id], [$c->id]]);
 });
 
 it('rigenera file e indice solo quando sono finiti tutti i blocchi', function () {

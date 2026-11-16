@@ -28,6 +28,19 @@ it('porta created_at dalla risposta al forestas del POI', function () {
     expect($forestas['created_at'])->toBe('2013-07-02 14:12:40');
 });
 
+it('scrive il nid nel forestas salvato del POI, che pois.geojson porta così com\'è', function () {
+    $response = ApiPoiResponse::fromJson([
+        'type' => 'Feature',
+        'geometry' => ['type' => 'Point', 'coordinates' => [9.1, 40.1]],
+        'properties' => ['id' => '137', 'name' => ['it' => 'Nuraghe Serbissi (Osini)']],
+    ]);
+
+    $properties = PoiPropertiesData::fromApiResponse(137, $response)->toArray();
+
+    expect($properties['forestas']['sardegnasentieri_id'])->toBe('137')
+        ->and($properties['out_source_feature_id'])->toBe('137');
+});
+
 it('lascia created_at nullo se la sorgente non lo dà', function () {
     $response = ApiPoiResponse::fromJson([
         'type' => 'Feature',

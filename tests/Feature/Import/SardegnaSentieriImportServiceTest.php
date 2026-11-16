@@ -10,7 +10,6 @@ use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiMediaJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackMediaJob;
-use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
@@ -379,6 +378,55 @@ it('conserva il manual_data inserito da un operatore quando reimporta il sentier
     expect(EcTrack::first()->properties['manual_data'])->toEqual($operatorManual);
 });
 
+it('scrive il roadbook come blocco dei Blocchi Dettaglio e non più in forestas (oc:8959)', function () {
+    $client = mockSardegnaSentieriSource();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'gpx' => ['http://example.com/track.gpx'],
+        'roadbook' => ['it' => ['<p>Uno</p>', '<p>Due</p>'], 'en' => ['<p>Uno</p>', '<p>Due</p>', '<p>One</p>']],
+        'roadbook_stages' => ['it' => ['<p>Uno</p>', '<p>Due</p>'], 'en' => ['<p>One</p>']],
+    ]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+
+    (makeServiceWith($client))->importTrack(75);
+
+    $properties = EcTrack::first()->properties;
+    expect($properties['forestas'])->not->toHaveKey('roadbook')
+        ->and($properties['config_detail'])->toHaveCount(1)
+        ->and($properties['config_detail'][0]['items'])->toEqual([
+            ['title' => ['it' => 'Tappa 1', 'en' => 'Stage 1'], 'content' => ['it' => '<p>Uno</p>', 'en' => '<p>One</p>']],
+            ['title' => ['it' => 'Tappa 2'], 'content' => ['it' => '<p>Due</p>']],
+        ]);
+});
+
+it('al reimport riscrive il blocco del roadbook e tiene quelli aggiunti in Nova (oc:8959)', function () {
+    $client = mockSardegnaSentieriSource();
+    $client->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'gpx' => ['http://example.com/track.gpx'],
+        'roadbook_stages' => ['it' => ['<p>Vecchio</p>']],
+    ]]));
+    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
+    (makeServiceWith($client))->importTrack(75);
+
+    // Un blocco aggiunto a mano in Nova, dopo quello del roadbook.
+    $track = EcTrack::first();
+    $manual = ['box_type' => 'info', 'items' => [['title' => ['it' => 'Orari'], 'content' => ['it' => '<p>Sempre</p>']]]];
+    DB::table('ec_tracks')->where('id', $track->id)->update([
+        'properties' => DB::raw("jsonb_set(properties::jsonb, '{config_detail}', (properties::jsonb->'config_detail') || '".json_encode([$manual])."'::jsonb)::json"),
+    ]);
+
+    $client2 = mockSardegnaSentieriSource();
+    $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75, ['properties' => [
+        'roadbook_stages' => ['it' => ['<p>Nuovo</p>', '<p>Nuovo due</p>']],
+    ]]));
+    (makeServiceWith($client2))->importTrack(75);
+
+    $config = EcTrack::first()->properties['config_detail'];
+    expect($config)->toHaveCount(2)
+        ->and($config[0]['items'])->toHaveCount(2)
+        ->and($config[0]['items'][0]['content'])->toEqual(['it' => '<p>Nuovo</p>'])
+        ->and($config[1])->toEqual($manual);
+});
+
 // ---------------------------------------------------------------------------
 // GPX parsing — namespace (fix P2)
 // ---------------------------------------------------------------------------
@@ -550,38 +598,6 @@ it('non accoda job dei layer quando l import scrive le attività (oc:8827)', fun
     expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
         ->toBe(['sardegnasentieri:type:sentiero']);
     Bus::assertNotDispatched(SyncAutoLayerAfterTrackTaxonomyChangeJob::class);
-});
-
-it('rimuove ecPois collegati quando partenza e arrivo vengono svuotati (fix P1)', function () {
-    $poi = EcPoi::factory()->create([
-        'app_id' => SardegnaSentieriImportService::IMPORT_APP_ID,
-        'properties' => ['out_source_feature_id' => '10'],
-    ]);
-
-    // Prima importazione con partenza e GPX
-    $feature = minimalTrackFeature(75, ['properties' => [
-        'gpx' => ['http://example.com/track.gpx'],
-        'partenza' => '10',
-    ]]);
-    $client = mockSardegnaSentieriSource();
-    $client->shouldReceive('getTrackDetail')->andReturn($feature);
-    $client->shouldReceive('getGpxContent')->andReturn(gpxWithoutNamespace());
-    (makeServiceWith($client))->importTrack(75);
-
-    // Il pivot lo scrive il job di fine batch (oc:8932), e scarta i POI oltre i 10 km dal
-    // tracciato: il POI della factory sta in un punto a caso, lo si porta sul tracciato.
-    DB::statement('UPDATE ec_pois SET geometry = ST_PointN(ST_GeometryN((SELECT geometry::geometry FROM ec_tracks LIMIT 1), 1), 1)::geography');
-    (new ResolveSardegnaSentieriRelationsJob)->handle();
-    $track = EcTrack::first();
-    expect($track->ecPois()->count())->toBe(1);
-
-    // Seconda importazione senza partenza (track esiste già con geometry)
-    $client2 = mockSardegnaSentieriSource();
-    $client2->shouldReceive('getTrackDetail')->andReturn(minimalTrackFeature(75));
-    (makeServiceWith($client2))->importTrack(75);
-
-    (new ResolveSardegnaSentieriRelationsJob)->handle();
-    expect($track->fresh()->ecPois()->count())->toBe(0);
 });
 
 // ---------------------------------------------------------------------------

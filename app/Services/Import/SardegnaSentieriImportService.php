@@ -15,6 +15,7 @@ use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\Source\SardegnaSentieriSource;
+use App\Support\RoadbookBlock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -548,6 +549,13 @@ class SardegnaSentieriImportService
                 $data['properties']['forestas'][$key] = $existingProperties['forestas'][$key];
             }
         }
+
+        // Il roadbook nei Blocchi Dettaglio, una riga per tappa (oc:8959): specchio di Drupal, gli
+        // altri blocchi aggiunti in Nova restano.
+        $data['properties']['config_detail'] = RoadbookBlock::apply(
+            $existingProperties['config_detail'] ?? null,
+            $response->roadbook_stages
+        );
 
         $isNew = ! $ecTrack->exists;
 

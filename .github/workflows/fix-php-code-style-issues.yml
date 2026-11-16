@@ -11,8 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     # Il commit delle correzioni sul branch della PR richiede la scrittura: il
     # token di Actions, per default, ha solo la lettura, e il push riceveva 403.
+    #
+    # `actions: write` serve a rilanciare i test (ultimo passo): un commit fatto con il
+    # token di Actions non fa partire altri workflow, e la PR resterebbe senza
+    # `laravel-tests` sul commit piu' recente, quindi non mergiabile se i test sono
+    # obbligatori su develop.
     permissions:
       contents: write
+      actions: write
 
     steps:
       - name: Checkout code
@@ -24,6 +30,13 @@ jobs:
         uses: aglipanci/laravel-pint-action@2.4
 
       - name: Commit changes
+        id: commit
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: Fix styling
+
+      - name: Rilancia i test sul commit di formattazione
+        if: steps.commit.outputs.changes_detected == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run run-tests.yml --repo "${{ github.repository }}" --ref "${{ github.head_ref }}"
