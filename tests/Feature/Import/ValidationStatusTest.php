@@ -86,27 +86,41 @@ it('traduce ogni id Drupal nel termine giusto', function (string $tid, string $i
     expect(validationStatusOf(importWithValidationStatus($tid)))->toBe([$identifier]);
 })->with([
     'non verificato' => ['4871', 'validation-status-unverified'],
-    'non percorribile' => ['4870', 'validation-status-not-walkable'],
     'in revisione-validazione' => ['4869', 'validation-status-under-review'],
     'in pre-accatastamento' => ['4868', 'validation-status-pre-registration'],
-    'percorribile' => ['4187', 'validation-status-walkable'],
     'validato' => ['4188', 'validation-status-validated'],
     'certificato' => ['4189', 'validation-status-certified'],
 ]);
 
-it('tiene i sette id Drupal del contratto con la sorgente', function () {
+/**
+ * I due tid che parlano del terreno non stanno piu' qui (oc:8989): vanno nella
+ * percorribilita', e la validazione di quei sentieri diventa «Non verificato»,
+ * perche' Drupal, con un campo solo, non l'ha mai dichiarata.
+ */
+it('manda i due tid di terreno alla percorribilità e segna la validazione come non verificata', function (string $tid, string $walkability) {
+    $track = importWithValidationStatus($tid);
+
+    expect(validationStatusOf($track))->toBe(['validation-status-unverified'])
+        ->and(app(\Wm\WmPackage\TrailRegistry\Services\WalkabilityService::class)->current($track)?->identifier)
+        ->toBe($walkability);
+})->with([
+    'non percorribile' => ['4870', 'walkability-status-not-walkable'],
+    'percorribile' => ['4187', 'walkability-status-walkable'],
+]);
+
+it('tiene i cinque id Drupal della pratica catastale', function () {
     $terms = TaxonomyTerm::query()->whereNotNull('parent_id')->pluck('identifier');
 
     expect(array_keys(SardegnaSentieriImportService::VALIDATION_STATUS_TERMS))
-        ->toBe([4871, 4870, 4869, 4868, 4187, 4188, 4189])
+        ->toBe([4871, 4869, 4868, 4188, 4189])
         ->and(collect(SardegnaSentieriImportService::VALIDATION_STATUS_TERMS)->every(fn ($identifier) => $terms->contains($identifier)))->toBeTrue();
 });
 
 it('al reimport lo stato cambia e non si somma', function () {
     importWithValidationStatus('4868');
-    $track = importWithValidationStatus('4187');
+    $track = importWithValidationStatus('4188');
 
-    expect(validationStatusOf($track))->toBe(['validation-status-walkable']);
+    expect(validationStatusOf($track))->toBe(['validation-status-validated']);
 });
 
 it('senza stato in Drupal il valore già scritto resta', function () {
@@ -149,15 +163,13 @@ function validationStatusField(): ?Field
     return $find((new EcTrackResource(new EcTrack))->fields(NovaRequest::create('/nova-api/ec-tracks', 'GET')));
 }
 
-it('in Nova il campo ha le sette etichette italiane, nell\'ordine di prima', function () {
+it('in Nova il campo ha le cinque etichette italiane della pratica, nell\'ordine di prima', function () {
     $options = collect(validationStatusField()->jsonSerialize()['options'])->mapWithKeys(fn ($o) => [$o['value'] => $o['label']])->all();
 
     expect($options)->toBe([
         'validation-status-unverified' => 'Non verificato',
-        'validation-status-not-walkable' => 'Non percorribile',
         'validation-status-under-review' => 'In revisione-validazione',
         'validation-status-pre-registration' => 'In pre-accatastamento o manutenzione',
-        'validation-status-walkable' => 'Percorribile',
         'validation-status-validated' => 'Validato',
         'validation-status-certified' => 'Certificato',
     ]);
@@ -176,16 +188,19 @@ it('in Nova la scheda mostra l\'etichetta dello stato, non un trattino', functio
     expect($field->jsonSerialize()['displayedAs'])->toBe('In pre-accatastamento o manutenzione');
 });
 
-it('in Nova lo stato apre il tab «Generale» delle classificazioni', function () {
-    // Prima di Tipo percorso e delle altre tassonomie: e' il primo dato che chi compila cerca.
+it('in Nova lo stato apre il tab «Stato» delle classificazioni', function () {
+    // Da oc:8989 gli stati del sentiero hanno un tab loro: la validazione lo apre, la
+    // percorribilità segue, lo storico chiude.
     $resource = new EcTrackResource(new EcTrack);
     $tabs = new ReflectionMethod($resource, 'taxonomyTabs');
     $tabs->setAccessible(true);
 
-    $general = collect($tabs->invoke($resource))->firstWhere('name', __('General'));
-    $names = collect($general->data ?? [])->map(fn ($f) => $f->name)->unique()->values()->all();
+    $status = collect($tabs->invoke($resource))->firstWhere('name', __('Status'));
+    $attributes = collect($status->data ?? [])->map(fn ($f) => $f->attribute)->values()->all();
 
-    expect($names[0] ?? null)->toBe(__('Validation status'));
+    expect($status)->not->toBeNull()
+        ->and(array_search('validation_status', $attributes, true))
+        ->toBeLessThan(array_search('walkability_status', $attributes, true));
 });
 
 it('in Nova il campo legge il termine e lo scrive, sostituendolo', function () {

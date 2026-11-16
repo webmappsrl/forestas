@@ -40,8 +40,12 @@ it('separa tassonomie e termini con il filtro Tipo', function () {
     $taxonomies = $filter->apply($request, TaxonomyTerm::query(), 'taxonomies')->pluck('identifier');
     $terms = $filter->apply($request, TaxonomyTerm::query(), 'terms')->pluck('identifier');
 
-    expect($taxonomies->all())->toBe(['hiking-difficulty'])
-        ->and($terms->all())->toBe(['hiking-difficulty-t']);
+    // Non un elenco esatto: il dominio Catasto installa da sé la famiglia della percorribilità
+    // con i suoi termini (oc:8989), e il filtro deve separarli come separa questi.
+    expect($taxonomies->all())->toContain('hiking-difficulty')
+        ->and($taxonomies->all())->not->toContain('hiking-difficulty-t')
+        ->and($terms->all())->toContain('hiking-difficulty-t')
+        ->and($terms->all())->not->toContain('hiking-difficulty');
 });
 
 it('elenca le tassonomie nel filtro Tipo e ne mostra solo i termini', function () {
@@ -49,7 +53,7 @@ it('elenca le tassonomie nel filtro Tipo e ne mostra solo i termini', function (
     $request = NovaRequest::create('/nova-api/taxonomy-terms', 'GET');
 
     expect($filter->options($request))
-        ->toBe(['Difficoltà escursionistica' => $this->taxonomy->id]);
+        ->toMatchArray(['Difficoltà escursionistica' => $this->taxonomy->id]);
 
     expect($filter->apply($request, TaxonomyTerm::query(), $this->taxonomy->id)->pluck('identifier')->all())
         ->toBe(['hiking-difficulty-t']);
@@ -86,7 +90,16 @@ it('l\'elenco Nova mostra il nome e applica i filtri', function () {
         ])))
         ->assertOk();
 
-    expect(collect($filtered->json('resources'))->count())->toBe(1);
+    // Ogni riga filtrata è una tassonomia, cioè un termine senza genitore: il numero dipende da
+    // quante famiglie il dominio installa, la proprietà no.
+    $identifiers = collect($filtered->json('resources'))
+        ->pluck('fields')
+        ->map(fn ($fields) => collect($fields)->firstWhere('attribute', 'identifier')['value'] ?? null)
+        ->filter()
+        ->all();
+
+    expect($identifiers)->toContain('hiking-difficulty')
+        ->and(TaxonomyTerm::query()->whereIn('identifier', $identifiers)->whereNotNull('parent_id')->count())->toBe(0);
 });
 
 it('sul dettaglio di un termine elenca i contenuti collegati, non su una tassonomia', function () {

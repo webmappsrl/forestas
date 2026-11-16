@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Nova\Filters;
 
+use App\Console\Commands\ConfigureTaxonomyTermsCommand;
 use App\Models\EcTrack;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -46,6 +47,18 @@ class EcTrackValidationStatusFilter extends Filter
             ->where('identifier', EcTrack::VALIDATION_STATUS_TAXONOMY)
             ->first();
 
-        return $family === null ? collect() : $family->children()->get();
+        if ($family === null) {
+            return collect();
+        }
+
+        // Solo gli stati che il comando dei termini dichiara: un termine rimasto in tabella da
+        // una configurazione precedente — i due di terreno usciti da questa famiglia (oc:8989) —
+        // comparirebbe fra le scelte, e chi lo sceglie rimette un sentiero in uno stato che non
+        // esiste più.
+        $declared = ConfigureTaxonomyTermsCommand::termIdentifiersOf(EcTrack::VALIDATION_STATUS_TAXONOMY);
+
+        return $family->children()->get()
+            ->filter(fn (TaxonomyTerm $term) => in_array($term->identifier, $declared, true))
+            ->values();
     }
 }

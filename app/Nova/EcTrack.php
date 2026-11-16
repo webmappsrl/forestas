@@ -19,10 +19,12 @@ use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\Field;
+use Laravel\Nova\Fields\Heading;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
@@ -34,6 +36,10 @@ use Wm\WmPackage\Nova\Filters\FeaturesExcludeByIds;
 use Wm\WmPackage\Nova\Filters\FeaturesIncludeByIds;
 use Wm\WmPackage\Nova\Layer;
 use Wm\WmPackage\Support\TaxonomyTermLabel;
+use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
+use Wm\WmPackage\TrailRegistry\Nova\TrailHistoryRenderer;
+use Wm\WmPackage\TrailRegistry\Nova\TrailStatusRenderer;
+use Wm\WmPackage\TrailRegistry\Services\TrailStatusService;
 
 class EcTrack extends WmNovaEcTrack
 {
@@ -41,6 +47,18 @@ class EcTrack extends WmNovaEcTrack
     use HasMirroredRelations;
 
     public static $model = EcTrackModel::class;
+
+    /**
+     * Il tab delle classificazioni che raccoglie gli stati del sentiero (oc:8989): la pratica
+     * catastale, la percorribilità che porta il package, e in fondo lo storico.
+     * È una chiave, non un'etichetta: Nova la traduce con `__()`, e deve combaciare con il
+     * `properties->tab` che `ConfigureTaxonomyTermsCommand` scrive sulla famiglia.
+     *
+     * Non «Validation»: il filesystem del container non distingue le maiuscole, quindi
+     * `__('Validation')` trova `lang/it/validation.php` e restituisce l'array delle regole di
+     * validazione invece di una stringa — `Tab::make()` riceve un array e la scheda va in 500.
+     */
+    public const STATUS_TAB = 'Status';
 
     public function fields(NovaRequest $request): array
     {
@@ -146,10 +164,16 @@ class EcTrack extends WmNovaEcTrack
     }
 
     /**
-     * Lo stato di validazione apre il tab «Generale» delle classificazioni (oc:8932).
+     * Lo stato di validazione apre il tab «Validazione» delle classificazioni (oc:8932,
+     * oc:8989).
      *
-     * Non passa da `taxonomyTabExtraFields()`, che appende in coda: e' il primo dato che chi
-     * compila la scheda cerca, quindi va prima di Tipo percorso e delle altre tassonomie. E' la
+     * Stava nel tab generale finché era l'unico stato del sentiero. Da quando la percorribilità
+     * è un dato a sé, i due stati hanno un tab ciascuno: è la stessa separazione che il lavoro
+     * ha fatto nei dati, portata nella scheda — lo stato della pratica catastale di qua, lo
+     * stato del terreno di là.
+     *
+     * Non passa da `taxonomyTabExtraFields()`, che appende in coda: è il primo dato che chi
+     * compila la scheda cerca, quindi va prima di eventuali campi aggiunti al tab. È la
      * famiglia `validation-status`, il cui campo generico resta tolto da
      * `makeTermFieldsForTaxonomies()`, altrimenti sarebbero due.
      *
@@ -158,7 +182,13 @@ class EcTrack extends WmNovaEcTrack
     public function makeTermFieldsByTab(string $default = 'General'): array
     {
         $byTab = parent::makeTermFieldsByTab($default);
-        $byTab['General'] = [$this->validationStatusField(), ...($byTab['General'] ?? [])];
+        $byTab[self::STATUS_TAB] = [
+            Heading::make('<h3 class="text-base font-bold">'.e(__('Trail validation')).'</h3>')->asHtml(),
+            $this->validationStatusDetailBlock(),
+            $this->validationStatusField(),
+            $this->validationNoteField(),
+            ...($byTab[self::STATUS_TAB] ?? []),
+        ];
 
         return $byTab;
     }
@@ -173,7 +203,17 @@ class EcTrack extends WmNovaEcTrack
      */
     protected function taxonomyTabExtraFields(): array
     {
+        $fromPackage = parent::taxonomyTabExtraFields();
+
         return [
+            // Il package porta qui il blocco della percorribilità (oc:8989): senza `parent::` i
+            // suoi campi sparirebbero, e con loro l'unico modo di cambiare lo stato lasciando
+            // una traccia nello storico. Lo storico va dopo, perché questi campi finiscono in
+            // coda a quelli di `makeTermFieldsByTab()`: messo lì resterebbe in mezzo.
+            self::STATUS_TAB => [
+                ...($fromPackage[self::STATUS_TAB] ?? []),
+                ...$this->historyBlock(),
+            ],
             'Inclusivity' => [
                 // Punteggi a mano: nessuna sorgente li possiede e l'import non li tocca.
                 $this->inclusivityField(__('Physical inclusivity'), 'forestas_inclusivity_physical', 'physical'),
@@ -236,33 +276,74 @@ class EcTrack extends WmNovaEcTrack
         $terms = EcTrackValidationStatusFilter::statuses();
         $options = $terms->mapWithKeys(fn ($term) => [$term->identifier => TaxonomyTermLabel::for($term)])->all();
 
-        return Select::make(__('Validation status'), 'validation_status')
+        // «Stato», sotto il titolo «Validazione»: il titolo dice già di quale stato si parla.
+        // Il nome vale anche per la colonna in lista, dove il campo compare senza quel titolo
+        // accanto: lì «Stato» è più corto di «Stato validazione» e la colonna resta la stessa.
+        return Select::make(__('Status'), 'validation_status')
             ->options($options)
             ->displayUsingLabels()
             ->nullable()
+            // In detail lo mostra `validationStatusDetailBlock()`, con autore e data: il campo
+            // ripeterebbe il solo valore sotto lo stesso titolo.
+            ->hideFromDetail()
             ->rules('nullable', Rule::in(array_keys($options)))
             ->resolveUsing(fn ($value, $resource) => $resource->exists
                 ? $resource->term(EcTrackModel::VALIDATION_STATUS_TAXONOMY)?->identifier
                 : null)
             ->fillUsing(function (NovaRequest $request, $model, $attribute, $requestAttribute) use ($terms) {
                 $wanted = $request->input($requestAttribute);
-                $wantedId = $wanted === null || $wanted === '' ? null : $terms->firstWhere('identifier', $wanted)?->id;
+                $wanted = $wanted === null || $wanted === '' ? null : $wanted;
 
-                // Dopo il salvataggio: su una traccia nuova l'id non esiste ancora. Come i campi
-                // del package: si tocca solo la famiglia, e solo se il valore è cambiato.
-                return function () use ($model, $terms, $wantedId) {
+                if ($wanted !== null && $terms->firstWhere('identifier', $wanted) === null) {
+                    return;
+                }
+
+                // Svuotare il campo toglie lo stato: il service sa portare da uno stato a un
+                // altro, non a nessuno — un evento senza termine di arrivo non esiste.
+                if ($wanted === null) {
+                    return function () use ($model, $terms) {
+                        /** @var EcTrackModel $model */
+                        $model->taxonomyTerms()->detach($terms->pluck('id')->all());
+                        $model->unsetRelation('taxonomyTerms');
+                    };
+                }
+
+                /** @var string|null $note */
+                $note = $request->input('validation_note');
+                $note = is_string($note) && trim($note) !== '' ? $note : null;
+
+                $userId = $request->user()?->getKey() ?? auth()->id();
+
+                // Dopo il salvataggio: su una traccia nuova l'id non esiste ancora. Passa dal
+                // service perché il cambio finisca nello storico con autore e data, come la
+                // percorribilità: scrivere il pivot a mano lo lascerebbe fuori (oc:8989).
+                return function () use ($model, $wanted, $note, $userId) {
                     /** @var EcTrackModel $model */
-                    $current = $model->taxonomyTerms()->whereIn('taxonomy_terms.id', $terms->pluck('id'))
-                        ->pluck('taxonomy_terms.id')->map(fn ($id) => (int) $id)->all();
-                    $wantedIds = $wantedId === null ? [] : [(int) $wantedId];
-
-                    $removed = array_values(array_diff($current, $wantedIds));
-                    $added = array_values(array_diff($wantedIds, $current));
-                    $model->taxonomyTerms()->detach($removed);
-                    $model->taxonomyTerms()->attach($added);
-                    $model->unsetRelation('taxonomyTerms');
+                    app(TrailStatusService::class)->set(
+                        $model,
+                        EcTrackModel::VALIDATION_STATUS_TAXONOMY,
+                        $wanted,
+                        $note,
+                        $userId === null ? null : (int) $userId,
+                        TrailStatusEventSource::Manual,
+                    );
                 };
             });
+    }
+
+    /**
+     * La nota del passaggio di validazione. Non ha un valore proprio da salvare: la legge il
+     * `fillUsing()` dello stato, che è l'unico a scrivere. Senza `fillUsing()` vuoto Nova
+     * cercherebbe una colonna `validation_note` sul modello.
+     */
+    private function validationNoteField(): Textarea
+    {
+        return Textarea::make(__('Note'), 'validation_note')
+            ->nullable()
+            ->onlyOnForms()
+            ->resolveUsing(fn () => null)
+            ->fillUsing(fn () => null)
+            ->help(__('Why the status changed: it stays in the history, with your name and the date.'));
     }
 
     /**
@@ -335,6 +416,51 @@ class EcTrack extends WmNovaEcTrack
                 Tiptap::make('Info utili', 'properties->forestas->info_utili')->readonly(),
             ])->hideFromIndex(),
             ...$this->forestasMediaFields(),
+        ];
+    }
+
+    /**
+     * Lo stato della pratica catastale in detail: valore, autore e data, come la percorribilità
+     * (oc:8989).
+     *
+     * Autore e data compaiono quando esiste un evento di quella famiglia in `trail_status_events`.
+     * Oggi non ne esistono: nessun percorso li registra ancora per la validazione, e il blocco
+     * mostra il solo valore. Quando la validazione datata arriverà, si riempirà da sé senza
+     * toccare questo codice.
+     */
+    private function validationStatusDetailBlock(): Text
+    {
+        // Nome vuoto: il titolo è l'intestazione che precede il blocco, e ripeterlo nella
+        // colonna di sinistra è la stessa parola due volte sulla stessa riga.
+        return Text::make(' ', fn () => TrailStatusRenderer::render(
+            $this->resource,
+            EcTrackModel::VALIDATION_STATUS_TAXONOMY,
+            __('Not recorded'),
+        ))->asHtml()->onlyOnDetail();
+    }
+
+    /**
+     * Lo storico, in fondo al tab «Stato» (oc:8989).
+     *
+     * Sta qui e non in una sezione a parte: chi registra un dato vuole vedere lì sotto cosa è
+     * stato registrato prima, non in un'altra parte della pagina. È uno solo per tutti gli stati,
+     * perché la tabella degli eventi è una: `TrailHistoryRenderer` la legge senza filtrare la
+     * famiglia, unendoci i passaggi dei codici catastali.
+     *
+     * @return array<int, Field>
+     */
+    private function historyBlock(): array
+    {
+        if (! config('wm-package.features.trail_registry.enabled') || ! $this->resource->exists) {
+            return [];
+        }
+
+        return [
+            Heading::make('<h3 class="text-base font-bold">'.e(__('History')).'</h3>')->asHtml()->onlyOnDetail(),
+            Text::make(
+                ' ',
+                fn () => TrailHistoryRenderer::render($this->resource),
+            )->asHtml()->onlyOnDetail(),
         ];
     }
 }

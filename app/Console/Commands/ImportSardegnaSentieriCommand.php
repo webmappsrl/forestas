@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\Import\CalculateNearbyTracksJob;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
+use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
@@ -345,8 +346,13 @@ class ImportSardegnaSentieriCommand extends Command
 
                 Artisan::call('wm-package:trail-registry-normalize', ['--force' => true]);
 
+                // Le incongruenze catastali (oc:8989) si ricalcolano qui
+                // insieme alle anomalie, e per lo stesso motivo: leggono lo
+                // stato dei tracciati, quindi vogliono il batch concluso.
+                app(WalkabilityInconsistencyService::class)->recalculate();
+
                 Log::channel('import')->info(
-                    "[sardegnasentieri:{$runId}] Anomalie ricalcolate (job falliti: {$failed}/{$total})."
+                    "[sardegnasentieri:{$runId}] Anomalie e incongruenze ricalcolate (job falliti: {$failed}/{$total})."
                 );
 
                 ImportRegistroCatastaleJob::dispatch();

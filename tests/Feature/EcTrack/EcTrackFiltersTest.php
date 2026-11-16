@@ -384,11 +384,13 @@ it('il filtro Ruolo restituisce le tracce con un ente in quel ruolo', function (
 });
 
 it('il filtro Stato validazione restituisce le tracce con quel valore', function () {
-    $percorribile = conStato(traccia(9.2, 9.4), 'walkable');
+    // Uno dei cinque stati della pratica catastale: «Percorribile» e «Non percorribile» sono
+    // usciti da questa famiglia e vivono in `walkability-status` (oc:8989).
+    $validata = conStato(traccia(9.2, 9.4), 'validated');
     conStato(traccia(9.5, 9.6), 'under-review');
     conStato(traccia(9.7, 9.8), null);
 
-    expect(idFiltrati($this, [EcTrackValidationStatusFilter::class => 'validation-status-walkable']))->toBe([$percorribile->id]);
+    expect(idFiltrati($this, [EcTrackValidationStatusFilter::class => 'validation-status-validated']))->toBe([$validata->id]);
 });
 
 it('i titoli dei filtri sono tradotti', function (string $lingua, array $attesi) {

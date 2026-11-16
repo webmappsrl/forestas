@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Wm\WmPackage\Models\EcTrack as WmEcTrack;
 use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
+use Wm\WmPackage\TrailRegistry\Services\WalkabilityService;
 
 /**
  * Porta lo stato di validazione dalla colonna `ec_tracks.stato_validazione` al termine della
@@ -41,12 +43,25 @@ class MoveValidationStatusToTermsCommand extends Command
      */
     private const LEGACY_VALUES = [
         'non_verificato' => 'validation-status-unverified',
-        'non_percorribile' => 'validation-status-not-walkable',
         'in_revisione_validazione' => 'validation-status-under-review',
         'in_pre_accatastamento' => 'validation-status-pre-registration',
-        'percorribile' => 'validation-status-walkable',
         'validato' => 'validation-status-validated',
         'certificato' => 'validation-status-certified',
+    ];
+
+    /**
+     * I due valori che non erano stati della pratica ma del terreno: dalla colonna vanno dritti
+     * nella famiglia della percorribilità, che è dove vivono da oc:8989, senza passare per i
+     * termini intermedi — che la famiglia della validazione non dichiara più.
+     *
+     * La pratica, per questi sentieri, resta «Non verificato»: dal valore della colonna non si
+     * ricava a che punto fosse.
+     *
+     * @var array<string, string>
+     */
+    private const TERRAIN_VALUES = [
+        'percorribile' => 'walkability-status-walkable',
+        'non_percorribile' => 'walkability-status-not-walkable',
     ];
 
     public function handle(): int
@@ -76,7 +91,10 @@ class MoveValidationStatusToTermsCommand extends Command
             ->orderBy('id')->get(['id', 'stato_validazione']);
 
         foreach ($rows as $row) {
-            $identifier = self::LEGACY_VALUES[$row->stato_validazione] ?? null;
+            $walkability = self::TERRAIN_VALUES[$row->stato_validazione] ?? null;
+            $identifier = $walkability !== null
+                ? 'validation-status-unverified'
+                : (self::LEGACY_VALUES[$row->stato_validazione] ?? null);
             if ($identifier === null) {
                 $unknown[$row->stato_validazione] = ($unknown[$row->stato_validazione] ?? 0) + 1;
 
@@ -97,7 +115,21 @@ class MoveValidationStatusToTermsCommand extends Command
             $moved++;
             if (! $dry) {
                 WmEcTrack::withoutSyncingToSearch(fn () => EcTrack::withoutSyncingToSearch(
-                    fn () => $track->taxonomyTerms()->attach($terms[$identifier])
+                    function () use ($track, $terms, $identifier, $walkability) {
+                        $track->taxonomyTerms()->attach($terms[$identifier]);
+
+                        // Passa dal service perché il passaggio resti nello storico con la sua
+                        // provenienza: è una migrazione, non un inserimento di qualcuno.
+                        if ($walkability !== null) {
+                            app(WalkabilityService::class)->set(
+                                $track,
+                                $walkability,
+                                null,
+                                null,
+                                TrailStatusEventSource::Migration,
+                            );
+                        }
+                    }
                 ));
             }
         }

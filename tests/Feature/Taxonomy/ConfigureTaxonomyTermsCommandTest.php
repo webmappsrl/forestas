@@ -11,14 +11,14 @@ uses(RefreshDatabase::class);
 it('crea le dodici tassonomie e i loro termini', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 
-    expect(TaxonomyTerm::taxonomies()->count())->toBe(12)
+    expect(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12)
         // Le avvertenze: la tassonomia nasce qui, i termini li porta l'import (oc:8910).
         ->and(TaxonomyTerm::where('identifier', 'warnings')->first()->children)->toHaveCount(0)
         // Stato di validazione (oc:8932): sette termini, uno solo per percorso.
         ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->single_choice)->toBeTrue()
         ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->children->pluck('identifier')->all())->toBe([
-            'validation-status-unverified', 'validation-status-not-walkable', 'validation-status-under-review',
-            'validation-status-pre-registration', 'validation-status-walkable', 'validation-status-validated',
+            'validation-status-unverified', 'validation-status-under-review',
+            'validation-status-pre-registration', 'validation-status-validated',
             'validation-status-certified',
         ])
         ->and(TaxonomyTerm::where('identifier', 'validation-status-pre-registration')->first()->getTranslation('name', 'it'))->toBe('In pre-accatastamento o manutenzione')
@@ -59,12 +59,14 @@ it('con --fresh riparte da vuoto', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms --fresh')->assertSuccessful();
 
     expect(TaxonomyTerm::find($custom->id))->toBeNull()
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
+        ->and(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12);
 });
 
 it('con --dry-run non scrive niente', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms --dry-run')->assertSuccessful();
-    expect(TaxonomyTerm::count())->toBe(0);
+    // La famiglia della percorribilità e i suoi quattro termini li crea la
+    // migration del dominio, non questo comando: restano anche con --dry-run.
+    expect(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')->count())->toBe(0);
 });
 
 it('riallinea l\'icona delle tassonomie già create senza duplicare', function () {
@@ -104,7 +106,7 @@ it('rinomina una chiave cambiata invece di creare un doppione', function () {
     expect(TaxonomyTerm::where('identifier', 'educational-trail-difficulty')->count())->toBe(0)
         // Stessa riga, non una nuova: le relazioni dei suoi termini restano dove sono.
         ->and(TaxonomyTerm::where('identifier', 'educational-trails-difficulty')->value('id'))->toBe($before->id)
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
+        ->and(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12);
 });
 
 it('dà alle attività il nome italiano, senza toccare quelle che ne hanno già uno', function () {
