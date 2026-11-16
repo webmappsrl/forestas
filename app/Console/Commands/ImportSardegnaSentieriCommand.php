@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\Source\DrupalDumpLock;
 use App\Services\Import\Source\SardegnaSentieriSource;
+use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Console\Command;
@@ -362,8 +363,13 @@ class ImportSardegnaSentieriCommand extends Command
 
                 Artisan::call('wm-package:trail-registry-normalize', ['--force' => true]);
 
+                // Le incongruenze catastali (oc:8989) si ricalcolano qui
+                // insieme alle anomalie, e per lo stesso motivo: leggono lo
+                // stato dei tracciati, quindi vogliono il batch concluso.
+                app(WalkabilityInconsistencyService::class)->recalculate();
+
                 Log::channel('import')->info(
-                    "[sardegnasentieri:{$runId}] Anomalie ricalcolate (job falliti: {$failed}/{$total})."
+                    "[sardegnasentieri:{$runId}] Anomalie e incongruenze ricalcolate (job falliti: {$failed}/{$total})."
                 );
 
                 ImportRegistroCatastaleJob::dispatch();

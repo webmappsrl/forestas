@@ -20,6 +20,8 @@ use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
 use App\Services\RegistroCatastale\AnomalyTypes\TracciaSenzaCodice;
 use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
+use App\Services\TrailRegistry\InconsistencyTypes\MissingWalkability;
+use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\Combined\AllOf;
 use Dedoc\Scramble\Support\Generator\Header;
@@ -31,6 +33,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -42,6 +45,7 @@ use Wm\WmPackage\Models\Tile;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
 use Wm\WmPackage\Policies\TilePolicy;
+use Wm\WmPackage\TrailRegistry\Events\WalkabilityChanged;
 use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
 
 class AppServiceProvider extends ServiceProvider
@@ -70,6 +74,25 @@ class AppServiceProvider extends ServiceProvider
         // unisce ai suoi nella Resource Anomalie. Il nome porta il prefisso
         // della provenienza. Si unisce a quanto gia' in config invece di
         // sovrascrivere, nel caso la chiave abbia gia' altre voci.
+        // Il ricalcolo delle incongruenze non puo' aspettare il prossimo import:
+        // dipende anche dalla percorribilita', che si inserisce a mano da Nova
+        // (oc:8989). Il package emette l'evento, qui si reagisce.
+        Event::listen(WalkabilityChanged::class, function (): void {
+            app(WalkabilityInconsistencyService::class)->recalculate();
+        });
+
+        // Incongruenze catastali (oc:8989): due informazioni che il catasto
+        // pubblica sullo stesso sentiero e che insieme non reggono. Sono una
+        // famiglia a parte rispetto alle anomalie — quelle riguardano il codice
+        // e si correggono alla fonte, queste si risolvono qui inserendo il dato
+        // che manca.
+        config(['wm-package.features.trail_registry.inconsistency_types' => array_merge(
+            (array) config('wm-package.features.trail_registry.inconsistency_types', []),
+            [
+                MissingWalkability::TYPE => MissingWalkability::class,
+            ],
+        )]);
+
         config(['wm-package.features.trail_registry.anomaly_types' => array_merge(
             (array) config('wm-package.features.trail_registry.anomaly_types', []),
             [

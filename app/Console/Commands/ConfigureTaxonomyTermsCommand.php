@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
@@ -110,16 +111,42 @@ class ConfigureTaxonomyTermsCommand extends Command
             // corrispondenza con i tid di Drupal vive nell'import
             // (`SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`). L'ordine è quello del
             // vecchio enum.
-            ['identifier' => 'validation-status', 'name' => 'Stato validazione', 'single_choice' => true, 'terms' => [
+            ['identifier' => 'validation-status', 'name' => 'Stato validazione', 'single_choice' => true, 'properties' => ['tab' => 'Status'], 'terms' => [
+                // «Non percorribile» e «Percorribile» non sono piu' qui (oc:8989):
+                // parlavano del terreno, non della pratica, e sono passati alla
+                // famiglia della percorribilita', che crea il package quando si
+                // accende il dominio. I sentieri che li portavano li sposta
+                // `sardegnasentieri:move-walkability`, da lanciare **prima** di
+                // questa modifica su un database che li ha ancora.
                 ['Non verificato', 'validation-status-unverified', 0],
-                ['Non percorribile', 'validation-status-not-walkable', 1],
                 ['In revisione-validazione', 'validation-status-under-review', 2],
                 ['In pre-accatastamento o manutenzione', 'validation-status-pre-registration', 3],
-                ['Percorribile', 'validation-status-walkable', 4],
                 ['Validato', 'validation-status-validated', 5],
                 ['Certificato', 'validation-status-certified', 6],
             ]],
         ];
+    }
+
+    /**
+     * Gli identifier dei termini che il comando dichiara per una famiglia (oc:8989).
+     *
+     * È la sola fonte di verità su quali stati esistono: la tabella può contenere righe rimaste
+     * da una configurazione precedente, e chi offre delle scelte all'utente deve offrire queste,
+     * non quelle.
+     *
+     * @return list<string>
+     */
+    public static function termIdentifiersOf(string $taxonomyIdentifier): array
+    {
+        foreach (self::taxonomies() as $taxonomy) {
+            if ($taxonomy['identifier'] !== $taxonomyIdentifier) {
+                continue;
+            }
+
+            return array_map(fn (array $term) => $term[1], $taxonomy['terms']);
+        }
+
+        return [];
     }
 
     /**
@@ -136,6 +163,24 @@ class ConfigureTaxonomyTermsCommand extends Command
         // tematismi non è mai arrivato l'elenco dei valori.
         'itineraries-and-paths',
         'themes',
+    ];
+
+    /**
+     * Termini ritirati: righe figlie che non devono più esistere (oc:8989).
+     *
+     * Diverso da `RETIRED`, che toglie intere famiglie: qui si tolgono singoli termini da una
+     * famiglia che resta. I due valori di terreno sono usciti da `validation-status` quando la
+     * percorribilità è diventata un dato a sé; finché restano in tabella compaiono a zero nei
+     * conteggi e nei filtri, come scelte che non selezionano niente.
+     *
+     * Si tolgono solo se nessuno li usa più: la migrazione dei sentieri (`move-walkability`) deve
+     * essere già passata. Se qualcosa li tiene, il comando lo dice e li lascia dove sono.
+     *
+     * @var list<string>
+     */
+    private const RETIRED_TERMS = [
+        'validation-status-walkable',
+        'validation-status-not-walkable',
     ];
 
     /**
@@ -192,6 +237,7 @@ class ConfigureTaxonomyTermsCommand extends Command
 
         $this->renameIdentifiers($dry);
         $this->removeRetired($dry);
+        $this->removeRetiredTerms($dry);
 
         $created = 0;
         $updated = 0;
@@ -246,6 +292,44 @@ class ConfigureTaxonomyTermsCommand extends Command
             }
 
             $this->line(($dry ? '[dry-run] ' : '')."Tolgo la tassonomia ritirata {$identifier}");
+            if (! $dry) {
+                $row->delete();
+            }
+        }
+    }
+
+    /**
+     * Toglie i termini ritirati, se nessuno li usa più.
+     *
+     * Due cose possono trattenerli: un sentiero ancora legato, e un evento di stato che li
+     * nomina. Il secondo conta perché le chiavi esterne di `trail_status_events` sono senza
+     * cascata: cancellare un termine che compare nella storia fallirebbe con un errore del
+     * database invece che con una frase leggibile — ed è voluto che la storia non si possa
+     * perdere per sbaglio.
+     */
+    private function removeRetiredTerms(bool $dry): void
+    {
+        foreach (self::RETIRED_TERMS as $identifier) {
+            $row = TaxonomyTerm::query()->where('identifier', $identifier)->whereNotNull('parent_id')->first();
+            if ($row === null) {
+                continue;
+            }
+
+            $links = DB::table('taxonomy_termables')->where('taxonomy_term_id', $row->id)->count();
+            $events = Schema::hasTable('trail_status_events')
+                ? DB::table('trail_status_events')
+                    ->where('from_term_id', $row->id)
+                    ->orWhere('to_term_id', $row->id)
+                    ->count()
+                : 0;
+
+            if ($links > 0 || $events > 0) {
+                $this->warn("Non tolgo il termine {$identifier}: ha {$links} contenuti collegati e {$events} eventi di stato.");
+
+                continue;
+            }
+
+            $this->line(($dry ? '[dry-run] ' : '')."Tolgo il termine ritirato {$identifier}");
             if (! $dry) {
                 $row->delete();
             }

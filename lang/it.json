@@ -81,5 +81,9 @@
     "Application not found.": "Domanda non trovata.",
     "Not found.": "Risorsa non trovata.",
     "Access denied: a valid token of the channel client is required.": "Accesso non consentito: serve un token valido del client dello sportello.",
-    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere."
+    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere.",
+    "Validated trail with unknown walkability": "Sentiero validato con percorribilità sconosciuta",
+    "The registry declares this trail validated or certified, but nobody has recorded whether it can be walked.": "Il catasto dichiara questo sentiero validato o certificato, ma nessuno ha registrato se si cammina.",
+    "Why the status changed: it stays in the history, with your name and the date.": "Perché lo stato è cambiato: resta nello storico, con il tuo nome e la data.",
+    "Trail validation status": "Stato di validazione dei sentieri"
 }

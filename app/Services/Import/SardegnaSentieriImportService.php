@@ -30,6 +30,9 @@ use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Services\FeaturesService;
 use Wm\WmPackage\Services\StorageService;
+use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
+use Wm\WmPackage\TrailRegistry\Services\TrailStatusService;
+use Wm\WmPackage\TrailRegistry\Services\WalkabilityService;
 use Wm\WmPackage\TrailRegistry\TrailCodeRegistrationOutcome;
 use Wm\WmPackage\TrailRegistry\TrailRegistryService;
 use Wm\WmPackage\Traits\NormalizesRelatedUrl;
@@ -109,12 +112,28 @@ class SardegnaSentieriImportService
      */
     public const VALIDATION_STATUS_TERMS = [
         '4871' => 'validation-status-unverified',
-        '4870' => 'validation-status-not-walkable',
         '4869' => 'validation-status-under-review',
         '4868' => 'validation-status-pre-registration',
-        '4187' => 'validation-status-walkable',
         '4188' => 'validation-status-validated',
         '4189' => 'validation-status-certified',
+    ];
+
+    /**
+     * I due tid che in Drupal parlano del **terreno** e non della pratica
+     * catastale (oc:8989): da qui in poi vanno nella famiglia della
+     * percorribilita', e la validazione di quei sentieri diventa
+     * `validation-status-unverified` — perche' Drupal, avendo un campo solo,
+     * non l'ha mai dichiarata, e un sentiero senza termine di validazione esce
+     * da ogni filtro e dai conteggi.
+     *
+     * Le chiavi sono i tid di Drupal: scritte come stringhe per leggerle come arrivano dalla
+     * sorgente, PHP le converte comunque in interi.
+     *
+     * @var array<int, string>
+     */
+    public const WALKABILITY_STATUS_TERMS = [
+        '4870' => 'walkability-status-not-walkable',
+        '4187' => 'walkability-status-walkable',
     ];
 
     /** Prefisso dell'`identifier` dei termini che vengono da `categorie_fruibilita_sentieri` (oc:8910). */
@@ -1051,9 +1070,21 @@ class SardegnaSentieriImportService
         // `missing_term` e la famiglia si svuota, come faceva la colonna.
         $statoId = $response->taxonomies->stato_di_validazione[0] ?? null;
         if ($statoId !== null) {
-            $classification['terms'][EcTrack::VALIDATION_STATUS_TAXONOMY] = [
-                self::VALIDATION_STATUS_TERMS[(string) $statoId] ?? self::DRUPAL_TERM_PREFIX.$statoId,
-            ];
+            $statoId = (string) $statoId;
+
+            // Due dei sette valori di Drupal parlano del terreno, non della
+            // pratica (oc:8989): quelli vanno nella percorribilita', e la
+            // validazione diventa «Non verificato» — scritta, non lasciata
+            // vuota, perche' Drupal non l'ha mai dichiarata e un sentiero senza
+            // termine di validazione esce da ogni filtro.
+            // Come la percorribilita', la validazione non passa dall'attach/detach generico ma
+            // dal service, che registra l'evento: si tiene da parte e si scrive in fondo.
+            if (isset(self::WALKABILITY_STATUS_TERMS[$statoId])) {
+                $classification['validation'] = 'validation-status-unverified';
+                $classification['walkability'] = self::WALKABILITY_STATUS_TERMS[$statoId];
+            } else {
+                $classification['validation'] = self::VALIDATION_STATUS_TERMS[$statoId] ?? self::DRUPAL_TERM_PREFIX.$statoId;
+            }
         }
 
         // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono una tassonomia come le
@@ -1118,7 +1149,97 @@ class SardegnaSentieriImportService
 
         $ecTrack->unsetRelation('taxonomyTerms');
 
+        $this->syncWalkability($ecTrack, $classification['walkability'] ?? null);
+        $this->syncValidationStatus($ecTrack, $classification['validation'] ?? null, $terms, $vocabularies, $anomalies);
+
         $this->rememberClassificationAnomalies($ecTrack, $anomalies);
+    }
+
+    /**
+     * La percorribilita' non si scrive con attach/detach come le altre
+     * classificazioni (oc:8989): passa dal service del dominio, che registra
+     * l'evento con data e provenienza.
+     *
+     * Senza, lo stato cambierebbe a ogni giro orario senza lasciare storia — lo
+     * stesso difetto che questo lavoro non replica da osm2cai, ma su un
+     * processo che gira ventiquattro volte al giorno invece che su un campo
+     * usato di rado. Il service non scrive nulla se lo stato non cambia, quindi
+     * un import che non porta novita' non sporca la cronologia.
+     */
+    private function syncWalkability(EcTrack $ecTrack, ?string $identifier): void
+    {
+        if ($identifier === null || ! config('wm-package.features.trail_registry.enabled')) {
+            return;
+        }
+
+        app(WalkabilityService::class)->set(
+            $ecTrack,
+            $identifier,
+            null,
+            null,
+            TrailStatusEventSource::Import,
+        );
+    }
+
+    /**
+     * Lo stato di validazione, come la percorribilita', passa dal service del dominio
+     * (oc:8989): e' lui a registrare l'evento con data e provenienza, e senza di lui un cambio
+     * arrivato da Drupal non lascerebbe nessuna riga nello storico.
+     *
+     * Il service non scrive se lo stato non cambia: un giro orario che non porta novita' non
+     * sporca la cronologia, e sono la quasi totalita'.
+     *
+     * **Il termine che non esiste** resta trattato come prima: si segnala `missing_term` e la
+     * famiglia si svuota, perche' un identifier che nessun termine porta non e' uno stato in cui
+     * si possa portare il sentiero.
+     *
+     * @param  Collection<string, TaxonomyTerm>  $terms
+     * @param  Collection<string, TaxonomyTerm>  $vocabularies
+     * @param  array<int, array<string, mixed>>  $anomalies
+     */
+    private function syncValidationStatus(EcTrack $ecTrack, ?string $identifier, $terms, $vocabularies, array &$anomalies): void
+    {
+        if ($identifier === null) {
+            return;
+        }
+
+        if ($terms->get($identifier) === null) {
+            $anomalies[] = [
+                'type' => 'missing_term',
+                'vocabulary' => EcTrack::VALIDATION_STATUS_TAXONOMY,
+                'identifier' => $identifier,
+            ];
+
+            // La famiglia sta in `$vocabularies`: `$terms` tiene i figli, e cercarla lì non
+            // darebbe nulla — il detach allora non svuoterebbe niente.
+            $family = $vocabularies->get(EcTrack::VALIDATION_STATUS_TAXONOMY);
+            $current = $family === null ? [] : $ecTrack->taxonomyTerms()
+                ->where('taxonomy_terms.parent_id', $family->id)
+                ->pluck('taxonomy_terms.id')
+                ->all();
+
+            if ($current !== []) {
+                \Wm\WmPackage\Models\EcTrack::withoutSyncingToSearch(fn () => EcTrack::withoutSyncingToSearch(
+                    fn () => $ecTrack->taxonomyTerms()->detach($current)
+                ));
+                $ecTrack->unsetRelation('taxonomyTerms');
+            }
+
+            return;
+        }
+
+        if (! config('wm-package.features.trail_registry.enabled')) {
+            return;
+        }
+
+        app(TrailStatusService::class)->set(
+            $ecTrack,
+            EcTrack::VALIDATION_STATUS_TAXONOMY,
+            $identifier,
+            null,
+            null,
+            TrailStatusEventSource::Import,
+        );
     }
 
     /**
