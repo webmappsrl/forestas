@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Scout\EngineManager;
+use Laravel\Scout\Engines\Engine;
 use Mockery\MockInterface;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
@@ -73,6 +75,51 @@ it('scrive l ente e salva il changed di Drupal', function () {
         ->and($ente->getTranslation('name', 'it'))->toBe('Agenzia Forestas')
         ->and($ente->getTranslation('name', 'en'))->toBe('Agenzia Forestas')
         ->and($ente->tipo_ente)->toBe(TipoEnte::EntePartner);
+});
+
+it('tiene la formattazione della descrizione e toglie il resto', function () {
+    // GAL BMG su Drupal ha titoli, paragrafi, link e corsivi (oc:8965).
+    $body = '<h4>Il GAL</h4><p style="x">Testo con <a href="https://www.galbmg.it">link</a> e <em>corsivo</em></p><script>x()</script>';
+    [$service, , $mediaSync] = enteService([3 => enteNode(3, ['body' => [['value' => $body]]])]);
+    $mediaSync->shouldReceive('syncImportedImages')->once();
+
+    $ente = Ente::findOrFail($service->importOrUpdateEnte('3', '2026-10-30 10:00:00'));
+
+    expect($ente->getTranslation('description', 'it'))
+        ->toBe('<h4>Il GAL</h4><p>Testo con <a href="https://www.galbmg.it">link</a> e <em>corsivo</em></p>');
+});
+
+it('normalizza lo slug di Drupal in ASCII', function (array $overrides, string $expected) {
+    // WordPress costruisce gli URL con sanitize_title(), che toglie gli accenti (oc:8965).
+    [$service, , $mediaSync] = enteService([82 => enteNode(82, $overrides)]);
+    $mediaSync->shouldReceive('syncImportedImages')->once();
+
+    $ente = Ente::findOrFail($service->importOrUpdateEnte('82', '2026-10-30 10:00:00'));
+
+    expect($ente->slug)->toBe($expected);
+})->with([
+    'slug accentato' => [['slug' => 'comune-di-lodè'], 'comune-di-lode'],
+    'slug già pulito' => [['slug' => 'oasi-tepilora'], 'oasi-tepilora'],
+    'senza slug, dal titolo' => [['title' => [['value' => 'Département de la Haute-Corse']]], 'departement-de-la-haute-corse'],
+]);
+
+it('aggiorna l indice dell ente dopo le immagini', function () {
+    $engine = Mockery::spy(Engine::class);
+    app(EngineManager::class)->extend('spy', fn () => $engine);
+    config(['scout.driver' => 'spy']);
+    [$service, , $mediaSync] = enteService([13 => enteNode(13)]);
+    $imagesSynced = false;
+    $mediaSync->shouldReceive('syncImportedImages')->once()->andReturnUsing(function () use (&$imagesSynced) {
+        $imagesSynced = true;
+    });
+    $indexedAfterImages = null;
+    $engine->shouldReceive('update')->andReturnUsing(function ($models) use (&$imagesSynced, &$indexedAfterImages) {
+        $indexedAfterImages = $imagesSynced && $models->first()?->sardegnasentieri_id === '13';
+    });
+
+    $service->importOrUpdateEnte('13', '2026-10-30 10:00:00');
+
+    expect($indexedAfterImages)->toBeTrue();
 });
 
 it('svuota i campi svuotati in Drupal', function () {

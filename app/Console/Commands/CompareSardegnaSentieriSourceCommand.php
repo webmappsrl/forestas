@@ -15,7 +15,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use Wm\WmPackage\Nova\Fields\ImageCredits;
 
 /**
@@ -397,7 +396,8 @@ class CompareSardegnaSentieriSourceCommand extends Command
 
         $title = (string) data_get($node, 'title.0.value', '');
         $this->compareShardValue("ente {$nid} pagina_web_title", $node['pagina_web_title'] ?? null, $row['pagina_web_title']);
-        $this->compareShardValue("ente {$nid} slug", $node['slug'] ?? Str::slug($title), $row['slug']);
+        // Come l'import, che salva lo slug di Drupal in ASCII (oc:8965).
+        $this->compareShardValue("ente {$nid} slug", Ente::normalizeSlug($node['slug'] ?? null, $title), $row['slug']);
         $this->compareShardValue("ente {$nid} drupal_created_at", $node['created'] ?? null,
             $row['drupal_created_at'] === null ? null : date('Y-m-d H:i:s', (int) strtotime((string) $row['drupal_created_at'])));
     }

@@ -77,7 +77,7 @@ class ImportSardegnaSentieriCommand extends Command
      */
     protected $signature = 'sardegnasentieri:import
                             {--force : Reimport all ignoring updated_at}
-                            {--only= : Import only pois or tracks}
+                            {--only= : Import only pois, tracks or enti (enti are always imported)}
                             {--reset : Truncate all imported data before importing (implies --force)}';
 
     /**
@@ -95,6 +95,23 @@ class ImportSardegnaSentieriCommand extends Command
         SardegnaSentieriImportService $importService
     ): int {
         $runId = strtoupper(Str::random(8));
+
+        // Un valore sconosciuto di `--only` si comporterebbe come «solo enti»: con `--reset`
+        // troncherebbe tracce e POI senza reimportarli (oc:8965).
+        $only = $this->option('only');
+        if ($only !== null && ! in_array($only, ['pois', 'tracks', 'enti'], true)) {
+            $this->error("--only={$only} non è valido: usa pois, tracks o enti.");
+
+            return self::FAILURE;
+        }
+
+        // `--reset` tronca tracce e POI qualunque sia `--only`: con i soli enti li cancellerebbe
+        // senza reimportarli (oc:8965). Si rifiuta prima del backup e del troncamento.
+        if ($this->option('reset') && $only === 'enti') {
+            $this->error('--only=enti non si combina con --reset: il reset tronca anche tracce e POI. Usa --only=enti --force.');
+
+            return self::FAILURE;
+        }
 
         // Prima di tutto, anche del `--reset`: una copia a metà ricarica
         // sembra una fonte con pochi nodi (oc:8900).
@@ -448,6 +465,8 @@ class ImportSardegnaSentieriCommand extends Command
             $properties['forestas']['deleted_from_source'] = true;
             $ente->properties = $properties;
             $ente->saveQuietly();
+            // saveQuietly() salta Scout: senza questo l'ente sparito resterebbe nella ricerca (oc:8965).
+            $ente->unsearchable();
         }
 
         if ($removed->count() > 0) {
