@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Jobs\Import\CalculateNearbyTracksJob;
 use App\Jobs\Import\ImportRegistroCatastaleJob;
-use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use App\Jobs\Import\ImportSardegnaSentieriEnteJob;
 use App\Jobs\Import\ImportSardegnaSentieriPoiJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackJob;
@@ -17,6 +16,7 @@ use App\Models\User;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\Source\DrupalDumpLock;
 use App\Services\Import\Source\SardegnaSentieriSource;
+use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Console\Command;

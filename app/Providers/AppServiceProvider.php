@@ -21,7 +21,6 @@ use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use App\Services\TrailRegistry\InconsistencyTypes\MissingWalkability;
 use App\Services\TrailRegistry\WalkabilityInconsistencyService;
-use Wm\WmPackage\TrailRegistry\Events\WalkabilityChanged;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\Combined\AllOf;
 use Dedoc\Scramble\Support\Generator\Header;
@@ -45,6 +44,7 @@ use Wm\WmPackage\Models\Tile;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
 use Wm\WmPackage\Policies\TilePolicy;
+use Wm\WmPackage\TrailRegistry\Events\WalkabilityChanged;
 use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
 
 class AppServiceProvider extends ServiceProvider

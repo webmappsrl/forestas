@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Nova\Dashboards\Main;
+use Laravel\Nova\Cards\Help;
+use Wm\WmPackage\Models\User;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
 use Wm\WmPackage\TrailRegistry\Nova\Cards\TrailRegistryInconsistenciesCard;
 use Wm\WmPackage\TrailRegistry\Nova\Cards\WalkabilityDistributionCard;
@@ -21,7 +23,7 @@ it('mostra le due card del Catasto', function () {
 it('non mostra più la pagina di benvenuto di Nova', function () {
     $cards = collect((new Main)->cards());
 
-    expect($cards->first(fn ($card) => $card instanceof \Laravel\Nova\Cards\Help))->toBeNull();
+    expect($cards->first(fn ($card) => $card instanceof Help))->toBeNull();
 });
 
 it('si costruisce senza errori per ogni ruolo che entra in Nova', function (string $role) {
@@ -31,7 +33,7 @@ it('si costruisce senza errori per ogni ruolo che entra in Nova', function (stri
 
     // Le card sono numeri d'insieme: le vede chiunque entri in Nova, senza
     // restrizione per ruolo. `Guest` e `Sus` in Nova non entrano affatto.
-    $user = \Wm\WmPackage\Models\User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole($role);
     auth()->login($user);
 

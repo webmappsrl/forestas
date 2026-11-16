@@ -28,11 +28,11 @@ use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyActivityable;
 use Wm\WmPackage\Models\TaxonomyPoiType;
 use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\Services\FeaturesService;
+use Wm\WmPackage\Services\StorageService;
 use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
 use Wm\WmPackage\TrailRegistry\Services\TrailStatusService;
 use Wm\WmPackage\TrailRegistry\Services\WalkabilityService;
-use Wm\WmPackage\Services\FeaturesService;
-use Wm\WmPackage\Services\StorageService;
 use Wm\WmPackage\TrailRegistry\TrailCodeRegistrationOutcome;
 use Wm\WmPackage\TrailRegistry\TrailRegistryService;
 use Wm\WmPackage\Traits\NormalizesRelatedUrl;
@@ -1190,8 +1190,8 @@ class SardegnaSentieriImportService
      * famiglia si svuota, perche' un identifier che nessun termine porta non e' uno stato in cui
      * si possa portare il sentiero.
      *
-     * @param  \Illuminate\Support\Collection<string, \Wm\WmPackage\Models\TaxonomyTerm>  $terms
-     * @param  \Illuminate\Support\Collection<string, \Wm\WmPackage\Models\TaxonomyTerm>  $vocabularies
+     * @param  Collection<string, TaxonomyTerm>  $terms
+     * @param  Collection<string, TaxonomyTerm>  $vocabularies
      * @param  array<int, array<string, mixed>>  $anomalies
      */
     private function syncValidationStatus(EcTrack $ecTrack, ?string $identifier, $terms, $vocabularies, array &$anomalies): void

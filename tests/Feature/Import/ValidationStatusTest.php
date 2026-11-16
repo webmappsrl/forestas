@@ -21,6 +21,7 @@ use Laravel\Nova\Tabs\TabsGroup;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\TaxonomyTerm;
+use Wm\WmPackage\TrailRegistry\Services\WalkabilityService;
 
 /**
  * Lo stato di validazione è un termine della famiglia `validation-status` (oc:8932), non più una
@@ -101,7 +102,7 @@ it('manda i due tid di terreno alla percorribilità e segna la validazione come 
     $track = importWithValidationStatus($tid);
 
     expect(validationStatusOf($track))->toBe(['validation-status-unverified'])
-        ->and(app(\Wm\WmPackage\TrailRegistry\Services\WalkabilityService::class)->current($track)?->identifier)
+        ->and(app(WalkabilityService::class)->current($track)?->identifier)
         ->toBe($walkability);
 })->with([
     'non percorribile' => ['4870', 'walkability-status-not-walkable'],
