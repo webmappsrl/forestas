@@ -23,12 +23,18 @@ Come il sito WordPress legge gli enti dallo shard: rotte, token, forma del JSON,
 ### Il JSON degli enti
 
 - `{"generated_at": …, "data": [...]}`, con gli enti non marcati
-  `properties.forestas.deleted_from_source` (`Ente::active()`); circa 1 MB per 93 enti.
+  `properties.forestas.deleted_from_source` (`Ente::active()`); circa 1,8 MB per 93 enti.
 - Ogni ente: `id`, `slug`, `name`, `type`, `description`, `contacts`, `website` (`url`, `title`),
   `geometry` (`Point` 2D), `feature_image` e `image_gallery` nella forma di `MediaResource` del
   package (prima foto per `order_column` = immagine principale), `related_url`, `created_at`,
-  `updated_at`, `tracks` (`id`, `ref`, `name`, `validation_status`, `roles`), `pois` (`id`, `name`,
-  `roles`). Tracce e POI spariti da Drupal sono esclusi. La forma è fissata da
+  `updated_at`, `tracks` (`id`, `ref`, `name`, `validation_status`, `roles`, `created_at` di
+  Drupal), `pois` (`id`, `name`, `roles`). Tracce e POI spariti da Drupal sono esclusi.
+- **Le tracce con ruolo `gestore` hanno anche i campi della card** del carosello «Sentieri
+  gestiti» del sito (oc:8990): `route_type`, `feature_image`, `distance`, `duration_forward`, gli
+  stessi di `ForestasDetailParts::trackCard()` per i sentieri correlati. Lunghezza e tempo restano
+  `null` finché non gira il DEM. Il sito ordina il carosello per `created_at`, come Drupal.
+- Delle tracce la query legge una `properties` ridotta (`jsonb_build_object` in `EnteController`):
+  solo le chiavi che servono a card e `created_at`, mai geometria e `properties` intere. La forma è fissata da
   `tests/Feature/Entes/EnteIndexTest.php`.
 - **La chiave `en` di nome, descrizione e contatti contiene il testo italiano**: su Drupal gli enti
   sono solo in italiano, l'import lo copia anche lì. Non è una traduzione.

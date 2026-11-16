@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Models\Ente;
+use App\Support\ForestasDetailParts;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -96,13 +97,27 @@ class EnteResource extends JsonResource
             /** @var EcTrack $track */
             $track = $rows->first();
 
-            return [
+            $roles = $this->roles($rows);
+            $item = [
                 'id' => (int) $track->id,
-                'ref' => $track->getAttribute('ref'),
+                'ref' => $track->properties['ref'] ?? null,
                 'name' => $track->getTranslations('name'),
                 'validation_status' => $track->term(EcTrack::VALIDATION_STATUS_TAXONOMY)?->identifier,
-                'roles' => $this->roles($rows),
+                'roles' => $roles,
+                // Data di creazione su Drupal: il sito ordina il carosello come Drupal.
+                'created_at' => $track->properties['forestas']['created_at'] ?? null,
             ];
+
+            // I sentieri gestiti hanno anche i campi della card del carosello sul sito, gli stessi
+            // della card dei sentieri correlati (oc:8990).
+            if (in_array('gestore', $roles, true)) {
+                $item += array_intersect_key(
+                    ForestasDetailParts::trackCard($track),
+                    array_flip(['route_type', 'feature_image', 'distance', 'duration_forward'])
+                );
+            }
+
+            return $item;
         })->values()->all();
     }
 
