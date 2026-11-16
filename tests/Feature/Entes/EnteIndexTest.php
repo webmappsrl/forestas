@@ -126,6 +126,12 @@ it('restituisce gli enti con la forma concordata', function () {
             'name' => ['it' => 'Sentiero Z-NU-G-202'],
             'validation_status' => 'validation-status-validated',
             'roles' => ['gestore', 'rilevatore'],
+            'created_at' => null,
+            // Traccia con ruolo gestore: i campi della card dei «Sentieri gestiti».
+            'route_type' => null,
+            'feature_image' => null,
+            'distance' => null,
+            'duration_forward' => null,
         ]])
         ->and($item['pois'])->toBe([[
             'id' => $poi->id,
@@ -186,6 +192,34 @@ it('non fa una query per ente né per traccia', function () {
     };
 
     expect($countFor(5))->toBe($countFor(1));
+});
+
+it('dà ai sentieri gestiti la card del carosello e a ogni traccia la data di creazione', function () {
+    // Il carosello «Sentieri gestiti» del dettaglio dell'ente sul sito (oc:8990): foto, nome con
+    // codice, tempo e lunghezza, ordinati come su Drupal per data di creazione.
+    $ente = indexEnte('13');
+    $routeType = TaxonomyTerm::create(['identifier' => 'route-type', 'name' => ['it' => 'Tipo percorso']]);
+    $trail = TaxonomyTerm::create(['parent_id' => $routeType->id, 'identifier' => 'route-type-trail', 'name' => ['it' => 'Sentiero']]);
+    $managed = indexTrack('Z-NU-G-202', [
+        'manual_data' => ['distance' => 12.3, 'duration_forward' => 240],
+        'forestas' => ['created_at' => '2014-05-09 11:53:14'],
+    ]);
+    $managed->taxonomyTerms()->attach($trail->id);
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    $managed->addMediaFromString($png)->usingFileName('sentiero.png')->toMediaCollection('default');
+    $surveyed = indexTrack('Z-NU-G-203', ['forestas' => ['created_at' => '2020-01-01 10:00:00']]);
+    entesLinkTrack($ente, $managed, 'gestore');
+    entesLinkTrack($ente, $surveyed, 'rilevatore');
+
+    $tracks = collect(entesJson($this)['data'][0]['tracks'])->keyBy('ref');
+
+    expect($tracks['Z-NU-G-202']['created_at'])->toBe('2014-05-09 11:53:14')
+        ->and($tracks['Z-NU-G-202']['feature_image']['url'])->toContain('sentiero')
+        ->and($tracks['Z-NU-G-202']['route_type']['identifier'])->toBe('route-type-trail')
+        ->and($tracks['Z-NU-G-202']['distance'])->toBe(12.3)
+        ->and($tracks['Z-NU-G-202']['duration_forward'])->toBe(240)
+        ->and($tracks['Z-NU-G-203']['created_at'])->toBe('2020-01-01 10:00:00')
+        ->and($tracks['Z-NU-G-203'])->not->toHaveKey('feature_image');
 });
 
 it('non carica geometria e properties intere delle tracce', function () {

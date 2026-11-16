@@ -77,6 +77,12 @@ cancellerebbe senza reimportarli. Il comando rifiuta la combinazione prima del b
   `EnteHtmlSanitizer` toglie il tag e tiene il testo, come `DiaryTextService` di camminiditalia
   (oc:8169).
 
+- **Card dei sentieri gestiti nel JSON** (16/11, dopo il merge di #63, quindi secondo merge di
+  oc:8965 in `develop`, scelto dal dev): richiesta per il carosello «Sentieri gestiti» del
+  dettaglio dell'ente su WordPress (oc:8990). Le tracce con ruolo `gestore` (327) hanno i campi di
+  `ForestasDetailParts::trackCard()`; tutte le tracce hanno `created_at` di Drupal, già in
+  `properties.forestas.created_at`, quindi l'import non cambia. Il JSON passa da circa 1,1 a 1,8 MB.
+
 ## Follow-up
 
 - **Creare gli indici di Elasticsearch nel deploy, per tracce ed enti**: oggi `ec_tracks` ed
