@@ -128,15 +128,6 @@ class ConfigureTaxonomyTermsCommand extends Command
     }
 
     /**
-     * Tassonomie di sistema ritirati, da togliere dove ancora esistono (oc:8910).
-     *
-     * Si cancellano solo se sono vuoti: senza termini e senza contenuti collegati. Se qualcuno
-     * nel frattempo li ha riempiti, il comando avvisa e li lascia stare — un dato inserito a
-     * mano non sparisce per una riga tolta da un elenco.
-     *
-     * @var array<int, string>
-     */
-    /**
      * Gli identifier dei termini che il comando dichiara per una famiglia (oc:8989).
      *
      * È la sola fonte di verità su quali stati esistono: la tabella può contenere righe rimaste
@@ -158,6 +149,15 @@ class ConfigureTaxonomyTermsCommand extends Command
         return [];
     }
 
+    /**
+     * Tassonomie di sistema ritirati, da togliere dove ancora esistono (oc:8910).
+     *
+     * Si cancellano solo se sono vuoti: senza termini e senza contenuti collegati. Se qualcuno
+     * nel frattempo li ha riempiti, il comando avvisa e li lascia stare — un dato inserito a
+     * mano non sparisce per una riga tolta da un elenco.
+     *
+     * @var array<int, string>
+     */
     private const RETIRED = [
         // Nati vuoti e mai riempiti: «Tipo percorso» copre la stessa informazione, e per i
         // tematismi non è mai arrivato l'elenco dei valori.

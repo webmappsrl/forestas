@@ -126,7 +126,10 @@ class SardegnaSentieriImportService
      * non l'ha mai dichiarata, e un sentiero senza termine di validazione esce
      * da ogni filtro e dai conteggi.
      *
-     * @var array<string, string>
+     * Le chiavi sono i tid di Drupal: scritte come stringhe per leggerle come arrivano dalla
+     * sorgente, PHP le converte comunque in interi.
+     *
+     * @var array<int, string>
      */
     public const WALKABILITY_STATUS_TERMS = [
         '4870' => 'walkability-status-not-walkable',

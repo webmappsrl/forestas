@@ -23,7 +23,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        app(WalkabilityTaxonomyInstaller::class)->install();
+        $install = fn () => app(WalkabilityTaxonomyInstaller::class)->install();
+
+        // Telescope registra ogni query, e per decidere se farlo legge
+        // `telescope_monitoring`. Se le sue migration non sono state pubblicate
+        // — in CI capita, dove il database nasce vuoto a ogni run — quella
+        // lettura fallisce, aborta la transazione della migration e
+        // l'inserimento dei termini muore con un errore che di Telescope non
+        // parla: «current transaction is aborted». Qui si sospende, se c'e'.
+        if (class_exists(\Laravel\Telescope\Telescope::class)) {
+            \Laravel\Telescope\Telescope::withoutRecording($install);
+
+            return;
+        }
+
+        $install();
     }
 
     /**

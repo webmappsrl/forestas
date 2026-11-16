@@ -1,0 +1,4 @@
+includes:
+    - phpstan.neon.dist
+parameters:
+    tmpDir: /tmp/phpstan-cache
