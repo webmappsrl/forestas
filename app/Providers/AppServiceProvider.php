@@ -10,6 +10,7 @@ use App\Observers\RelatedTrackCardObserver;
 use App\Observers\RelatedTrackMediaObserver;
 use App\Observers\RelatedTrackRouteTypeObserver;
 use App\Policies\RegistroCatastaleRowPolicy;
+use App\Search\EnteSearchIndex;
 use App\Services\Import\Source\SardegnaSentieriDatabaseSource;
 use App\Services\Import\Source\SardegnaSentieriSource;
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
@@ -106,13 +107,19 @@ class AppServiceProvider extends ServiceProvider
             ->get('ec/poi/{id}', [EcPoiDetailController::class, 'show'])
             ->name('default.api.ec.poi.json');
 
-        // Branch API riservato al SUS (oc:8333). Registrato qui e non in
-        // routes/api.php perche' bootstrap/app.php non carica quel file:
-        // stesso pattern di WmPackageServiceProvider.
+        // Branch API riservato al SUS (oc:8333), registrato qui con lo stesso
+        // pattern di WmPackageServiceProvider. Da oc:8965 bootstrap/app.php
+        // carica anche routes/api.php, dove stanno le rotte degli enti: il SUS
+        // e' rimasto qui perche' spostarlo era fuori da quel ticket.
         Route::name('sus.')
             ->middleware('api')
             ->prefix('api/v1/sus')
             ->group(base_path('routes/sus.php'));
+
+        // Indice degli enti (oc:8965): WmPackageServiceProvider::packageRegistered() sostituisce
+        // `elasticsearch.indices` con quella del package, quindi la chiave degli enti si aggiunge
+        // qui, nel boot, che gira dopo tutte le register, senza togliere le altre.
+        config(['elasticsearch.indices.mappings.'.EnteSearchIndex::NAME => EnteSearchIndex::mappings()]);
 
         // Lo strumento di prova del canale (vedi config/sus.php): fuori da
         // `api/v1/sus`, quindi fuori dalla documentazione e dal gruppo `api`,

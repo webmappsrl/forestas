@@ -28,3 +28,7 @@ paths:
   La sequenza di avvio è `elasticsearch` → `elasticsearch-init` → `kibana`; `scout-init` (solo
   `local.compose.yml`) esegue `scout:import` sui modelli del package quando Elasticsearch e il
   database sono pronti
+- **Un mapping Elasticsearch di forestas non va in un file di config**:
+  `WmPackageServiceProvider::packageRegistered()` sostituisce `elasticsearch.indices` con quella del
+  package e il file verrebbe ignorato; la chiave si aggiunge in `AppServiceProvider::boot()`, come
+  `entes` (oc:8965)

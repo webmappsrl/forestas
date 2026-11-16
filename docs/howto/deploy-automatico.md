@@ -36,6 +36,25 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
 - **I rilasci di WordPress con passi propri**, come `applica --conferma` e `pagine --conferma` di
   `wp-forestas/bin/wordpress-config.sh`: vedi [messa-in-opera-wordpress-uat.md](messa-in-opera-wordpress-uat.md).
 - **Le variabili nuove nei `.env`** dei server.
+- **Il primo deploy dell'API degli enti (oc:8965)**, su ogni server, in quest'ordine:
+  1. **prima del deploy**, scrivere nel `.env` del server `WP_API_TOKEN` con un valore generato
+     da `openssl rand -hex 32`, e passarlo a chi configura il sito WordPress. Il deploy esegue
+     `php artisan optimize`, che congela la configurazione: una variabile aggiunta dopo non viene
+     letta, e senza token le rotte `api/v1/entes` rispondono 403;
+  2. **subito dopo il deploy, prima del prossimo import** (orario sul dev, alle 06:00 su UAT),
+     creare l'indice della ricerca degli enti, altrimenti `api/v1/entes/search` risponde 503:
+     `docker exec php-forestas php artisan scout:import "App\Models\Ente"`.
+     Se un import o un salvataggio da Nova arriva prima, Elasticsearch crea da solo un indice vero
+     chiamato `entes`, senza il mapping degli enti, e `scout:import` fallisce perché non può creare
+     l'alias con lo stesso nome. Il rimedio è cancellarlo e rilanciare:
+     `docker exec php-forestas php artisan scout:delete-index entes`, poi di nuovo `scout:import`;
+  3. generare le miniature delle immagini degli enti già importate, che prima di oc:8965 non
+     avevano conversioni:
+     `docker exec php-forestas php artisan media-library:regenerate "App\Models\Ente" --only-missing --force`
+     (`--force` perché il comando chiede conferma in produzione, e UAT gira come `production`);
+  4. riscrivere le descrizioni con la loro formattazione, che l'import prima toglieva:
+     `docker exec php-forestas php artisan sardegnasentieri:import --only=enti --force`. Su UAT
+     il reset notturno riscrive comunque gli enti ogni notte, ma il passo evita di aspettarlo.
 
 ## Configurazione una tantum
 

@@ -9,6 +9,7 @@ use App\Services\Import\SardegnaSentieriMediaSyncService;
 use App\Services\Import\Source\DrupalRecordReader;
 use App\Services\Import\Source\SardegnaSentieriDatabaseSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\Downloaders\Downloader;
 use Spatie\Permission\Models\Role;
@@ -121,6 +122,8 @@ it('tiene una sola copia per file, quella con la didascalia', function () {
     // sui dati veri sono nate 120 righe doppie su 57 file, in 46 casi una con la didascalia e
     // una senza, e la scheda mostrava la stessa foto due volte (oc:8932).
     $file = 'doppia.jpg';
+    // Il file finto non è un'immagine: le miniature dell'ente (oc:8965) non si generano.
+    Queue::fake();
     $ente = Ente::create(['sardegnasentieri_id' => '1', 'name' => ['it' => 'Ente'], 'properties' => []]);
 
     $url = captionManifest($file, null)[0]['url'];

@@ -1451,8 +1451,9 @@ class SardegnaSentieriImportService
             ? [['url' => (string) $node['field_immagine_principale'][0]['url']]]
             : []);
 
+        // Con la sua formattazione: il filtro HTML lo applica il mutator di Ente (oc:8965).
         $description = isset($node['body'][0]['value'])
-            ? trim(strip_tags((string) $node['body'][0]['value']))
+            ? trim((string) $node['body'][0]['value'])
             : null;
 
         $lat = isset($node['field_geolocalizzazione'][0]['lat'])
@@ -1474,7 +1475,9 @@ class SardegnaSentieriImportService
         }
         $ente->pagina_web = $paginaWeb;
         $ente->pagina_web_title = $node['pagina_web_title'] ?? null;
-        $ente->slug = $node['slug'] ?? (string) Str::slug($title);
+        // Solo ASCII: WordPress costruisce gli URL con sanitize_title(), che toglie gli accenti, e
+        // `comune-di-lodè` non si ritroverebbe più (oc:8965).
+        $ente->slug = Ente::normalizeSlug($node['slug'] ?? null, $title);
         // Convertita in PHP dalla sorgente, mai con FROM_UNIXTIME.
         $ente->drupal_created_at = $node['created'] ?? null;
         if ($description !== null && $description !== '') {
@@ -1512,6 +1515,10 @@ class SardegnaSentieriImportService
             'caption' => (string) ($image['caption'] ?? ''),
             'order' => $order,
         ], $images, array_keys($images)));
+
+        // L'ente è salvato con saveQuietly(), che non fa scattare Scout: l'indice degli enti si
+        // aggiorna qui, dopo le immagini, perché la card della ricerca ha la prima foto (oc:8965).
+        $ente->searchable();
 
         return $ente->id;
     }
