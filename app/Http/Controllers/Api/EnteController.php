@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\EnteResource;
 use App\Models\Ente;
 use App\Search\EnteSearch;
+use App\Support\DeletedFromSource;
 use App\Support\ForestasDetailParts;
 use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -49,12 +50,12 @@ class EnteController extends Controller
                 'ecTracks' => fn (Relation $query) => $query
                     ->select('ec_tracks.id', 'ec_tracks.name', 'ec_tracks.osmid')
                     ->selectRaw(self::TRACK_PROPERTIES)
-                    ->whereRaw(self::notDeleted('ec_tracks'))
+                    ->whereRaw(DeletedFromSource::notDeletedSql('ec_tracks'))
                     ->orderBy('ec_tracks.id'),
                 ...array_map(fn (string $relation) => "ecTracks.{$relation}", ForestasDetailParts::TRACK_CARD_RELATIONS),
                 'ecPois' => fn (Relation $query) => $query
                     ->select('ec_pois.id', 'ec_pois.name')
-                    ->whereRaw(self::notDeleted('ec_pois'))
+                    ->whereRaw(DeletedFromSource::notDeletedSql('ec_pois'))
                     ->orderBy('ec_pois.id'),
             ])
             ->orderBy('entes.id')
@@ -91,13 +92,5 @@ class EnteController extends Controller
             'type' => $source['type'] ?? null,
             'feature_image' => $source['feature_image'] ?? null,
         ], $sources)]);
-    }
-
-    /**
-     * Esclude i contenuti spariti da Drupal: l'import li marca invece di cancellarli.
-     */
-    private static function notDeleted(string $table): string
-    {
-        return "({$table}.properties->'forestas'->>'deleted_from_source') IS DISTINCT FROM 'true'";
     }
 }
