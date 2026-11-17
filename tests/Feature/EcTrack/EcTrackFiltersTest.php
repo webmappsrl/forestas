@@ -3,33 +3,34 @@
 use App\Models\EcTrack as ForestasEcTrack;
 use App\Models\User;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
-use App\Nova\Filters\EcTrackRuoloFilter;
-use App\Nova\Filters\EcTrackValidationStatusFilter;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\Layer;
-use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Models\TaxonomyWhere;
 use Wm\WmPackage\Services\GeometryComputationService;
 use Wm\WmPackage\Services\RolesAndPermissionsService;
 
 /**
- * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825, oc:8875): le tipologie restano nel
- * filtro dei layer, le aree catastali hanno un filtro a parte, a scelta multipla in OR; Ruolo e Stato
- * validazione completano il menu, senza App né Include/Exclude per id.
+ * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825, oc:8875, oc:8988): un filtro per
+ * tassonomia sui termini del contenuto (stato di validazione, percorribilità, tipo percorso,
+ * inclusività), più le aree catastali, a scelta multipla in OR. Niente filtro per layer, Ruolo,
+ * App né Include/Exclude per id.
  *
  * Le aree sono tre quadrati affiancati: B (lon 9-10), C (10-11), G (11-12), lat 40-41.
  */
 uses(RefreshDatabase::class);
 
-const LAYER_FILTER_KEY = 'features_by_layer_ecTracks';
+const VALIDATION_KEY = 'taxonomy_term_validation-status';
+const WALKABILITY_KEY = 'taxonomy_term_walkability-status';
+const ROUTE_TYPE_KEY = 'taxonomy_term_route-type';
+const DISABILITIES_KEY = 'taxonomy_term_inclusivity-disabilities';
+const DIFFICULTY_KEY = 'taxonomy_term_inclusivity-difficulty';
 
 beforeEach(function () {
     Bus::fake();
@@ -115,26 +116,6 @@ function scelte(TaxonomyWhere ...$aree): array
     return collect($aree)->map(fn ($area) => $area->id)->values()->all();
 }
 
-it('il filtro dei layer elenca solo le tipologie e conserva la chiave del package', function () {
-    areaCatastale('Area B', 9);
-    Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
-
-    $filtro = definizioneFiltro($this, LAYER_FILTER_KEY);
-
-    expect($filtro['name'])->toBe('Layer')
-        ->and(collect($filtro['options'])->pluck('label')->all())->toBe(['Sentieri']);
-});
-
-it('un layer legato a una where di altra sorgente resta nel filtro dei layer', function () {
-    $comune = taxonomyWhereConGeometria('Nuoro', ['source' => 'osmfeatures'], quadrato(30));
-    Layer::factory()->createQuietly(['name' => ['it' => 'Itinerari', 'en' => 'Itinerari'], 'properties' => []])
-        ->taxonomyWheres()->attach($comune->id);
-
-    $filtro = definizioneFiltro($this, LAYER_FILTER_KEY);
-
-    expect(collect($filtro['options'])->pluck('label')->all())->toBe(['Itinerari']);
-});
-
 it('il filtro aree catastali elenca le aree ordinate per nome', function () {
     $areaG = areaCatastale('Area G', 11);
     $areaB = areaCatastale('Area B', 9);
@@ -143,13 +124,16 @@ it('il filtro aree catastali elenca le aree ordinate per nome', function () {
 
     $filtro = definizioneFiltro($this, EcTrackCadastralAreaFilter::class);
 
+    // Selettore di Choice (oc:8988): id in stringa, come vuole la ricerca del selettore.
     expect($filtro['name'])->toBe(__('Cadastral areas'))
-        ->and($filtro['component'])->toBe('nova-multiselect-filter')
-        ->and($filtro['placeholder'])->toBe(__('Select cadastral area'))
+        ->and($filtro['component'])->toBe('choice-filter')
+        ->and($filtro['multiple'])->toBeTrue()
+        ->and($filtro['currentValue'])->toBe([])
+        ->and($filtro['searchPlaceholder'])->toBeNull()
         ->and($filtro['options'])->toBe([
-            ['label' => 'Area B', 'value' => $areaB->id],
-            ['label' => 'Area C', 'value' => $areaC->id],
-            ['label' => 'Area G', 'value' => $areaG->id],
+            ['label' => 'Area B', 'value' => (string) $areaB->id],
+            ['label' => 'Area C', 'value' => (string) $areaC->id],
+            ['label' => 'Area G', 'value' => (string) $areaG->id],
         ]);
 });
 
@@ -187,27 +171,6 @@ it('nessuna area scelta non restringe nulla', function () {
         ->toEqualCanonicalizing($tracce);
 });
 
-it('tipologia e area si combinano in AND', function () {
-    // L'attività legge le icone dal disco wmfe: senza disco finto andrebbe su S3.
-    Storage::fake('wmfe');
-    Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
-    $areaB = areaCatastale('Area B', 9);
-    $attivita = TaxonomyActivity::createQuietly(['name' => ['it' => 'Sentiero', 'en' => 'Trail'], 'identifier' => 'sentiero']);
-    $sentieri = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
-    $sentieri->taxonomyActivities()->attach($attivita->id);
-
-    $sentieroInB = traccia(9.2, 9.4);
-    $sentieroInB->taxonomyActivities()->attach($attivita->id);
-    traccia(9.5, 9.6);
-    traccia(20, 20.5)->taxonomyActivities()->attach($attivita->id);
-    calcolaAree();
-
-    expect(idFiltrati($this, [
-        LAYER_FILTER_KEY => $sentieri->id,
-        EcTrackCadastralAreaFilter::class => scelte($areaB),
-    ]))->toBe([$sentieroInB->id]);
-});
-
 it('una where osm2cai con osm2cai_id uguale all id di un area non fa uscire le sue tracce', function () {
     $areaB = areaCatastale('Area B', 9);
     taxonomyWhereConGeometria('ZNUB2', ['source' => 'osm2cai', 'osm2cai_id' => $areaB->id], quadrato(20));
@@ -228,98 +191,6 @@ it('legge anche la voce dell area scritta nella forma di oc:8487', function () {
     expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => scelte($areaB)]))->toBe([$vecchia->id]);
 });
 
-/*
- * Filtro dei layer con le tracce del layer, non le candidate di onLayer() (oc:8825).
- */
-
-function layerTipologia(string $nome): Layer
-{
-    return Layer::factory()->createQuietly(['name' => ['it' => $nome, 'en' => $nome], 'properties' => []]);
-}
-
-function attivitaSentiero(): TaxonomyActivity
-{
-    // L'attività legge le icone dal disco wmfe: senza disco finto andrebbe su S3.
-    Storage::fake('wmfe');
-    Storage::disk('wmfe')->put(config('app.name', 'forestas').'/json/icons.json', json_encode(['height' => 1024, 'icons' => []]));
-
-    return TaxonomyActivity::createQuietly(['name' => ['it' => 'Sentiero', 'en' => 'Trail'], 'identifier' => 'sentiero']);
-}
-
-it('un layer senza attività con tracce associate restituisce solo quelle', function () {
-    $cammini = layerTipologia('Cammini di Sardegna');
-    $associate = [traccia(9.2, 9.4)->id, traccia(9.5, 9.6)->id];
-    traccia(10.2, 10.4);
-    traccia(11.2, 11.4);
-    $cammini->ecTracks()->attach($associate);
-
-    expect(idFiltrati($this, [LAYER_FILTER_KEY => $cammini->id]))->toEqualCanonicalizing($associate);
-});
-
-it('un layer in automatico con attività resta su onLayer anche se ha un associata diversa', function () {
-    $attivita = attivitaSentiero();
-    $sentieri = layerTipologia('Sentieri');
-    $sentieri->taxonomyActivities()->attach($attivita->id);
-    $sentiero = traccia(9.2, 9.4);
-    $sentiero->taxonomyActivities()->attach($attivita->id);
-    $altra = traccia(10.2, 10.4);
-    $sentieri->ecTracks()->attach($altra->id);
-
-    expect($sentieri->fresh()->isAutoTrackMode())->toBeTrue()
-        ->and(idFiltrati($this, [LAYER_FILTER_KEY => $sentieri->id]))->toBe([$sentiero->id]);
-});
-
-it('un layer in automatico con aree nelle properties resta su onLayer anche se ha un associata diversa', function () {
-    $sentieri = Layer::factory()->createQuietly([
-        'name' => ['it' => 'Sentieri del Nuorese', 'en' => 'Sentieri del Nuorese'],
-        'properties' => ['taxonomy_where' => ['nuoro' => ['it' => 'Nuoro']]],
-    ]);
-    $nelNuorese = traccia(9.2, 9.4, ['taxonomy_where' => ['nuoro' => ['it' => 'Nuoro']]]);
-    $altra = traccia(10.2, 10.4);
-    $sentieri->ecTracks()->attach($altra->id);
-
-    expect(idFiltrati($this, [LAYER_FILTER_KEY => $sentieri->id]))->toBe([$nelNuorese->id]);
-});
-
-it('un layer in modalità manuale restituisce le tracce associate anche se ha un attività', function () {
-    $attivita = attivitaSentiero();
-    $layer = layerTipologia('Sentieri scelti');
-    $layer->taxonomyActivities()->attach($attivita->id);
-    $layer->setTrackMode('manual');
-    traccia(9.2, 9.4)->taxonomyActivities()->attach($attivita->id);
-    $scelta = traccia(10.2, 10.4);
-    $layer->ecTracks()->attach($scelta->id);
-
-    expect(idFiltrati($this, [LAYER_FILTER_KEY => $layer->id]))->toBe([$scelta->id]);
-});
-
-it('un layer senza attività né tracce associate restituisce tutte le tracce come oggi', function () {
-    $vuoto = layerTipologia('Sentieri accessibili');
-    $tutte = [traccia(9.2, 9.4)->id, traccia(10.2, 10.4)->id];
-
-    expect(idFiltrati($this, [LAYER_FILTER_KEY => $vuoto->id]))->toEqualCanonicalizing($tutte);
-});
-
-it('le tracce associate si combinano con le aree catastali', function () {
-    $areaB = areaCatastale('Area B', 9);
-    $cammini = layerTipologia('Cammini di Sardegna');
-    $camminoInB = traccia(9.2, 9.4);
-    $camminoInC = traccia(10.2, 10.4);
-    traccia(9.5, 9.6);
-    $cammini->ecTracks()->attach([$camminoInB->id, $camminoInC->id]);
-    calcolaAree();
-
-    expect(idFiltrati($this, [
-        LAYER_FILTER_KEY => $cammini->id,
-        EcTrackCadastralAreaFilter::class => scelte($areaB),
-    ]))->toBe([$camminoInB->id]);
-});
-
-/*
- * Verifica dei filtri della lista (oc:8875): App e Include/Exclude per id fuori dal menu, Ruolo e
- * Stato validazione fissati sul comportamento verificato nel browser, titoli tradotti.
- */
-
 /**
  * @return list<string>
  */
@@ -329,7 +200,7 @@ function chiaviFiltri($test): array
         ->pluck('class')->all();
 }
 
-function conEnte(EcTrack $traccia, string $ruolo): void
+function conEnte(EcTrack $traccia, string $ruolo): int
 {
     $enteId = DB::table('entes')->insertGetId([
         // sardegnasentieri_id è unique: un valore derivato evita collisioni fra chiamate.
@@ -343,15 +214,24 @@ function conEnte(EcTrack $traccia, string $ruolo): void
         'enteable_type' => ForestasEcTrack::class,
         'ruolo' => $ruolo,
     ]);
+
+    return $enteId;
 }
 
-/** Collega la traccia al termine di stato (identifier del termine, senza il prefisso della famiglia). */
-function conStato(EcTrack $traccia, ?string $stato): EcTrack
+/**
+ * I termini delle tassonomie, come in produzione: li crea il comando di allineamento, la
+ * percorribilità la installa la migration del dominio Catasto.
+ */
+function configuraTermini(): void
 {
-    if ($stato !== null) {
-        // I termini li crea il comando di allineamento: senza, la famiglia non esiste.
-        expect(Artisan::call('sardegnasentieri:configure-taxonomy-terms'))->toBe(0);
-        $termine = TaxonomyTerm::query()->where('identifier', 'validation-status-'.$stato)->firstOrFail();
+    expect(Artisan::call('sardegnasentieri:configure-taxonomy-terms'))->toBe(0);
+}
+
+/** Collega la traccia ai termini, per identifier, come fa l'import. */
+function conTermini(EcTrack $traccia, string ...$identifiers): EcTrack
+{
+    foreach ($identifiers as $identifier) {
+        $termine = TaxonomyTerm::query()->where('identifier', $identifier)->firstOrFail();
         DB::table('taxonomy_termables')->insert([
             'taxonomy_term_id' => $termine->id,
             'termable_type' => ForestasEcTrack::class,
@@ -363,47 +243,173 @@ function conStato(EcTrack $traccia, ?string $stato): EcTrack
     return $traccia;
 }
 
-it('il menu dei filtri ha solo Layer, Aree catastali, Ruolo e Stato validazione', function () {
+it('tipo percorso e area si combinano in AND', function () {
+    configuraTermini();
+    $areaB = areaCatastale('Area B', 9);
+    $sentieroInB = conTermini(traccia(9.2, 9.4), 'route-type-trail');
+    conTermini(traccia(9.5, 9.6), 'route-type-walk');
+    conTermini(traccia(20, 20.5), 'route-type-trail');
+    calcolaAree();
+
+    expect(idFiltrati($this, [
+        ROUTE_TYPE_KEY => ['route-type-trail'],
+        EcTrackCadastralAreaFilter::class => scelte($areaB),
+    ]))->toBe([$sentieroInB->id]);
+});
+
+it('più tipi di percorso scelti valgono in OR e si combinano in AND con le aree', function () {
+    configuraTermini();
+    $areaB = areaCatastale('Area B', 9);
+    $camminoInB = conTermini(traccia(9.2, 9.4), 'route-type-walk');
+    $sentieroInB = conTermini(traccia(9.3, 9.5), 'route-type-trail');
+    conTermini(traccia(9.5, 9.6), 'route-type-itinerary');
+    conTermini(traccia(10.2, 10.4), 'route-type-walk');
+    calcolaAree();
+
+    expect(idFiltrati($this, [
+        ROUTE_TYPE_KEY => ['route-type-walk', 'route-type-trail'],
+        EcTrackCadastralAreaFilter::class => scelte($areaB),
+    ]))->toEqualCanonicalizing([$camminoInB->id, $sentieroInB->id]);
+});
+
+it('un link salvato con gli id interi del vecchio filtro delle aree continua a filtrare', function () {
+    $areaB = areaCatastale('Area B', 9);
+    areaCatastale('Area C', 10);
+    $dentroB = traccia(9.2, 9.4);
+    traccia(10.2, 10.4);
+    calcolaAree();
+
+    // Il vecchio filtro outline metteva nell'URL gli id come numeri, con la stessa chiave.
+    expect(idFiltrati($this, [EcTrackCadastralAreaFilter::class => [$areaB->id]]))->toBe([$dentroB->id]);
+});
+
+it('il menu dei filtri ha i filtri delle tassonomie e le aree catastali, e nient altro', function () {
     // Elenco esatto, non l'assenza di chiavi note: un filtro che ricompare con un'altra chiave
-    // (App, Include/Exclude per id o uno nuovo del package) fa fallire il test.
+    // (Layer, App, Include/Exclude per id o uno nuovo del package) fa fallire il test.
     expect(chiaviFiltri($this))->toEqualCanonicalizing([
-        LAYER_FILTER_KEY,
+        VALIDATION_KEY,
+        WALKABILITY_KEY,
+        ROUTE_TYPE_KEY,
+        DISABILITIES_KEY,
+        DIFFICULTY_KEY,
         EcTrackCadastralAreaFilter::class,
-        EcTrackRuoloFilter::class,
-        EcTrackValidationStatusFilter::class,
     ]);
 });
 
-it('il filtro Ruolo restituisce le tracce con un ente in quel ruolo', function () {
-    $conGestore = traccia(9.2, 9.4);
-    conEnte($conGestore, 'gestore');
-    conEnte(traccia(9.5, 9.6), 'rilevatore');
-    traccia(9.7, 9.8);
+it('a dominio Catasto spento il filtro della percorribilità non c è', function () {
+    config(['wm-package.features.trail_registry.enabled' => false]);
 
-    expect(idFiltrati($this, [EcTrackRuoloFilter::class => 'gestore']))->toBe([$conGestore->id]);
+    expect(chiaviFiltri($this))->not->toContain(WALKABILITY_KEY)
+        ->and(chiaviFiltri($this))->toContain(VALIDATION_KEY);
+});
+
+it('la percorribilità usa l identifier della config del dominio', function () {
+    config(['wm-package.features.trail_registry.walkability_taxonomy' => 'altra-percorribilita']);
+
+    expect(chiaviFiltri($this))->toContain('taxonomy_term_altra-percorribilita')
+        ->and(chiaviFiltri($this))->not->toContain(WALKABILITY_KEY);
 });
 
 it('il filtro Stato validazione restituisce le tracce con quel valore', function () {
     // Uno dei cinque stati della pratica catastale: «Percorribile» e «Non percorribile» sono
     // usciti da questa famiglia e vivono in `walkability-status` (oc:8989).
-    $validata = conStato(traccia(9.2, 9.4), 'validated');
-    conStato(traccia(9.5, 9.6), 'under-review');
-    conStato(traccia(9.7, 9.8), null);
+    configuraTermini();
+    $validata = conTermini(traccia(9.2, 9.4), 'validation-status-validated');
+    conTermini(traccia(9.5, 9.6), 'validation-status-under-review');
+    traccia(9.7, 9.8);
 
-    expect(idFiltrati($this, [EcTrackValidationStatusFilter::class => 'validation-status-validated']))->toBe([$validata->id]);
+    expect(idFiltrati($this, [VALIDATION_KEY => 'validation-status-validated']))->toBe([$validata->id]);
 });
 
-it('i titoli dei filtri sono tradotti', function (string $lingua, array $attesi) {
-    // La CI gira con APP_LOCALE=en: la lingua va impostata qui.
-    app()->setLocale($lingua);
+it('il filtro Percorribilità restituisce le tracce con quel valore', function () {
+    configuraTermini();
+    $percorribile = conTermini(traccia(9.2, 9.4), 'walkability-status-walkable');
+    conTermini(traccia(9.5, 9.6), 'walkability-status-not-walkable');
+    traccia(9.7, 9.8);
+
+    expect(idFiltrati($this, [WALKABILITY_KEY => 'walkability-status-walkable']))->toBe([$percorribile->id]);
+});
+
+it('con i filtri tassonomici si ricostruiscono i quattro layer di tipologia', function () {
+    configuraTermini();
+    $sentiero = conTermini(traccia(9.2, 9.4), 'route-type-trail');
+    $itinerario = conTermini(traccia(9.5, 9.6), 'route-type-itinerary');
+    $cammino = conTermini(traccia(9.7, 9.8), 'route-type-walk');
+    $accessibileAt = conTermini(traccia(10.1, 10.2), 'route-type-trail', 'inclusivity-difficulty-at');
+    $accessibileAee = conTermini(traccia(10.3, 10.4), 'route-type-walk', 'inclusivity-difficulty-aee');
+
+    // Sentieri, Itinerari e Cammini: il tipo percorso. Sentieri Accessibili: un grado di
+    // difficoltà di accessibilità qualsiasi (docs/knowledge/8806-filtro-ec-tracce.md).
+    expect(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-trail']]))->toEqualCanonicalizing([$sentiero->id, $accessibileAt->id])
+        ->and(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-itinerary']]))->toBe([$itinerario->id])
+        ->and(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-walk']]))->toEqualCanonicalizing([$cammino->id, $accessibileAee->id])
+        ->and(idFiltrati($this, [DIFFICULTY_KEY => ['inclusivity-difficulty-at', 'inclusivity-difficulty-ae', 'inclusivity-difficulty-aee']]))
+        ->toEqualCanonicalizing([$accessibileAt->id, $accessibileAee->id]);
+});
+
+it('disabilità accolte e tipo percorso si combinano in AND', function () {
+    configuraTermini();
+    $entrambi = conTermini(traccia(9.2, 9.4), 'route-type-trail', 'inclusivity-disabilities-physical');
+    conTermini(traccia(9.5, 9.6), 'route-type-trail');
+    conTermini(traccia(9.7, 9.8), 'route-type-walk', 'inclusivity-disabilities-physical');
+
+    expect(idFiltrati($this, [
+        ROUTE_TYPE_KEY => ['route-type-trail'],
+        DISABILITIES_KEY => ['inclusivity-disabilities-physical'],
+    ]))->toBe([$entrambi->id]);
+});
+
+it('i filtri tassonomici hanno il selettore di Choice nella modalità giusta', function () {
+    configuraTermini();
+    $filtri = collect($this->actingAs(amministratore())->getJson('/nova-api/ec-tracks/filters')->assertOk()->json())
+        ->keyBy('class');
+
+    expect($filtri[VALIDATION_KEY]['component'])->toBe('choice-filter')
+        ->and($filtri[VALIDATION_KEY]['multiple'])->toBeFalse()
+        ->and($filtri[WALKABILITY_KEY]['multiple'])->toBeFalse()
+        ->and($filtri[ROUTE_TYPE_KEY]['multiple'])->toBeTrue()
+        ->and($filtri[DISABILITIES_KEY]['multiple'])->toBeTrue()
+        ->and($filtri[DIFFICULTY_KEY]['multiple'])->toBeTrue()
+        ->and(collect($filtri[ROUTE_TYPE_KEY]['options'])->pluck('value')->all())
+        ->toBe(['route-type-trail', 'route-type-itinerary', 'route-type-walk']);
+});
+
+it('i titoli dei filtri sono i nomi delle tassonomie', function () {
+    configuraTermini();
+    app()->setLocale('it');
 
     $nomi = collect($this->actingAs(amministratore())->getJson('/nova-api/ec-tracks/filters')->assertOk()->json())
         ->pluck('name', 'class');
 
-    expect($nomi[LAYER_FILTER_KEY])->toBe($attesi[0])
-        ->and($nomi[EcTrackRuoloFilter::class])->toBe($attesi[1])
-        ->and($nomi[EcTrackValidationStatusFilter::class])->toBe($attesi[2]);
-})->with([
-    'italiano' => ['it', ['Layer', 'Ruolo', 'Stato validazione']],
-    'inglese' => ['en', ['Layer', 'Role', 'Validation status']],
-]);
+    expect($nomi[VALIDATION_KEY])->toBe('Stato validazione')
+        ->and($nomi[ROUTE_TYPE_KEY])->toBe('Tipo percorso')
+        ->and($nomi[DISABILITIES_KEY])->toBe('Disabilità accolte')
+        ->and($nomi[DIFFICULTY_KEY])->toBe('Difficoltà di accessibilità')
+        ->and($nomi[EcTrackCadastralAreaFilter::class])->toBe('Aree Catastali');
+});
+
+it('lo stesso menu filtra le tracce di un ente nella sua detail view', function () {
+    configuraTermini();
+    $gestitaSentiero = conTermini(traccia(9.2, 9.4), 'route-type-trail');
+    $gestitaCammino = conTermini(traccia(9.5, 9.6), 'route-type-walk');
+    conTermini(traccia(9.7, 9.8), 'route-type-trail');
+    $enteId = conEnte($gestitaSentiero, 'gestore');
+    DB::table('enteables')->insert([
+        'ente_id' => $enteId,
+        'enteable_id' => $gestitaCammino->id,
+        'enteable_type' => ForestasEcTrack::class,
+        'ruolo' => 'gestore',
+    ]);
+    $via = "viaResource=entes&viaResourceId={$enteId}&viaRelationship=ecTracksGestore&relationshipType=morphToMany";
+    $filtri = base64_encode(json_encode([[ROUTE_TYPE_KEY => ['route-type-trail']]]));
+
+    $chiavi = collect($this->actingAs(amministratore())->getJson("/nova-api/ec-tracks/filters?{$via}")->assertOk()->json())
+        ->pluck('class')->all();
+    $ids = $this->actingAs(amministratore())
+        ->getJson("/nova-api/ec-tracks?{$via}&perPage=100&filters={$filtri}")
+        ->assertOk()
+        ->json('resources.*.id.value');
+
+    expect($chiavi)->toContain(ROUTE_TYPE_KEY)
+        ->and($ids)->toBe([$gestitaSentiero->id]);
+});

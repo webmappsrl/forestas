@@ -8,9 +8,6 @@ use App\Models\EcTrack as EcTrackModel;
 use App\Nova\Concerns\HasForestasMediaFields;
 use App\Nova\Concerns\HasMirroredRelations;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
-use App\Nova\Filters\EcTrackLayerFilter;
-use App\Nova\Filters\EcTrackRuoloFilter;
-use App\Nova\Filters\EcTrackValidationStatusFilter;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Support\InclusivityScore;
 use Illuminate\Support\Carbon;
@@ -37,6 +34,7 @@ use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 use Wm\WmPackage\Nova\Filters\FeaturesByLayerFilter;
 use Wm\WmPackage\Nova\Filters\FeaturesExcludeByIds;
 use Wm\WmPackage\Nova\Filters\FeaturesIncludeByIds;
+use Wm\WmPackage\Nova\Filters\TaxonomyTermFilter;
 use Wm\WmPackage\Nova\Layer;
 use Wm\WmPackage\Support\TaxonomyTermLabel;
 use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
@@ -344,7 +342,7 @@ class EcTrack extends WmNovaEcTrack
      */
     private function validationStatusField(): Select
     {
-        $terms = EcTrackValidationStatusFilter::statuses();
+        $terms = EcTrackModel::validationStatusTerms();
         $options = $terms->mapWithKeys(fn ($term) => [$term->identifier => TaxonomyTermLabel::for($term)])->all();
 
         // «Stato», sotto il titolo «Validazione»: il titolo dice già di quale stato si parla.
@@ -430,19 +428,15 @@ class EcTrack extends WmNovaEcTrack
 
     public function filters(NovaRequest $request): array
     {
-        // Il filtro dei layer del package va sostituito, non affiancato: con due filtri
-        // sulla stessa chiave Nova applicherebbe il primo che trova (oc:8806).
-        // Include/Exclude per id servivano al vecchio campo dei layer, che oggi usa rotte sue:
-        // nel menu comparivano senza controllo, inutilizzabili (oc:8875).
+        // Il filtro dei layer del package si toglie senza sostituto: i filtri leggono direttamente
+        // i termini delle tassonomie, invece di passare dai layer che da quei termini si
+        // costruiscono (oc:8988). Include/Exclude per id servivano al vecchio campo dei layer, che
+        // oggi usa rotte sue: nel menu comparivano senza controllo, inutilizzabili (oc:8875).
         $filters = [];
         foreach (parent::filters($request) as $filter) {
-            if (get_class($filter) === FeaturesByLayerFilter::class) {
-                $filters[] = new EcTrackLayerFilter($this->resource->getLayerRelationName());
-                $filters[] = new EcTrackCadastralAreaFilter;
-
-                continue;
-            }
-            if ($filter instanceof FeaturesIncludeByIds || $filter instanceof FeaturesExcludeByIds) {
+            if ($filter instanceof FeaturesByLayerFilter
+                || $filter instanceof FeaturesIncludeByIds
+                || $filter instanceof FeaturesExcludeByIds) {
                 continue;
             }
             $filters[] = $filter;
@@ -450,9 +444,30 @@ class EcTrack extends WmNovaEcTrack
 
         return [
             ...$filters,
-            new EcTrackRuoloFilter,
-            new EcTrackValidationStatusFilter,
+            new TaxonomyTermFilter(EcTrackModel::VALIDATION_STATUS_TAXONOMY),
+            ...$this->walkabilityFilters(),
+            new TaxonomyTermFilter('route-type', multiple: true),
+            new TaxonomyTermFilter('inclusivity-disabilities', multiple: true),
+            new TaxonomyTermFilter('inclusivity-difficulty', multiple: true),
+            new EcTrackCadastralAreaFilter,
         ];
+    }
+
+    /**
+     * La percorribilità è del dominio Catasto del package: la tassonomia la installa il dominio e
+     * l'import la scrive solo a dominio acceso, quindi a dominio spento il filtro non avrebbe
+     * opzioni. L'identifier si legge dalla stessa config del dominio, che uno shard può cambiare
+     * (oc:8988).
+     *
+     * @return list<TaxonomyTermFilter>
+     */
+    private function walkabilityFilters(): array
+    {
+        if (! config('wm-package.features.trail_registry.enabled')) {
+            return [];
+        }
+
+        return [new TaxonomyTermFilter(config('wm-package.features.trail_registry.walkability_taxonomy', 'walkability-status'))];
     }
 
     public function cards(NovaRequest $request): array

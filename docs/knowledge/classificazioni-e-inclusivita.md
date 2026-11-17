@@ -161,9 +161,11 @@ nomi italiani di prima. Enum e colonna non esistono più.
   sorgente e stanno in `SardegnaSentieriImportService::VALIDATION_STATUS_TERMS`. La famiglia non
   è fra quelle sostituite sempre: se Drupal non dice nessuno stato, quello già scritto resta; un
   tid fuori mappa svuota la famiglia e finisce fra le anomalie come `missing_term`.
-- **Nova**: campo `Select` in cima alla scheda, colonna in lista e filtro propri
-  (`EcTrack::validationStatusField()`, `EcTrackValidationStatusFilter`). Il campo generico del
-  package per questa famiglia è tolto, altrimenti ci sarebbero due campi per lo stesso dato.
+- **Nova**: campo `Select` in cima alla scheda e colonna in lista (`EcTrack::validationStatusField()`,
+  con gli stati di `App\Models\EcTrack::validationStatusTerms()`); il filtro della lista è il
+  `TaxonomyTermFilter` del package sulla famiglia, che propone anche i termini ritirati (vedi
+  [8806-filtro-ec-tracce.md](8806-filtro-ec-tracce.md), oc:8988). Il campo generico del package per
+  questa famiglia è tolto, altrimenti ci sarebbero due campi per lo stesso dato.
 - **Database esistenti** (UAT, dev, locale vecchio) hanno ancora la colonna: dopo
   `sardegnasentieri:configure-taxonomy-terms` si lancia una volta `sardegnasentieri:move-validation-status`
   (`--dry-run` per provare), che sposta i valori e toglie la colonna, e si fa un reindex. Quando
