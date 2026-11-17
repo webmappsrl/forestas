@@ -9,9 +9,9 @@ Come un operatore pubblica l'avviso di un sentiero e come il sito WordPress lo l
 - Un avviso è il flag `properties->not_accessible` acceso, con il testo in
   `properties->not_accessible_message` (traducibile). Sono campi del wm-package che esistevano già;
   la data `properties->not_accessible_updated_at` la scrive il modello del package — regola in
-  [wm-package/docs/knowledge/8981-data-dell-avviso-su-ectrack.md](../../wm-package/docs/knowledge/8981-data-dell-avviso-su-ectrack.md).
-- Per l'app un avviso resta `not_accessible`, cioè sentiero non accessibile: la label «Avviso» è
-  solo di Forestas.
+  [wm-package/docs/knowledge/8981-data-di-non-accessibilita-su-ectrack.md](../../wm-package/docs/knowledge/8981-data-di-non-accessibilita-su-ectrack.md).
+- Per l'app un avviso resta `not_accessible`, cioè sentiero non accessibile: nel package i campi e
+  la data restano «Not Accessible» in ogni lingua, e il nome «avviso» lo dà solo Forestas.
 - Un avviso per sentiero, nessuno storico, nessuna scadenza: si spegne togliendo il flag.
 
 ### In Nova

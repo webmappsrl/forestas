@@ -58,6 +58,12 @@ Modifiche arrivate dopo le review, non scritte nel piano:
 - Prova in locale (dev, 17/11): il flag si chiama «Pubblica avviso» e non «Avviso», che è già
   l'Heading del blocco; i tre campi, compreso il contenitore `NovaTabTranslatable`, sono nascosti
   dall'index delle tracce.
+- Nel wm-package la data resta legata alla non accessibilità (dev, 17/11, dopo l'apertura delle
+  PR): label «Data di non accessibilità» (en «Not Accessible Updated At») invece di «Data
+  dell'avviso», commenti senza «avviso», test rinominato in
+  `EcTrackFromSpreadsheetNotAccessibleUpdatedAtTest`, pagina in
+  `wm-package/docs/knowledge/8981-data-di-non-accessibilita-su-ectrack.md`. Il significato di
+  «avviso» è solo di Forestas.
 
 ## Follow-up
 
