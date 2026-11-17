@@ -42,7 +42,7 @@ class EcPoi extends WmEcPoi
 
     /**
      * I percorsi collegati al POI in `ec_poi_ec_track`, calcolati per vicinanza entro
-     * `sardegnasentieri.poi_tracks_radius_meters` da `CalculatePoiTracksChunkJob` (oc:8959), dal
+     * la distanza dell'App (`PoiNearbyTracksDistance`) da `CalculatePoiTracksChunkJob` (oc:8959), dal
      * più vicino: `distance_from_poi` è la distanza in metri dal tratto più vicino, calcolata nella
      * query sulle colonne `geography`. Nel dettaglio del POI sono i suoi `nearby_tracks`.
      */

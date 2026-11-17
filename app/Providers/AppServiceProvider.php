@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EcPoiDetailController;
 use App\Http\Controllers\Api\Sus\SusTestDecisionController;
 use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
+use App\Observers\AppNearbyTracksDistanceObserver;
 use App\Observers\RelatedTrackCardObserver;
 use App\Observers\RelatedTrackMediaObserver;
 use App\Observers\RelatedTrackRouteTypeObserver;
@@ -37,6 +38,7 @@ use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Models\App as WmApp;
 use Wm\WmPackage\Models\TaxonomyTermable;
 use Wm\WmPackage\Models\Tile;
 use Wm\WmPackage\Policies\PermissionPolicy;
@@ -98,6 +100,8 @@ class AppServiceProvider extends ServiceProvider
         EcTrack::observe(RelatedTrackCardObserver::class);
         config('media-library.media_model')::observe(RelatedTrackMediaObserver::class);
         TaxonomyTermable::observe(RelatedTrackRouteTypeObserver::class);
+        // Distanza dei percorsi vicini al POI cambiata in Nova: ricalcolo dei POI (oc:8959).
+        WmApp::observe(AppNearbyTracksDistanceObserver::class);
 
         // Dettaglio del POI di Forestas (oc:8959): sostituisce la rotta del package con lo stesso
         // URI e nome. Registrata qui, dopo il package: la rotta registrata per ultima vince, e

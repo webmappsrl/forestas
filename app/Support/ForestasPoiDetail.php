@@ -6,8 +6,10 @@ namespace App\Support;
 
 use App\Models\EcPoi;
 use App\Models\EcTrack;
+use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
 use Wm\WmPackage\Http\Resources\MediaResource;
+use Wm\WmPackage\Models\App;
 
 /**
  * `properties.forestas` nel dettaglio pubblico del POI (oc:8959), come `ForestasTrackDetail` per
@@ -52,6 +54,13 @@ final class ForestasPoiDetail
             'related_pois' => self::relatedPois($poi),
             'nearby_tracks' => array_slice($tracks, 0, self::NEARBY_TRACKS_LIMIT),
             'nearby_tracks_count' => $tracks === [] ? null : count($tracks),
+            // Il raggio con cui sono calcolati i `nearby_tracks`, anche quando non ce ne sono:
+            // il sito scrive «Percorsi entro … km» con questo valore (oc:8959). Solo per l'app
+            // dell'import, l'unica i cui POI sono collegati per vicinanza. `instanceof` perché la
+            // relazione del package è tipizzata come `Model`.
+            'nearby_tracks_max_distance_meters' => (int) $poi->app_id === SardegnaSentieriImportService::IMPORT_APP_ID
+                ? PoiNearbyTracksDistance::forApp($poi->app instanceof App ? $poi->app : null)
+                : null,
         ], fn ($value) => $value !== null && $value !== '' && $value !== []);
     }
 

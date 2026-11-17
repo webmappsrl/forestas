@@ -7,6 +7,7 @@ use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Models\Ente;
 use App\Services\Import\SardegnaSentieriImportService;
+use App\Support\PoiNearbyTracksDistance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -127,6 +128,7 @@ it('costruisce forestas in uscita con chiavi in inglese e senza id di Drupal', f
         'updated_at' => '2025-07-28 12:33:33',
         'directions' => ['it' => 'Da Osini…'],
         'videos' => [['url' => 'https://www.youtube.com/watch?v=abc', 'title' => null]],
+        'nearby_tracks_max_distance_meters' => 1000,
     ])
         ->and($poi->fresh()->properties['forestas'])->toHaveKey('poi_correlati');
 });
@@ -152,7 +154,7 @@ it('legge il nid anche dai POI salvati con il vecchio nome sardegnasentieri_id',
 it('non rompe con come_arrivare salvato null', function () {
     $poi = detailPoi(['forestas' => ['come_arrivare' => null, 'codice' => 'X']]);
 
-    expect(poiDetail($poi)['properties']['forestas'])->toBe(['code' => 'X']);
+    expect(poiDetail($poi)['properties']['forestas'])->toBe(['code' => 'X', 'nearby_tracks_max_distance_meters' => 1000]);
 });
 
 it('porta gli enti per ruolo, come nelle tracce', function () {
@@ -242,4 +244,30 @@ it('lascia invariato il POI nel DB', function () {
     poiDetail($poi);
 
     expect($poi->fresh()->properties['forestas'])->toBe(['codice' => 'X', 'source_relations' => ['pois' => []]]);
+});
+
+it('espone la distanza massima dei percorsi vicini, anche senza percorsi', function () {
+    $poi = detailPoi();
+
+    $forestas = poiDetail($poi)['properties']['forestas'];
+
+    expect($forestas['nearby_tracks_max_distance_meters'])->toBe(1000)
+        ->and($forestas)->not->toHaveKey('nearby_tracks');
+
+    App::query()->whereKey(SardegnaSentieriImportService::IMPORT_APP_ID)
+        ->update([PoiNearbyTracksDistance::COLUMN => 1500]);
+
+    expect(poiDetail($poi)['properties']['forestas']['nearby_tracks_max_distance_meters'])->toBe(1500);
+});
+
+it("non espone la distanza per i POI di un'altra App, che non sono collegati per vicinanza", function () {
+    $other = App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID + 1]);
+    $poi = EcPoi::withoutEvents(fn () => EcPoi::query()->create([
+        'name' => ['it' => 'Nuraghe Serbissi'],
+        'app_id' => $other->id,
+        'properties' => [],
+        'geometry' => DB::raw("ST_GeomFromText('POINT Z(9.05 40.499 0)', 4326)"),
+    ]));
+
+    expect(poiDetail($poi)['properties']['forestas'] ?? [])->not->toHaveKey('nearby_tracks_max_distance_meters');
 });

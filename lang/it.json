@@ -81,5 +81,7 @@
     "Application not found.": "Domanda non trovata.",
     "Not found.": "Risorsa non trovata.",
     "Access denied: a valid token of the channel client is required.": "Accesso non consentito: serve un token valido del client dello sportello.",
-    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere."
+    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere.",
+    "Maximum distance of tracks near the POI (m)": "Distanza massima dei percorsi vicini al POI (m)",
+    "Straight-line distance within which a track is linked to the POI. Saving a different value recalculates the nearby tracks of every POI and rewrites the track files: for a few minutes a POI detail may show the new distance with the old tracks.": "Distanza in linea d'aria entro cui una traccia è collegata al POI. Salvando un valore diverso si ricalcolano i percorsi vicini di tutti i POI e si riscrivono i file delle tracce: per qualche minuto il dettaglio di un POI può mostrare la distanza nuova con i percorsi vecchi."
 }

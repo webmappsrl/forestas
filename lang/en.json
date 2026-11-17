@@ -79,5 +79,7 @@
     "Application not found.": "Application not found.",
     "Not found.": "Not found.",
     "Access denied: a valid token of the channel client is required.": "Access denied: a valid token of the channel client is required.",
-    "Only an application under review can be approved or rejected.": "Only an application under review can be approved or rejected."
+    "Only an application under review can be approved or rejected.": "Only an application under review can be approved or rejected.",
+    "Maximum distance of tracks near the POI (m)": "Maximum distance of tracks near the POI (m)",
+    "Straight-line distance within which a track is linked to the POI. Saving a different value recalculates the nearby tracks of every POI and rewrites the track files: for a few minutes a POI detail may show the new distance with the old tracks.": "Straight-line distance within which a track is linked to the POI. Saving a different value recalculates the nearby tracks of every POI and rewrites the track files: for a few minutes a POI detail may show the new distance with the old tracks."
 }
