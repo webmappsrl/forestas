@@ -2,6 +2,7 @@
 
 use App\Models\EcTrack as ForestasEcTrack;
 use App\Models\User;
+use App\Nova\Filters\EcTrackActivityFilter;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\Layer;
+use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Models\TaxonomyWhere;
 use Wm\WmPackage\Services\GeometryComputationService;
@@ -19,8 +21,8 @@ use Wm\WmPackage\Services\RolesAndPermissionsService;
 /**
  * Filtri della lista Nova delle EC Tracce (oc:8806, oc:8825, oc:8875, oc:8988): un filtro per
  * tassonomia sui termini del contenuto (stato di validazione, percorribilità, tipo percorso,
- * inclusività), più le aree catastali, a scelta multipla in OR. Niente filtro per layer, Ruolo,
- * App né Include/Exclude per id.
+ * disabilità accolte, avvertenze), le attività e le aree catastali, a scelta multipla in OR.
+ * Niente filtro per layer, Ruolo, App, Include/Exclude per id né difficoltà di accessibilità.
  *
  * Le aree sono tre quadrati affiancati: B (lon 9-10), C (10-11), G (11-12), lat 40-41.
  */
@@ -30,7 +32,7 @@ const VALIDATION_KEY = 'taxonomy_term_validation-status';
 const WALKABILITY_KEY = 'taxonomy_term_walkability-status';
 const ROUTE_TYPE_KEY = 'taxonomy_term_route-type';
 const DISABILITIES_KEY = 'taxonomy_term_inclusivity-disabilities';
-const DIFFICULTY_KEY = 'taxonomy_term_inclusivity-difficulty';
+const WARNINGS_KEY = 'taxonomy_term_warnings';
 
 beforeEach(function () {
     Bus::fake();
@@ -243,6 +245,27 @@ function conTermini(EcTrack $traccia, string ...$identifiers): EcTrack
     return $traccia;
 }
 
+/** L'attività, come la crea l'import nella tabella storica `taxonomy_activities`. */
+function attivita(string $identifier, string $nome): TaxonomyActivity
+{
+    return TaxonomyActivity::create(['identifier' => $identifier, 'name' => ['it' => $nome]]);
+}
+
+function conAttivita(EcTrack $traccia, TaxonomyActivity ...$attivita): EcTrack
+{
+    $traccia->taxonomyActivities()->attach(collect($attivita)->pluck('id')->all());
+
+    return $traccia;
+}
+
+/** Un termine delle avvertenze, come lo crea l'import sotto la famiglia `warnings`. */
+function avvertenza(string $identifier, string $nome): TaxonomyTerm
+{
+    $famiglia = TaxonomyTerm::query()->taxonomies()->where('identifier', 'warnings')->firstOrFail();
+
+    return TaxonomyTerm::create(['parent_id' => $famiglia->id, 'identifier' => $identifier, 'name' => ['it' => $nome]]);
+}
+
 it('tipo percorso e area si combinano in AND', function () {
     configuraTermini();
     $areaB = areaCatastale('Area B', 9);
@@ -290,8 +313,9 @@ it('il menu dei filtri ha i filtri delle tassonomie e le aree catastali, e nient
         VALIDATION_KEY,
         WALKABILITY_KEY,
         ROUTE_TYPE_KEY,
+        EcTrackActivityFilter::class,
         DISABILITIES_KEY,
-        DIFFICULTY_KEY,
+        WARNINGS_KEY,
         EcTrackCadastralAreaFilter::class,
     ]);
 });
@@ -335,16 +359,18 @@ it('con i filtri tassonomici si ricostruiscono i quattro layer di tipologia', fu
     $sentiero = conTermini(traccia(9.2, 9.4), 'route-type-trail');
     $itinerario = conTermini(traccia(9.5, 9.6), 'route-type-itinerary');
     $cammino = conTermini(traccia(9.7, 9.8), 'route-type-walk');
-    $accessibileAt = conTermini(traccia(10.1, 10.2), 'route-type-trail', 'inclusivity-difficulty-at');
-    $accessibileAee = conTermini(traccia(10.3, 10.4), 'route-type-walk', 'inclusivity-difficulty-aee');
+    $perTutti = attivita('accessible-trails', 'Sentieri (accessibili) per tutti');
+    $accessibileSentiero = conAttivita(conTermini(traccia(10.1, 10.2), 'route-type-trail'), $perTutti);
+    $accessibileCammino = conAttivita(conTermini(traccia(10.3, 10.4), 'route-type-walk'), $perTutti);
 
-    // Sentieri, Itinerari e Cammini: il tipo percorso. Sentieri Accessibili: un grado di
-    // difficoltà di accessibilità qualsiasi (docs/knowledge/8806-filtro-ec-tracce.md).
-    expect(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-trail']]))->toEqualCanonicalizing([$sentiero->id, $accessibileAt->id])
+    // Sentieri, Itinerari e Cammini: il tipo percorso. Sentieri Accessibili: l'attività
+    // «Sentieri (accessibili) per tutti», ora che il filtro della difficoltà di accessibilità
+    // non c'è più (docs/knowledge/8806-filtro-ec-tracce.md).
+    expect(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-trail']]))->toEqualCanonicalizing([$sentiero->id, $accessibileSentiero->id])
         ->and(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-itinerary']]))->toBe([$itinerario->id])
-        ->and(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-walk']]))->toEqualCanonicalizing([$cammino->id, $accessibileAee->id])
-        ->and(idFiltrati($this, [DIFFICULTY_KEY => ['inclusivity-difficulty-at', 'inclusivity-difficulty-ae', 'inclusivity-difficulty-aee']]))
-        ->toEqualCanonicalizing([$accessibileAt->id, $accessibileAee->id]);
+        ->and(idFiltrati($this, [ROUTE_TYPE_KEY => ['route-type-walk']]))->toEqualCanonicalizing([$cammino->id, $accessibileCammino->id])
+        ->and(idFiltrati($this, [EcTrackActivityFilter::class => ['accessible-trails']]))
+        ->toEqualCanonicalizing([$accessibileSentiero->id, $accessibileCammino->id]);
 });
 
 it('disabilità accolte e tipo percorso si combinano in AND', function () {
@@ -369,7 +395,9 @@ it('i filtri tassonomici hanno il selettore di Choice nella modalità giusta', f
         ->and($filtri[WALKABILITY_KEY]['multiple'])->toBeFalse()
         ->and($filtri[ROUTE_TYPE_KEY]['multiple'])->toBeTrue()
         ->and($filtri[DISABILITIES_KEY]['multiple'])->toBeTrue()
-        ->and($filtri[DIFFICULTY_KEY]['multiple'])->toBeTrue()
+        ->and($filtri[WARNINGS_KEY]['multiple'])->toBeTrue()
+        ->and($filtri[EcTrackActivityFilter::class]['component'])->toBe('choice-filter')
+        ->and($filtri[EcTrackActivityFilter::class]['multiple'])->toBeTrue()
         ->and(collect($filtri[ROUTE_TYPE_KEY]['options'])->pluck('value')->all())
         ->toBe(['route-type-trail', 'route-type-itinerary', 'route-type-walk']);
 });
@@ -384,7 +412,8 @@ it('i titoli dei filtri sono i nomi delle tassonomie', function () {
     expect($nomi[VALIDATION_KEY])->toBe('Stato validazione')
         ->and($nomi[ROUTE_TYPE_KEY])->toBe('Tipo percorso')
         ->and($nomi[DISABILITIES_KEY])->toBe('Disabilità accolte')
-        ->and($nomi[DIFFICULTY_KEY])->toBe('Difficoltà di accessibilità')
+        ->and($nomi[WARNINGS_KEY])->toBe('Avvertenze')
+        ->and($nomi[EcTrackActivityFilter::class])->toBe('Attività')
         ->and($nomi[EcTrackCadastralAreaFilter::class])->toBe('Aree Catastali');
 });
 
@@ -412,4 +441,57 @@ it('lo stesso menu filtra le tracce di un ente nella sua detail view', function 
 
     expect($chiavi)->toContain(ROUTE_TYPE_KEY)
         ->and($ids)->toBe([$gestitaSentiero->id]);
+});
+
+it('il filtro Attività elenca le attività con l identifier come valore', function () {
+    attivita('mtb', 'Mountain Bike');
+    attivita('hiking', 'Alte vie');
+    app()->setLocale('it');
+
+    $filtro = definizioneFiltro($this, EcTrackActivityFilter::class);
+
+    expect($filtro['currentValue'])->toBe([])
+        ->and($filtro['options'])->toBe([
+            ['label' => 'Mountain Bike', 'value' => 'mtb'],
+            ['label' => 'Alte vie', 'value' => 'hiking'],
+        ]);
+});
+
+it('più attività scelte valgono in OR e si combinano in AND con il tipo percorso', function () {
+    configuraTermini();
+    $mtb = attivita('mtb', 'Mountain Bike');
+    $cavallo = attivita('horse', 'Turismo equestre');
+    $nordic = attivita('nordic-walking', 'Nordic Walking');
+    $sentieroMtb = conAttivita(conTermini(traccia(9.2, 9.4), 'route-type-trail'), $mtb);
+    $sentieroCavallo = conAttivita(conTermini(traccia(9.5, 9.6), 'route-type-trail'), $cavallo, $nordic);
+    conAttivita(conTermini(traccia(9.7, 9.8), 'route-type-walk'), $mtb);
+    conAttivita(conTermini(traccia(9.9, 9.95), 'route-type-trail'), $nordic);
+
+    expect(idFiltrati($this, [EcTrackActivityFilter::class => ['mtb', 'horse']]))
+        ->toHaveCount(3)
+        ->and(idFiltrati($this, [
+            EcTrackActivityFilter::class => ['mtb', 'horse'],
+            ROUTE_TYPE_KEY => ['route-type-trail'],
+        ]))->toEqualCanonicalizing([$sentieroMtb->id, $sentieroCavallo->id]);
+});
+
+it('un attività che non esiste non allarga i risultati', function () {
+    attivita('mtb', 'Mountain Bike');
+    traccia(9.2, 9.4);
+
+    expect(idFiltrati($this, [EcTrackActivityFilter::class => ['attivita-tolta']]))->toBe([]);
+});
+
+it('il filtro Avvertenze restituisce le tracce con almeno una delle avvertenze scelte', function () {
+    configuraTermini();
+    avvertenza('sardegnasentieri:warning:1', 'Tratti esposti');
+    avvertenza('sardegnasentieri:warning:2', 'Assenza di acqua');
+    avvertenza('sardegnasentieri:warning:3', 'Guadi');
+    $esposta = conTermini(traccia(9.2, 9.4), 'sardegnasentieri:warning:1');
+    $senzaAcqua = conTermini(traccia(9.5, 9.6), 'sardegnasentieri:warning:2');
+    conTermini(traccia(9.7, 9.8), 'sardegnasentieri:warning:3');
+    traccia(9.9, 9.95);
+
+    expect(idFiltrati($this, [WARNINGS_KEY => ['sardegnasentieri:warning:1', 'sardegnasentieri:warning:2']]))
+        ->toEqualCanonicalizing([$esposta->id, $senzaAcqua->id]);
 });

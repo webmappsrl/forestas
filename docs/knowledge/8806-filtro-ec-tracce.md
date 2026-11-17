@@ -13,12 +13,17 @@ delle classificazioni scritti sulla traccia (oc:8988). Tutti i filtri usano il s
 | Stato validazione | `TaxonomyTermFilter(EcTrack::VALIDATION_STATUS_TAXONOMY)` | singola |
 | Percorribilità | `TaxonomyTermFilter(<walkability_taxonomy>)`, solo con il dominio Catasto acceso | singola |
 | Tipo percorso | `TaxonomyTermFilter('route-type', multiple: true)` | multipla |
+| Attività | `app/Nova/Filters/EcTrackActivityFilter.php`, su `ChoiceFilter` | multipla |
 | Disabilità accolte | `TaxonomyTermFilter('inclusivity-disabilities', multiple: true)` | multipla |
-| Difficoltà di accessibilità | `TaxonomyTermFilter('inclusivity-difficulty', multiple: true)` | multipla |
+| Avvertenze | `TaxonomyTermFilter(SardegnaSentieriImportService::WARNINGS_TAXONOMY, multiple: true)` | multipla |
 | Aree catastali | `app/Nova/Filters/EcTrackCadastralAreaFilter.php`, su `ChoiceFilter` | multipla |
 
-Nell'URL un filtro tassonomico ha la chiave `taxonomy_term_<identifier>`; le aree catastali hanno il
-nome della classe, come ogni filtro che non ridefinisce `key()`.
+Nell'URL un filtro tassonomico ha la chiave `taxonomy_term_<identifier>`; attività e aree
+catastali hanno il nome della classe, come ogni filtro che non ridefinisce `key()`.
+
+La **Difficoltà di accessibilità** (`inclusivity-difficulty`) non è più nel menu: tolta su
+richiesta subito dopo oc:8988, insieme all'aggiunta di Attività e Avvertenze. Un link salvato con
+quel filtro non filtra più.
 
 - **I valori dello stesso filtro valgono in OR, filtri diversi in AND.** Una traccia senza termini
   in quella tassonomia non esce da un filtro attivo.
@@ -37,6 +42,11 @@ nome della classe, come ogni filtro che non ridefinisce `key()`.
   trovare le tracce che li hanno ancora. Il campo «Stato» del form propone invece solo i termini
   dichiarati (`EcTrack::validationStatusTerms()`). I ritirati restano in tabella se lo storico dei
   cambi di stato li nomina, e scelti nel filtro danno zero tracce, perché l'import non li scrive più.
+- **Le attività stanno ancora in `taxonomy_activities`**, non in `taxonomy_terms`: per questo il
+  filtro non è un `TaxonomyTermFilter` ma una sottoclasse di `ChoiceFilter` che legge la relazione
+  `taxonomyActivities`. Il valore è l'identifier dell'attività; un identifier che non esiste dà un
+  elenco vuoto. Fra le opzioni ci sono anche «Itinerario», «Sentiero» e «Cammini di Sardegna», le
+  attività scritte dall'import, che si sovrappongono al Tipo percorso.
 - **Le aree catastali** sono le `TaxonomyWhere` di sorgente `geohub_conf_32`
   (`TaxonomyWhereLayersImportService::SOURCE_KEY`), in ordine di nome. Il valore è la lista degli
   id delle aree. La chiave e il formato sono quelli del vecchio filtro outline, quindi i link
@@ -51,14 +61,20 @@ nome della classe, come ogni filtro che non ridefinisce `key()`.
   (`vendor/laravel/nova/src/Filters/FilterDecoder.php`). Un preferito «tracce da validare» apre
   la lista con tutte le tracce.
 
-Con i filtri tassonomici si ottiene il contenuto dei quattro layer di tipologia:
+Con i filtri del menu si ottiene il contenuto dei quattro layer di tipologia:
 
 | Layer | Filtro |
 |---|---|
 | Sentieri | Tipo percorso = Sentiero |
 | Itinerari | Tipo percorso = Itinerario |
 | Cammini di Sardegna | Tipo percorso = Cammino |
-| Sentieri Accessibili | Difficoltà di accessibilità = AT, AE, AEE |
+| Sentieri Accessibili | Attività = «Sentieri (accessibili) per tutti» (`accessible-trails`) |
+
+Il layer «Sentieri Accessibili» resta definito dalla scala della difficoltà di accessibilità
+(sezione sotto). Il filtro dell'attività `accessible-trails` lo approssima: l'import scrive
+l'attività dai termini di `field_tipologia_sentiero`, e la scala dai campi dell'inclusività, quindi
+le due cose possono non coincidere su ogni traccia. In locale, il 17/11: 2 tracce con l'attività,
+4 con un grado della scala, 2 in comune.
 
 ### Come le tracce finiscono nei layer (oc:8827)
 
