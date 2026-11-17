@@ -7,22 +7,25 @@ namespace App\Nova\Filters;
 use App\Services\Import\TaxonomyWhereLayersImportService;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Outl1ne\NovaMultiselectFilter\MultiselectFilter;
 use Wm\WmPackage\Models\TaxonomyWhere;
+use Wm\WmPackage\Nova\Filters\ChoiceFilter;
 
 /**
- * Filtro delle EC Tracce per area catastale, a scelta multipla (oc:8806), come multiselect con
- * ricerca (oc:8825).
+ * Filtro delle EC Tracce per area catastale, a scelta multipla (oc:8806), con ricerca (oc:8825),
+ * sul selettore del campo `Choice` come gli altri filtri della Resource (oc:8988).
  *
  * Legge properties->taxonomy_where, scritto dal calcolo geometrico delle aree: una traccia
  * esce se attraversa almeno una delle aree scelte, anche per un tratto breve.
+ *
+ * La chiave resta quella di Nova, il nome della classe, e il valore un array di id, come con il
+ * vecchio filtro outline: i link salvati con le aree continuano a filtrare.
  */
-class EcTrackCadastralAreaFilter extends MultiselectFilter
+class EcTrackCadastralAreaFilter extends ChoiceFilter
 {
     public function __construct()
     {
-        // Senza segnaposto il componente ripete il nome del filtro nella casella di ricerca.
-        $this->placeholder(__('Select cadastral area'));
+        // Il segnaposto della ricerca è quello di default, come negli altri filtri del menu.
+        $this->multiple();
     }
 
     public function name(): string
@@ -31,11 +34,11 @@ class EcTrackCadastralAreaFilter extends MultiselectFilter
     }
 
     /**
-     * @param  list<int|string>|mixed  $value  id delle aree scelte
+     * @param  list<string>|string  $value  id delle aree scelte
      */
-    public function apply(NovaRequest $request, Builder $query, mixed $value): Builder
+    protected function applyChoice(NovaRequest $request, Builder $query, string|array $value): Builder
     {
-        $areaIds = collect(is_array($value) ? $value : [])
+        $areaIds = collect((array) $value)
             ->map(fn ($id) => (int) $id)
             ->filter(fn (int $id) => $id > 0)
             ->map(fn (int $id) => (string) $id)
@@ -67,17 +70,19 @@ class EcTrackCadastralAreaFilter extends MultiselectFilter
     }
 
     /**
-     * Formato del pacchetto: id => nome (l'inverso del BooleanFilter di Nova).
+     * Le aree per nome, in ordine naturale. L'id resta intero: lo converte in stringa
+     * `ChoiceFilter`.
      *
-     * @return array<int, string>
+     * @return list<array{value: int, label: string}>
      */
-    public function options(NovaRequest $request): array
+    protected function choiceOptions(NovaRequest $request): array
     {
         return TaxonomyWhere::query()
             ->where('properties->source', TaxonomyWhereLayersImportService::SOURCE_KEY)
             ->get()
             ->sortBy(fn (TaxonomyWhere $area) => $area->name, SORT_NATURAL | SORT_FLAG_CASE)
-            ->mapWithKeys(fn (TaxonomyWhere $area) => [$area->id => $area->name])
+            ->map(fn (TaxonomyWhere $area) => ['value' => $area->id, 'label' => (string) $area->name])
+            ->values()
             ->all();
     }
 }

@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\ConfigureTaxonomyTermsCommand;
 use App\Support\ForestasTrackDetail;
 use App\Support\InclusivityScore;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Wm\WmPackage\Models\EcTrack as WmEcTrack;
 use Wm\WmPackage\Models\Layer;
+use Wm\WmPackage\Models\TaxonomyTerm;
 
 /**
  * @property Carbon|null $forestas_survey_date
@@ -38,6 +41,35 @@ class EcTrack extends WmEcTrack
     public function getValidationStatusAttribute(): ?string
     {
         return $this->exists ? $this->term(self::VALIDATION_STATUS_TAXONOMY)?->identifier : null;
+    }
+
+    /**
+     * Gli stati di validazione che si possono scegliere, nell'ordine dei dati; vuoto se la
+     * famiglia non esiste ancora. Li usa il campo «Stato validazione» della Resource EcTrack
+     * (oc:8988: prima stavano nel filtro dello stato, sostituito da `TaxonomyTermFilter`).
+     *
+     * Solo gli stati che il comando dei termini dichiara: un termine rimasto in tabella da una
+     * configurazione precedente — i due di terreno usciti da questa famiglia (oc:8989) —
+     * comparirebbe fra le scelte, e chi lo sceglie rimette un sentiero in uno stato che non esiste
+     * più. Il filtro invece li propone tutti: servono a trovare le tracce che li hanno ancora.
+     *
+     * @return Collection<int, TaxonomyTerm>
+     */
+    public static function validationStatusTerms(): Collection
+    {
+        $family = TaxonomyTerm::query()->taxonomies()
+            ->where('identifier', self::VALIDATION_STATUS_TAXONOMY)
+            ->first();
+
+        if ($family === null) {
+            return collect();
+        }
+
+        $declared = ConfigureTaxonomyTermsCommand::termIdentifiersOf(self::VALIDATION_STATUS_TAXONOMY);
+
+        return $family->children()->get()
+            ->filter(fn (TaxonomyTerm $term) => in_array($term->identifier, $declared, true))
+            ->values();
     }
 
     /**

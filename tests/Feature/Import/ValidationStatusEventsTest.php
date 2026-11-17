@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Nova\Filters\EcTrackValidationStatusFilter;
+use App\Models\EcTrack as ForestasEcTrack;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\TrailRegistry\Enums\TrailStatusEventSource;
@@ -61,7 +61,7 @@ it('non offre fra gli stati i due termini di terreno rimasti in tabella', functi
         'sort_order' => 4,
     ]);
 
-    $identifiers = EcTrackValidationStatusFilter::statuses()->pluck('identifier')->all();
+    $identifiers = ForestasEcTrack::validationStatusTerms()->pluck('identifier')->all();
 
     expect($identifiers)->not->toContain('validation-status-not-walkable')
         ->and($identifiers)->toContain('validation-status-validated');
