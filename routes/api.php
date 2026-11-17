@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\EnteController;
+use App\Http\Controllers\Api\NoticeController;
 use App\Http\Middleware\VerifyWpApiToken;
 use Illuminate\Support\Facades\Route;
 
@@ -25,3 +26,6 @@ Route::prefix('v1/entes')
             ->middleware('throttle:600,1')
             ->name('search');
     });
+
+// Avvisi dei sentieri (oc:8981): pubblica come `api/ec/track`, senza token né throttle.
+Route::get('v1/avvisi', [NoticeController::class, 'index'])->name('notices.index');

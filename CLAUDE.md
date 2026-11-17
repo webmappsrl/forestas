@@ -88,6 +88,7 @@ Le trappole del dominio Catasto Sentieri stanno nel package: sezione «Trappole�
 | Dettaglio del POI: dati di Forestas | rotta `api/ec/poi/{id}` sostituita in forestas, `properties.forestas` dei POI (con il nid di Drupal, anche in `pois.geojson`), percorsi del POI calcolati per vicinanza in `ec_poi_ec_track` (anche POI correlati delle tracce) | [docs/knowledge/dettaglio-del-poi-dati-forestas.md](docs/knowledge/dettaglio-del-poi-dati-forestas.md) |
 | Classificazioni e inclusività | come nascono famiglie e termini, mappatura dei termini Drupal, dati manuali e importati, punteggio e soglie, reindex | [docs/knowledge/classificazioni-e-inclusivita.md](docs/knowledge/classificazioni-e-inclusivita.md) |
 | API degli enti | rotte `api/v1/entes` e ricerca per il sito WordPress, token `WP_API_TOKEN`, forma del JSON, cache di un'ora, indice `entes` | [docs/knowledge/8965-api-degli-enti-per-il-nuovo-sito-wordpress.md](docs/knowledge/8965-api-degli-enti-per-il-nuovo-sito-wordpress.md) |
+| Avvisi dei sentieri | il dato riusato (`not_accessible`), i campi nel tab Status di Nova, l'API pubblica `api/v1/avvisi` per il sito, data = ultimo aggiornamento del testo italiano, perdita notturna su UAT | [docs/knowledge/8981-avvisi-dei-sentieri.md](docs/knowledge/8981-avvisi-dei-sentieri.md) |
 
 Il dominio del Catasto Sentieri — tabelle, stati, service, comando, interfaccia — è documentato nel
 package: `wm-package/docs/resources/TrailRegistry.md`. Le pagine qui coprono solo la

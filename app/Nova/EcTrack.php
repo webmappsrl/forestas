@@ -13,10 +13,12 @@ use App\Nova\Filters\EcTrackRuoloFilter;
 use App\Nova\Filters\EcTrackValidationStatusFilter;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Support\InclusivityScore;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Kongulov\NovaTabTranslatable\NovaTabTranslatable;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\BelongsToMany;
+use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Heading;
@@ -29,6 +31,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Tabs\Tab;
 use Laravel\Nova\Tabs\TabsGroup;
 use Marshmallow\Tiptap\Tiptap;
+use Wm\WmPackage\Models\EcTrack as WmEcTrack;
 use Wm\WmPackage\Nova\Cards\ApiLinksCard\EcTrackApiLinksCard;
 use Wm\WmPackage\Nova\EcTrack as WmNovaEcTrack;
 use Wm\WmPackage\Nova\Filters\FeaturesByLayerFilter;
@@ -194,6 +197,73 @@ class EcTrack extends WmNovaEcTrack
     }
 
     /**
+     * Gli attributi dell'avviso: nel package stanno nel tab Info, qui vanno nel tab Stato (oc:8981).
+     */
+    private const NOTICE_FLAG = 'properties->not_accessible';
+
+    private const NOTICE_MESSAGE = 'properties->not_accessible_message';
+
+    private const NOTICE_DATE = 'properties->'.WmEcTrack::NOT_ACCESSIBLE_UPDATED_AT;
+
+    private const NOTICE_ATTRIBUTES = [self::NOTICE_FLAG, self::NOTICE_MESSAGE, self::NOTICE_DATE];
+
+    /**
+     * Fuso e formato con cui l'editor legge la data dell'avviso (salvata in UTC).
+     */
+    private const NOTICE_TIMEZONE = 'Europe/Rome';
+
+    private const NOTICE_DATE_FORMAT = 'd/m/Y H:i';
+
+    /**
+     * Il tab Info del package senza i campi dell'avviso, che si ridisegnano in `noticeFields()`.
+     * Si filtra invece di copiare il tab del package, così il resto resta allineato a lui.
+     *
+     * @return array<int, Field>
+     */
+    public function getInfoTabFields(): array
+    {
+        return array_values(array_filter(parent::getInfoTabFields(), function ($field) {
+            if ($field instanceof NovaTabTranslatable) {
+                foreach ($field->originalFields as $original) {
+                    if (in_array($original->attribute, self::NOTICE_ATTRIBUTES, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return ! in_array($field->attribute ?? null, self::NOTICE_ATTRIBUTES, true);
+        }));
+    }
+
+    /**
+     * L'avviso del sentiero, nel tab Stato dopo la percorribilità e prima dello storico (oc:8981).
+     * Gli attributi sono quelli del package: cambia solo l'etichetta e la posizione.
+     *
+     * @return array<int, Field>
+     */
+    private function noticeFields(): array
+    {
+        return [
+            // L'avviso non va nell'index delle tracce: si legge nel detail, nel tab Status.
+            Heading::make('<h3 class="text-base font-bold">'.e(__('Notice')).'</h3>')->asHtml()->hideFromIndex(),
+            Boolean::make(__('Publish notice'), self::NOTICE_FLAG)->hideFromIndex(),
+            NovaTabTranslatable::make([
+                Textarea::make(__('Notice message'), self::NOTICE_MESSAGE)
+                    ->help(__('Without an Italian message the notice is not shown on the website.')),
+            ])->hideFromIndex(),
+            Text::make(__('Notice date'), self::NOTICE_DATE)
+                ->readonly()
+                // Il valore è un ISO 8601 in UTC: l'editor lo legge in ora di Roma.
+                ->displayUsing(fn ($value) => $value
+                    ? Carbon::parse($value)->setTimezone(self::NOTICE_TIMEZONE)->format(self::NOTICE_DATE_FORMAT)
+                    : null)
+                ->onlyOnDetail(),
+        ];
+    }
+
+    /**
      * I campi dell'inclusività che non sono tassonomie: li possiede solo Forestas (oc:8910).
      *
      * La chiave è il tab dichiarato dai due tassonomie dell'inclusività: i campi gli finiscono
@@ -212,6 +282,7 @@ class EcTrack extends WmNovaEcTrack
             // coda a quelli di `makeTermFieldsByTab()`: messo lì resterebbe in mezzo.
             self::STATUS_TAB => [
                 ...($fromPackage[self::STATUS_TAB] ?? []),
+                ...$this->noticeFields(),
                 ...$this->historyBlock(),
             ],
             'Inclusivity' => [

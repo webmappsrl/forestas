@@ -85,5 +85,10 @@
     "Validated trail with unknown walkability": "Sentiero validato con percorribilità sconosciuta",
     "The registry declares this trail validated or certified, but nobody has recorded whether it can be walked.": "Il catasto dichiara questo sentiero validato o certificato, ma nessuno ha registrato se si cammina.",
     "Why the status changed: it stays in the history, with your name and the date.": "Perché lo stato è cambiato: resta nello storico, con il tuo nome e la data.",
-    "Trail validation status": "Stato di validazione dei sentieri"
+    "Trail validation status": "Stato di validazione dei sentieri",
+    "Notice": "Avviso",
+    "Notice message": "Messaggio Avviso",
+    "Publish notice": "Pubblica avviso",
+    "Notice date": "Data avviso",
+    "Without an Italian message the notice is not shown on the website.": "Senza messaggio in italiano l'avviso non compare sul sito."
 }
