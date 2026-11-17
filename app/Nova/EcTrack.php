@@ -7,6 +7,7 @@ namespace App\Nova;
 use App\Models\EcTrack as EcTrackModel;
 use App\Nova\Concerns\HasForestasMediaFields;
 use App\Nova\Concerns\HasMirroredRelations;
+use App\Nova\Filters\EcTrackActivityFilter;
 use App\Nova\Filters\EcTrackCadastralAreaFilter;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Support\InclusivityScore;
@@ -447,8 +448,9 @@ class EcTrack extends WmNovaEcTrack
             new TaxonomyTermFilter(EcTrackModel::VALIDATION_STATUS_TAXONOMY),
             ...$this->walkabilityFilters(),
             new TaxonomyTermFilter('route-type', multiple: true),
+            new EcTrackActivityFilter,
             new TaxonomyTermFilter('inclusivity-disabilities', multiple: true),
-            new TaxonomyTermFilter('inclusivity-difficulty', multiple: true),
+            new TaxonomyTermFilter(SardegnaSentieriImportService::WARNINGS_TAXONOMY, multiple: true),
             new EcTrackCadastralAreaFilter,
         ];
     }
