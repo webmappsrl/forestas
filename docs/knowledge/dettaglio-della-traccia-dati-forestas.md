@@ -61,8 +61,10 @@ Il job è unico per traccia finché non parte: un salvataggio in Nova che cambia
 uno. L'import non lo accoda: salva le tracce senza eventi, scarica le foto dentro
 `RelatedTrackCards::withoutRefresh()` e a fine giro rigenera tutti i file.
 
-I `related_pois` del dettaglio (chiave del package, da `ec_poi_ec_track`) sono i POI entro 1 km dalla
-traccia, dal più vicino, calcolati a fine import: vedi `dettaglio-del-poi-dati-forestas.md`.
+I `related_pois` del dettaglio (chiave del package, da `ec_poi_ec_track`) sono i POI entro la
+distanza configurata nella tab `pois` dell'App (1 km di default) dalla traccia, dal più vicino,
+calcolati a fine import e di nuovo quando in Nova cambia quella distanza: vedi
+`dettaglio-del-poi-dati-forestas.md`.
 
 **Il roadbook sta nei Blocchi Dettaglio**, non in `forestas` (oc:8959): `properties.config_detail` (campo
 Nova «Detail Blocks» del package) ha un blocco `info` con una riga per tappa, titolo «Tappa N» e il
