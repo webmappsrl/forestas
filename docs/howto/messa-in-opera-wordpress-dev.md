@@ -122,6 +122,8 @@ commit in `wp-forestas` non basta, serve anche l'aggiornamento del puntatore su 
 dello shard, `scripts/wordpress-up.sh`, come su UAT. Il rilascio della ricerca unica (oc:8952) ha gli stessi passi di UAT
 ([«Ricerca unica e plugin `wp-package`»](messa-in-opera-wordpress-uat.md#ricerca-unica-e-plugin-wp-package-oc8952)),
 compreso togliere a mano `wm-package` e il ritorno indietro.
+Anche il rilascio degli enti (oc:8990) ha i passi di UAT
+([«Enti sul sito»](messa-in-opera-wordpress-uat.md#enti-sul-sito-oc8990)).
 
 Per azzerare: `scripts/wordpress-reset.sh --conferma`, poi il passo 5 (o si aspetta il giro del
 cron) e la verifica. Su dev si può fare quando serve.
