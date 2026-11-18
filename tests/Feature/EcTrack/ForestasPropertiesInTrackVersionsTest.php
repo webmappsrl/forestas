@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Jobs\Track\UpdateEcTrackAwsJob;
 use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Models\TaxonomyWhere;
 use Wm\WmPackage\Services\StorageService;
 
 /**
@@ -132,7 +133,7 @@ it('toglie sardegnasentieri_id dalle properties e lo lascia dentro forestas, in 
 
 it('nella v1 le tassonomie hanno la sola forma taxonomies, nel file senza versione ci sono tutte', function () {
     $track = versionedTrack();
-    $where = Wm\WmPackage\Models\TaxonomyWhere::create(['name' => ['it' => 'Zona '.uniqid()]]);
+    $where = TaxonomyWhere::create(['name' => ['it' => 'Zona '.uniqid()]]);
     $track->taxonomyWheres()->attach($where->id);
     $track->properties = [...$track->properties, 'taxonomy_where' => [(string) $where->id => ['name' => ['it' => 'Zona'], 'admin_level' => 8]]];
     $track->saveQuietly();
