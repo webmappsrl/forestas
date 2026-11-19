@@ -37,7 +37,6 @@ class ConfigureTaxonomyTermsCommand extends Command
 
     protected $description = 'Crea (o allinea) le tassonomie e i termini del modello unico delle classificazioni';
 
-
     /**
      * Elenco di sistema. Termine: [nome, identifier, sort_order, icona|null, tid di Drupal|null].
      *

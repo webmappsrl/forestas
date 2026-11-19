@@ -87,7 +87,6 @@ class SardegnaSentieriImportService
         '4899' => ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-cognitive'],
     ];
 
-
     /**
      * Le tassonomie che l'import scrive e di cui è l'unica fonte: a ogni import
      * le loro relazioni si sostituiscono con quelle di Drupal. Fuori da qui
@@ -321,7 +320,6 @@ class SardegnaSentieriImportService
             }
         }
     }
-
 
     // -------------------------------------------------------------------------
     // Taxonomy resolution

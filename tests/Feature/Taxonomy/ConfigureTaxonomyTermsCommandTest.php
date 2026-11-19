@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\DB;
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
