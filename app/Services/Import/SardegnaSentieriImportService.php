@@ -1051,7 +1051,7 @@ class SardegnaSentieriImportService
         // ha creato il termine — il nome collideva con un altro — resta con la chiave storica e
         // diventa un'anomalia `missing_term` poco sotto.
         $classification['terms'][self::WARNINGS_TAXONOMY] = array_map(
-            fn ($apiId) => $this->termsByDrupalTid()->get((string) $apiId)?->identifier
+            fn ($apiId) => $this->termsByDrupalTid()->get((string) $apiId)->identifier
                 ?? self::WARNING_TERM_PREFIX.$apiId,
             $response->taxonomies->tipologia_di_avvertenze ?? []
         );
@@ -1239,7 +1239,7 @@ class SardegnaSentieriImportService
             // Il termine si riconosce dal tid dichiarato in `properties`, non dall'identifier:
             // un tid che l'elenco di sistema non prevede resta con la chiave storica e diventa
             // un'anomalia `missing_term`.
-            ->map(fn (string $tid) => $this->termsByDrupalTid()->get($tid)?->identifier
+            ->map(fn (string $tid) => $this->termsByDrupalTid()->get($tid)->identifier
                 ?? self::DRUPAL_TERM_PREFIX.$tid)
             ->values()
             ->all();
