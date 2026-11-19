@@ -24,6 +24,16 @@ use Wm\WmPackage\Models\TaxonomyTerm;
 class EcTrack extends WmEcTrack
 {
     /**
+     * `HasPackageFactory` del package ricava la factory dal namespace della classe chiamante
+     * (`src/Traits/HasPackageFactory.php`): da qui cercherebbe `App\Database\Factories\
+     * EcTrackFactory`, che non esiste. La factory e' quella del package.
+     */
+    protected static function newFactory(): \Wm\WmPackage\Database\Factories\EcTrackFactory
+    {
+        return \Wm\WmPackage\Database\Factories\EcTrackFactory::new();
+    }
+
+    /**
      * Identifier della famiglia dello stato di validazione (oc:8932): era la colonna
      * `stato_validazione`. Si legge con `$track->term(self::VALIDATION_STATUS_TAXONOMY)`.
      */
