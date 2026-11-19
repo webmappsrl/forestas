@@ -215,28 +215,61 @@ return [
 
         ## I valori ammessi dei campi a scelta chiusa
 
-        Quattro campi accettano solo uno di pochi identificativi. Un valore diverso e' rifiutato
-        con `422`, anche se la frase italiana corrispondente e' quella giusta: si manda
-        l'identificativo, non l'etichetta.
+        Questi campi accettano solo uno degli identificativi elencati qui sotto. Si manda
+        l'identificativo, mai l'etichetta: un valore diverso e' rifiutato con `422`, anche quando
+        la frase italiana corrispondente e' quella giusta. L'etichetta e' il testo che l'operatore
+        legge nel Catasto, e serve qui solo a far capire cosa significa l'identificativo.
 
-        | Campo | Identificativo | Che cosa significa |
-        |---|---|---|
-        | 38 — `existing_signage` | `good_condition` | c'e' ed e' in buono stato |
-        | | `dilapidated` | c'e' ed e' fatiscente |
-        | | `absent` | non c'e' |
-        | 47 — `soggetto_gestore` | `applicant` | il richiedente |
-        | | `municipalities` | i comuni territorialmente competenti selezionati |
-        | | `third_party` | altro soggetto terzo |
-        | | `forestas` | Forestas |
-        | 49 — `soggetto_rilevatore` | `applicant` | il richiedente |
-        | | `other_surveyor` | altro soggetto rilevatore |
-        | 53 — `soggetto_manutentore` | `applicant` | il richiedente, se soggetto giuridico |
-        | | `municipalities` | i comuni territorialmente competenti selezionati |
-        | | `other_legal_entity` | altro soggetto giuridico |
-        | | `forestas` | Forestas |
+        ### Campo 38 — `existing_signage`, stato della segnaletica pre-esistente
 
-        Gli altri due campi a scelta chiusa hanno una sezione propria: le attivita' (campo 36) e i
-        livelli di difficolta' (campo 37), piu' avanti.
+        | Identificativo | Etichetta |
+        |---|---|
+        | `good_condition` | c'e' ed e' in buono stato |
+        | `dilapidated` | c'e' ed e' fatiscente |
+        | `absent` | non c'e' |
+
+        ### Campo 47 — `soggetto_gestore`
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `applicant` | Il richiedente |
+        | `municipalities` | Comuni territorialmente competenti selezionati |
+        | `third_party` | Altro soggetto terzo |
+        | `forestas` | Forestas |
+
+        ### Campo 49 — `soggetto_rilevatore`
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `applicant` | Il richiedente |
+        | `other_surveyor` | Altro soggetto rilevatore |
+
+        ### Campo 53 — `soggetto_manutentore`
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `applicant` | Il richiedente (se soggetto giuridico) |
+        | `municipalities` | Comuni territorialmente competenti selezionati |
+        | `other_legal_entity` | Altro soggetto giuridico |
+        | `forestas` | Forestas |
+
+        ### Campo 36 — `activities`, le attivita' proposte
+
+        Lista, almeno una voce. Le tre del format sono `trekking`, `mtb` e `horse`; le altre
+        quattro il Catasto le gestisce e il format non le prevede, ma sono accettate.
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `trekking` | Trekking |
+        | `hiking` | Escursionismo |
+        | `mtb` | Mountain bike |
+        | `horse` | Ippovia |
+        | `accessible-trails` | Percorsi accessibili |
+        | `nordic-walking` | Nordic Walking |
+        | `educational-trails` | Sentiero didattico |
+
+        Il campo 37 (`difficulty`) ha una sezione propria piu' avanti, perche' i suoi valori
+        dipendono dall'attivita'.
 
         ## I campi che diventano obbligatori
 
@@ -328,20 +361,37 @@ return [
         una chiave solo per le attivita' indicate in `activities`. Ogni attivita' ha la sua scala, e
         un livello di un'altra scala e' rifiutato con `422`:
 
-        | Attivita' | Livelli ammessi |
-        |---|---|
-        | `trekking` | `T` · `E` · `EE` · `EEA` |
-        | `hiking` | `T` · `E` · `EE` · `EEA` |
-        | `mtb` | `TC` · `MC` · `BC` · `OC` · `EC` |
-        | `horse` | `easy` · `medium` · `hard` |
-        | `accessible-trails` | `AT` · `AE` · `AEE` |
-        | `nordic-walking` | `easy` · `medium` · `hard` |
-        | `educational-trails` | `easy` · `medium` · `hard` |
+        Dove la scala ha una sigla ufficiale l'identificativo e' la sigla stessa, maiuscola, ed e'
+        anche l'etichetta che si legge nel Catasto:
 
-        Le sigle sono quelle delle scale ufficiali — CAI per trekking ed escursionismo, la scala
-        MTB, quella dell'accessibilita'. Le tre scale che non hanno sigle si mandano invece con un
-        codice (`easy`, `medium`, `hard`), non con l'etichetta italiana che compare nelle schede:
-        cosi' il valore resta stabile anche se un giorno l'etichetta cambia.
+        | Attivita' | Identificativi |
+        |---|---|
+        | `trekking`, `hiking` — scala CAI | `T` · `E` · `EE` · `EEA` |
+        | `mtb` | `TC` · `MC` · `BC` · `OC` · `EC` |
+        | `accessible-trails` | `AT` · `AE` · `AEE` |
+
+        Dove invece l'etichetta e' una parola italiana, l'identificativo e' un codice inglese
+        minuscolo: l'etichetta e' un testo che si puo' rinominare dal pannello, e il valore
+        scambiato deve restare stabile.
+
+        **Ippovia** (`horse`):
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `easy` | Facile |
+        | `medium` | Medio |
+        | `hard` | Difficile |
+
+        **Nordic walking** (`nordic-walking`) e **sentieri didattici** (`educational-trails`):
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `easy` | Facile |
+        | `medium` | Medio |
+        | `hard` | Impegnativo |
+
+        Il terzo gradino si chiama «Difficile» sull'ippovia e «Impegnativo» sulle altre due: sono
+        la stessa posizione nella scala, e `hard` le copre entrambe.
 
         `trekking` e `hiking` hanno la stessa scala ma restano due giudizi distinti: lo stesso
         sentiero puo' essere `E` per il trekking e `EEA` per l'escursionismo.
