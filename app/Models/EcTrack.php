@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Wm\WmPackage\Database\Factories\EcTrackFactory;
 use Wm\WmPackage\Models\EcTrack as WmEcTrack;
 use Wm\WmPackage\Models\Layer;
 use Wm\WmPackage\Models\TaxonomyTerm;
@@ -28,9 +29,9 @@ class EcTrack extends WmEcTrack
      * (`src/Traits/HasPackageFactory.php`): da qui cercherebbe `App\Database\Factories\
      * EcTrackFactory`, che non esiste. La factory e' quella del package.
      */
-    protected static function newFactory(): \Wm\WmPackage\Database\Factories\EcTrackFactory
+    protected static function newFactory(): EcTrackFactory
     {
-        return \Wm\WmPackage\Database\Factories\EcTrackFactory::new();
+        return EcTrackFactory::new();
     }
 
     /**
