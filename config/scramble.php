@@ -297,6 +297,30 @@ return [
         gestisce e il format non prevede: `hiking`, `accessible-trails`, `nordic-walking`,
         `educational-trails`. Un valore fuori da questi sette e' rifiutato con `422`.
 
+        ### I livelli di difficolta' ammessi, attivita' per attivita'
+
+        Il campo 37 (`difficulty`) e' un **oggetto** `attivita' -> livello`, non una lista, e porta
+        una chiave solo per le attivita' indicate in `activities`. Ogni attivita' ha la sua scala, e
+        un livello di un'altra scala e' rifiutato con `422`:
+
+        | Attivita' | Livelli ammessi |
+        |---|---|
+        | `trekking` | `T` · `E` · `EE` · `EEA` |
+        | `hiking` | `T` · `E` · `EE` · `EEA` |
+        | `mtb` | `TC` · `MC` · `BC` · `OC` · `EC` |
+        | `horse` | `easy` · `medium` · `hard` |
+        | `accessible-trails` | `AT` · `AE` · `AEE` |
+        | `nordic-walking` | `easy` · `medium` · `hard` |
+        | `educational-trails` | `easy` · `medium` · `hard` |
+
+        Le sigle sono quelle delle scale ufficiali — CAI per trekking ed escursionismo, la scala
+        MTB, quella dell'accessibilita'. Le tre scale che non hanno sigle si mandano invece con un
+        codice (`easy`, `medium`, `hard`), non con l'etichetta italiana che compare nelle schede:
+        cosi' il valore resta stabile anche se un giorno l'etichetta cambia.
+
+        `trekking` e `hiking` hanno la stessa scala ma restano due giudizi distinti: lo stesso
+        sentiero puo' essere `E` per il trekking e `EEA` per l'escursionismo.
+
                 **La creazione non si corregge, si rifa.** Non esiste un endpoint che modifichi i dati di una
         domanda gia' creata: e' una scelta, descritta nella pagina della chiamata.
 

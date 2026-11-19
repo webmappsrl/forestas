@@ -56,9 +56,9 @@ class ConfigureSardegnaSentieriLayersCommand extends Command
         'Itinerari' => ['route-type-itinerary'],
         'Cammini di Sardegna' => ['route-type-walk'],
         'Sentieri Accessibili' => [
-            'inclusivity-difficulty-at',
-            'inclusivity-difficulty-ae',
-            'inclusivity-difficulty-aee',
+            'inclusivity-difficulty-AT',
+            'inclusivity-difficulty-AE',
+            'inclusivity-difficulty-AEE',
         ],
     ];
 

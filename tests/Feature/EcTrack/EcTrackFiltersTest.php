@@ -484,14 +484,14 @@ it('un attività che non esiste non allarga i risultati', function () {
 
 it('il filtro Avvertenze restituisce le tracce con almeno una delle avvertenze scelte', function () {
     configuraTermini();
-    avvertenza('sardegnasentieri:warning:1', 'Tratti esposti');
-    avvertenza('sardegnasentieri:warning:2', 'Assenza di acqua');
-    avvertenza('sardegnasentieri:warning:3', 'Guadi');
-    $esposta = conTermini(traccia(9.2, 9.4), 'sardegnasentieri:warning:1');
-    $senzaAcqua = conTermini(traccia(9.5, 9.6), 'sardegnasentieri:warning:2');
-    conTermini(traccia(9.7, 9.8), 'sardegnasentieri:warning:3');
+    avvertenza('warnings-exposed', 'Tratti esposti');
+    avvertenza('warnings-no-water', 'Assenza di acqua');
+    avvertenza('warnings-fords', 'Guadi');
+    $esposta = conTermini(traccia(9.2, 9.4), 'warnings-exposed');
+    $senzaAcqua = conTermini(traccia(9.5, 9.6), 'warnings-no-water');
+    conTermini(traccia(9.7, 9.8), 'warnings-fords');
     traccia(9.9, 9.95);
 
-    expect(idFiltrati($this, [WARNINGS_KEY => ['sardegnasentieri:warning:1', 'sardegnasentieri:warning:2']]))
+    expect(idFiltrati($this, [WARNINGS_KEY => ['warnings-exposed', 'warnings-no-water']]))
         ->toEqualCanonicalizing([$esposta->id, $senzaAcqua->id]);
 });

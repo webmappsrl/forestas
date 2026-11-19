@@ -86,7 +86,7 @@ it('il layer dei percorsi accessibili prende tutta la scala di accessibilità (o
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
     expect(layerByName('Sentieri Accessibili')->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
-        ->toBe(['inclusivity-difficulty-ae', 'inclusivity-difficulty-aee', 'inclusivity-difficulty-at']);
+        ->toBe(['inclusivity-difficulty-AE', 'inclusivity-difficulty-AEE', 'inclusivity-difficulty-AT']);
 });
 
 it('scrive la tassonomia sulla relazione, cosi il filtro per famiglia funziona (oc:8910)', function () {

@@ -317,7 +317,7 @@ it('porta in layer_name il nome del layer di tipologia della traccia, in tutte l
     // Un layer d'area e uno per inclusività non sono il layer di appartenenza.
     $area = Layer::factory()->createQuietly(['name' => ['it' => 'Area D (Sud-OVEST)'], 'properties' => []]);
     $accessible = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri Accessibili'], 'properties' => []]);
-    $accessible->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'inclusivity-difficulty-at')->value('id'));
+    $accessible->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'inclusivity-difficulty-AT')->value('id'));
     foreach ([$area, $accessible, $walks] as $layer) {
         DB::table('layerables')->insert(['layer_id' => $layer->id, 'layerable_type' => 'App\\Models\\EcTrack', 'layerable_id' => $track->id]);
     }

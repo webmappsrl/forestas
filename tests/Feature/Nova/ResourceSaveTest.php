@@ -68,7 +68,7 @@ it('salva la scheda di un\'attività, di un tipo di POI e di un\'avvertenza', fu
     $warnings = TaxonomyTerm::create(['identifier' => 'warnings', 'name' => ['it' => 'Avvertenze']]);
     $warning = TaxonomyTerm::create([
         'parent_id' => $warnings->id,
-        'identifier' => 'sardegnasentieri:warning:1',
+        'identifier' => 'warnings-exposed',
         'name' => ['it' => 'Frana'],
     ]);
 
@@ -81,7 +81,7 @@ it('salva la scheda di un\'attività, di un tipo di POI e di un\'avvertenza', fu
     // Le avvertenze sono termini del modello unico, con la loro vista dedicata.
     $this->actingAs($this->user)
         ->putJson("/nova-api/taxonomy-warnings/{$warning->id}", [
-            'identifier' => 'sardegnasentieri:warning:1',
+            'identifier' => 'warnings-exposed',
             'sort_order' => 0,
             'translations_name_it' => 'Frana attiva',
         ])
