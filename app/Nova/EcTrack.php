@@ -137,7 +137,7 @@ class EcTrack extends WmNovaEcTrack
     /**
      * Le tassonomie storiche, senza le righe che attività non sono (oc:8910).
      *
-     * `sardegnasentieri:type:*` e `sardegnasentieri:cammino` dicono che tipo di percorso è, non
+     * `trail`, `itinerary` e `walk` dicono che tipo di percorso è, non
      * cosa ci si fa: la stessa informazione sta nella tassonomia «Tipo percorso», e Alessio in
      * call il 3/11 ha confermato che sono due cose ortogonali.
      *
@@ -156,8 +156,8 @@ class EcTrack extends WmNovaEcTrack
             }
 
             $taxonomy['hidden'] = [
-                SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero',
-                SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'itinerario',
+                SardegnaSentieriImportService::TYPE_ACTIVITIES['sentiero'],
+                SardegnaSentieriImportService::TYPE_ACTIVITIES['itinerario'],
                 SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER,
             ];
 

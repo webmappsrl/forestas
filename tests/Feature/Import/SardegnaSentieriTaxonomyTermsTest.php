@@ -115,7 +115,7 @@ it('scrive la difficoltà nella tassonomia giusta', function () {
     // 4909 = MTB_MC_trail_Grado2
     $track = importWithUsability([4909]);
 
-    expect($track->fresh()->term('mtb-difficulty')->identifier)->toBe('sardegnasentieri:tid:4909')
+    expect($track->fresh()->term('mtb-difficulty')->identifier)->toBe('mtb-difficulty-MC')
         ->and($track->fresh()->term('mtb-difficulty')->getTranslation('name', 'it'))->toBe('MC')
         ->and($track->fresh()->taxonomyTerms)->toHaveCount(2);
 });
@@ -123,26 +123,26 @@ it('scrive la difficoltà nella tassonomia giusta', function () {
 it('porta una difficoltà per ogni modo di fruizione', function () {
     $track = importWithUsability([4067, 4909, 4903, 4906, 4917]);
 
-    expect(identifiersOf($track, 'hiking-difficulty'))->toBe(['sardegnasentieri:tid:4067'])
-        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4909'])
-        ->and(identifiersOf($track, 'horse-difficulty'))->toBe(['sardegnasentieri:tid:4903'])
-        ->and(identifiersOf($track, 'nordic-walking-difficulty'))->toBe(['sardegnasentieri:tid:4906'])
-        ->and(identifiersOf($track, 'soft-mobility-difficulty'))->toBe(['sardegnasentieri:tid:4917']);
+    expect(identifiersOf($track, 'hiking-difficulty'))->toBe(['hiking-difficulty-E'])
+        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-MC'])
+        ->and(identifiersOf($track, 'horse-difficulty'))->toBe(['horse-difficulty-medium'])
+        ->and(identifiersOf($track, 'nordic-walking-difficulty'))->toBe(['nordic-walking-difficulty-medium'])
+        ->and(identifiersOf($track, 'soft-mobility-difficulty'))->toBe(['soft-mobility-difficulty-medium']);
 });
 
 it('collassa le tre scale di accessibilità in grado più categoria', function () {
     // «Accessibile dis. Sensoriali → AE» (nodo 3901)
     $track = importWithUsability([4892]);
 
-    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-ae')
+    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AE')
         ->and(identifiersOf($track, 'inclusivity-disabilities'))->toBe(['inclusivity-disabilities-sensory']);
 });
 
 it('mappa tutti e nove i tid di accessibilità sul grado e sulla categoria giusti', function () {
     $expected = [
-        4897 => ['at', 'physical'], 4900 => ['ae', 'physical'], 4893 => ['aee', 'physical'],
-        4896 => ['at', 'sensory'], 4892 => ['ae', 'sensory'], 4898 => ['aee', 'sensory'],
-        4891 => ['at', 'cognitive'], 4901 => ['ae', 'cognitive'], 4899 => ['aee', 'cognitive'],
+        4897 => ['AT', 'physical'], 4900 => ['AE', 'physical'], 4893 => ['AEE', 'physical'],
+        4896 => ['AT', 'sensory'], 4892 => ['AE', 'sensory'], 4898 => ['AEE', 'sensory'],
+        4891 => ['AT', 'cognitive'], 4901 => ['AE', 'cognitive'], 4899 => ['AEE', 'cognitive'],
     ];
 
     $nid = 100;
@@ -158,7 +158,7 @@ it('accoglie più categorie di disabilità con lo stesso grado senza segnalare n
     // «motorie AE» e «cognitiva AE»: un solo grado, due categorie.
     $track = importWithUsability([4900, 4901]);
 
-    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-ae')
+    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AE')
         ->and(identifiersOf($track, 'inclusivity-disabilities'))->toBe(['inclusivity-disabilities-cognitive', 'inclusivity-disabilities-physical'])
         ->and($track->fresh()->properties['forestas'] ?? [])->not->toHaveKey(SardegnaSentieriImportService::CLASSIFICATION_ANOMALIES_KEY);
 });
@@ -170,7 +170,7 @@ it('ignora una relazione verso una radice: nessun grado e nessuna attività in p
     // Le radici di tutti i modi di fruizione, sentiero didattico e mobilità dolce compresi.
     $track = importWithUsability([4064, 4061, 4065, 4062, 4060, 4059], nid: 75);
 
-    expect($withoutRows)->toBe(['sardegnasentieri:type:sentiero'])
+    expect($withoutRows)->toBe(['trail'])
         ->and(identifiersOf($track, 'mtb-difficulty'))->toBeEmpty()->and($track->fresh()->taxonomyTerms)->toHaveCount(1)
         ->and($track->fresh()->properties['forestas'] ?? [])->not->toHaveKey(SardegnaSentieriImportService::CLASSIFICATION_ANOMALIES_KEY)
         ->and($track->fresh()->taxonomyActivities->pluck('identifier')->sort()->values()->all())->toBe($withoutRows)
@@ -180,7 +180,7 @@ it('ignora una relazione verso una radice: nessun grado e nessuna attività in p
 it('lascia una radice accanto a un grade: scrive solo il grado', function () {
     $track = importWithUsability([4064, 4909]);
 
-    expect(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4909'])
+    expect(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-MC'])
         ->and($track->fresh()->taxonomyTerms)->toHaveCount(2);
 });
 
@@ -197,7 +197,7 @@ it('sostituisce le relazioni di una tassonomia quando in Drupal cambiano', funct
     importWithUsability([4909, 4067], nid: 75);
     $track = importWithUsability([4910], nid: 75);
 
-    expect(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4910'])
+    expect(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-BC'])
         // Drupal non dice più niente di trekking: la sua tassonomia si svuota.
         ->and($track->fresh()->terms('hiking-difficulty'))->toBeEmpty();
 });
@@ -206,7 +206,7 @@ it('non lascia nascere un doppione: lo rifiuta il database', function () {
     // Prima il doppione si poteva scrivere e lo ripuliva l'import. Ora lo vieta l'unique su
     // (taxonomy_term_id, termable_type, termable_id): la garanzia non dipende più dal codice.
     $track = importWithUsability([4909], nid: 75);
-    $term = TaxonomyTerm::where('identifier', 'sardegnasentieri:tid:4909')->first();
+    $term = TaxonomyTerm::where('identifier', 'mtb-difficulty-MC')->first();
 
     expect(fn () => $track->taxonomyTerms()->attach($term->id))
         ->toThrow(UniqueConstraintViolationException::class);
@@ -225,39 +225,39 @@ it('non tocca le relazioni delle tassonomie che non vengono da Drupal', function
 
     expect(identifiersOf($track, 'educational-trails-difficulty'))->toBe(['educational-trails-difficulty-medium'])
         ->and(identifiersOf($track, 'tematismi-miei'))->toBe(['tema-uno'])
-        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4910']);
+        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-BC']);
 });
 
 it('non cancella grado e categorie messi a mano se Drupal non porta accessibilità', function () {
     $track = importWithUsability([4909], nid: 75);
-    $manuals = TaxonomyTerm::whereIn('identifier', ['inclusivity-difficulty-aee', 'inclusivity-disabilities-physical', 'inclusivity-disabilities-cognitive'])->pluck('id')->all();
+    $manuals = TaxonomyTerm::whereIn('identifier', ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-physical', 'inclusivity-disabilities-cognitive'])->pluck('id')->all();
     $track->taxonomyTerms()->attach($manuals);
 
     // Reimport: Drupal parla solo di mountain bike.
     $track = importWithUsability([4910], nid: 75);
 
-    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-aee')
+    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AEE')
         ->and(identifiersOf($track, 'inclusivity-disabilities'))->toBe(['inclusivity-disabilities-cognitive', 'inclusivity-disabilities-physical'])
         // Le difficoltà invece seguono Drupal.
-        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4910']);
+        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-BC']);
 
     // Nemmeno con field_frubilita vuoto.
     $track = importWithUsability([], nid: 75);
 
-    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-aee')
+    expect($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AEE')
         ->and($track->fresh()->terms('mtb-difficulty'))->toBeEmpty();
 });
 
 it('sostituisce grado e categorie messi a mano se Drupal porta un tid di accessibilità', function () {
     $track = importWithUsability([4909], nid: 75);
-    $manuals = TaxonomyTerm::whereIn('identifier', ['inclusivity-difficulty-aee', 'inclusivity-disabilities-physical', 'inclusivity-disabilities-cognitive'])->pluck('id')->all();
+    $manuals = TaxonomyTerm::whereIn('identifier', ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-physical', 'inclusivity-disabilities-cognitive'])->pluck('id')->all();
     $track->taxonomyTerms()->attach($manuals);
 
     // «Accessibile dis. Sensoriali → AE»
     $track = importWithUsability([4909, 4892], nid: 75);
 
     expect($track->fresh()->terms('inclusivity-difficulty'))->toHaveCount(1)
-        ->and($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-ae')
+        ->and($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AE')
         ->and(identifiersOf($track, 'inclusivity-disabilities'))->toBe(['inclusivity-disabilities-sensory']);
 });
 
@@ -274,12 +274,12 @@ it('segnala come anomalia due gradi nella stessa tassonomia e non muore', functi
         ->and($anomalies[0])->toMatchArray([
             'type' => 'multiple_terms_single_choice',
             'taxonomy' => 'inclusivity-difficulty',
-            'kept' => 'inclusivity-difficulty-at',
-            'discarded' => ['inclusivity-difficulty-aee'],
+            'kept' => 'inclusivity-difficulty-AT',
+            'discarded' => ['inclusivity-difficulty-AEE'],
         ])
         // Entra un grado solo, le due categorie restano.
         ->and($track->fresh()->terms('inclusivity-difficulty'))->toHaveCount(1)
-        ->and($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-at')
+        ->and($track->fresh()->term('inclusivity-difficulty')->identifier)->toBe('inclusivity-difficulty-AT')
         ->and(identifiersOf($track, 'inclusivity-disabilities'))->toBe(['inclusivity-disabilities-physical', 'inclusivity-disabilities-sensory']);
 
     $channel->shouldHaveReceived('warning')->once();
@@ -293,7 +293,7 @@ it('segnala due gradi nella stessa tassonomia di una difficoltà', function () {
 
     expect($anomalies)->toHaveCount(1)
         ->and($anomalies[0]['taxonomy'])->toBe('mtb-difficulty')
-        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4909']);
+        ->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-MC']);
 });
 
 it('toglie il segno di anomalia quando Drupal viene corretto', function () {
@@ -311,7 +311,7 @@ it('segnala un tid che il modello non conosce e scrive il resto', function () {
 
     expect($anomalies)->toEqual([
         ['type' => 'unknown_term', 'tid' => '4999'],
-    ])->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['sardegnasentieri:tid:4909']);
+    ])->and(identifiersOf($track, 'mtb-difficulty'))->toBe(['mtb-difficulty-MC']);
 });
 
 it('non scrive relazioni e non muore se le tassonomie non esistono', function () {
@@ -437,13 +437,13 @@ it('il reimport del tipo percorso non accumula doppioni e segue il cambio di tip
 it('un itinerario con due tipologie le prende entrambe', function () {
     $track = importWithUsability([], bundle: 'itinerario', tipologiaItinerari: [4725, 4727]);
 
-    expect(identifiersOf($track, 'itinerary-type'))->toBe(['sardegnasentieri:tid:4725', 'sardegnasentieri:tid:4727']);
+    expect(identifiersOf($track, 'itinerary-type'))->toBe(['itinerary-type-long-distance', 'itinerary-type-thematic']);
 });
 
 it('il 4728 non diventa mai una tipologia di itinerario', function () {
     $track = importWithUsability([], bundle: 'itinerario', tipologiaItinerari: [4728, 4725]);
 
-    expect(identifiersOf($track, 'itinerary-type'))->toBe(['sardegnasentieri:tid:4725'])
+    expect(identifiersOf($track, 'itinerary-type'))->toBe(['itinerary-type-long-distance'])
         ->and(identifiersOf($track, 'route-type'))->toBe(['route-type-walk']);
 
     $only = importWithUsability([], nid: 76, bundle: 'itinerario', tipologiaItinerari: [4728]);
@@ -462,5 +462,5 @@ it('il reimport delle tipologie non accumula doppioni e segue le modifiche', fun
     expect(identifiersOf($track, 'itinerary-type'))->toHaveCount(2);
 
     importWithUsability([], bundle: 'itinerario', tipologiaItinerari: [4727]);
-    expect(identifiersOf($track, 'itinerary-type'))->toBe(['sardegnasentieri:tid:4727']);
+    expect(identifiersOf($track, 'itinerary-type'))->toBe(['itinerary-type-thematic']);
 });

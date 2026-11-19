@@ -86,7 +86,7 @@ it('il layer dei percorsi accessibili prende tutta la scala di accessibilità (o
     $this->artisan('sardegnasentieri:configure-layers')->assertExitCode(0);
 
     expect(layerByName('Sentieri Accessibili')->taxonomyTerms()->pluck('identifier')->sort()->values()->all())
-        ->toBe(['inclusivity-difficulty-ae', 'inclusivity-difficulty-aee', 'inclusivity-difficulty-at']);
+        ->toBe(['inclusivity-difficulty-AE', 'inclusivity-difficulty-AEE', 'inclusivity-difficulty-AT']);
 });
 
 it('scrive la tassonomia sulla relazione, cosi il filtro per famiglia funziona (oc:8910)', function () {
@@ -167,7 +167,7 @@ it('toglie dal layer le tassonomie che non sono i suoi termini (oc:8910)', funct
     Storage::fake('wmfe');
     makeAllTypeLayers();
     $trailsLayer = layerByName('Sentieri');
-    $activity = TaxonomyActivity::createQuietly(['identifier' => 'sardegnasentieri:type:sentiero', 'name' => ['it' => 'Sentiero']]);
+    $activity = TaxonomyActivity::createQuietly(['identifier' => 'trail', 'name' => ['it' => 'Sentiero']]);
     $where = TaxonomyWhere::withoutEvents(fn () => TaxonomyWhere::create(['name' => ['it' => 'Area F Nord']]));
     TaxonomyActivityable::withoutEvents(fn () => $trailsLayer->taxonomyActivities()->attach($activity->id));
     TaxonomyWhereable::withoutEvents(fn () => $trailsLayer->taxonomyWheres()->attach($where->id));
@@ -188,7 +188,7 @@ it('stacca le altre tassonomie senza accodare una catena per ogni riga (oc:8910)
     Storage::fake('wmfe');
     makeAllTypeLayers();
     $trailsLayer = layerByName('Sentieri');
-    $activity = TaxonomyActivity::createQuietly(['identifier' => 'sardegnasentieri:type:sentiero', 'name' => ['it' => 'Sentiero']]);
+    $activity = TaxonomyActivity::createQuietly(['identifier' => 'trail', 'name' => ['it' => 'Sentiero']]);
     TaxonomyActivityable::withoutEvents(fn () => $trailsLayer->taxonomyActivities()->attach($activity->id));
 
     $this->artisan('sardegnasentieri:configure-layers', ['--no-recalc' => true])->assertExitCode(0);

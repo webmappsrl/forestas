@@ -45,10 +45,21 @@ class SardegnaSentieriImportService
     public const IMPORT_APP_ID = 1;
 
     /** Identifier dell'attività che raggruppa i cammini (oc:8827). */
-    public const CAMMINO_ACTIVITY_IDENTIFIER = 'sardegnasentieri:cammino';
+    public const CAMMINO_ACTIVITY_IDENTIFIER = 'walk';
 
-    /** Prefisso dell'`identifier` delle attività che nascono dal tipo del tracciato (`sentiero`, `itinerario`). */
-    public const TYPE_ACTIVITY_PREFIX = 'sardegnasentieri:type:';
+    /**
+     * Tipo del tracciato in Drupal -> identifier dell'attività che ne nasce.
+     *
+     * L'identifier era `sardegnasentieri:type:<tipo>`: portava il nome della sorgente, che va
+     * dismessa, e una parola italiana. Il tipo alla fonte resta `sentiero` e `itinerario`, ed è
+     * questa mappa a tradurlo.
+     *
+     * @var array<string, string>
+     */
+    public const TYPE_ACTIVITIES = [
+        'sentiero' => 'trail',
+        'itinerario' => 'itinerary',
+    ];
 
     public const CAMMINO_ACTIVITY_NAME = 'Cammini di Sardegna';
 
@@ -65,15 +76,15 @@ class SardegnaSentieriImportService
      * tid Drupal => [identifier del grado, identifier della categoria].
      */
     private const ACCESSIBILITY_TIDS = [
-        '4897' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-physical'],
-        '4900' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-physical'],
-        '4893' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-physical'],
-        '4896' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-sensory'],
-        '4892' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-sensory'],
-        '4898' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-sensory'],
-        '4891' => ['inclusivity-difficulty-at', 'inclusivity-disabilities-cognitive'],
-        '4901' => ['inclusivity-difficulty-ae', 'inclusivity-disabilities-cognitive'],
-        '4899' => ['inclusivity-difficulty-aee', 'inclusivity-disabilities-cognitive'],
+        '4897' => ['inclusivity-difficulty-AT', 'inclusivity-disabilities-physical'],
+        '4900' => ['inclusivity-difficulty-AE', 'inclusivity-disabilities-physical'],
+        '4893' => ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-physical'],
+        '4896' => ['inclusivity-difficulty-AT', 'inclusivity-disabilities-sensory'],
+        '4892' => ['inclusivity-difficulty-AE', 'inclusivity-disabilities-sensory'],
+        '4898' => ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-sensory'],
+        '4891' => ['inclusivity-difficulty-AT', 'inclusivity-disabilities-cognitive'],
+        '4901' => ['inclusivity-difficulty-AE', 'inclusivity-disabilities-cognitive'],
+        '4899' => ['inclusivity-difficulty-AEE', 'inclusivity-disabilities-cognitive'],
     ];
 
     /**
@@ -190,6 +201,9 @@ class SardegnaSentieriImportService
     /** @var Collection<string, TaxonomyTerm>|null Termini del modello unico per identifier, con la tassonomia. */
     private ?Collection $termsByIdentifier = null;
 
+    /** @var Collection<string, TaxonomyTerm>|null */
+    private ?Collection $termsByDrupalTid = null;
+
     public function __construct(
         private readonly SardegnaSentieriSource $source,
         private readonly SardegnaSentieriClient $client,
@@ -303,69 +317,6 @@ class SardegnaSentieriImportService
                 }
 
                 $taxonomy->saveQuietly();
-            }
-        }
-    }
-
-    /**
-     * Le avvertenze di Drupal diventano termini della tassonomia `warnings` (oc:8910).
-     *
-     * Erano una tassonomia a sé, con le sue due tabelle; ora sono termini come tutti gli altri.
-     * L'`identifier` resta quello di prima, `sardegnasentieri:warning:<tid>`, così l'import
-     * continua a riconoscerle per quello e non per il nome.
-     *
-     * Si scrive con `insertOrIgnore` più rilettura, mai con `firstOrCreate`: due job che
-     * importano insieme violerebbero l'unicità, e sotto transazione PostgreSQL l'errore aborta la
-     * transazione (oc:8607).
-     */
-    private function importWarningTaxonomies(): void
-    {
-        $vocabulary = TaxonomyTerm::query()->taxonomies()->where('identifier', self::WARNINGS_TAXONOMY)->first();
-
-        if ($vocabulary === null) {
-            Log::channel('import')->warning('Tassonomia «'.self::WARNINGS_TAXONOMY.'» non trovata: avvertenze non importate.');
-
-            return;
-        }
-
-        foreach ($this->source->getTaxonomyWarnings() as $apiId => $term) {
-            if (! is_array($term)) {
-                continue;
-            }
-
-            $nameRaw = $term['name'] ?? null;
-            $name = is_array($nameRaw) ? $nameRaw : ['it' => (string) ($nameRaw ?? '')];
-
-            if (empty($name['it'])) {
-                continue;
-            }
-
-            $identifier = self::WARNING_TERM_PREFIX.$apiId;
-            $properties = ['source_id' => (string) $apiId, 'vocabulary' => 'tipologia_di_avvertenze'];
-
-            $now = now();
-            DB::table('taxonomy_terms')->insertOrIgnore([
-                'parent_id' => $vocabulary->id,
-                'identifier' => $identifier,
-                'name' => json_encode($name, JSON_UNESCAPED_UNICODE),
-                'properties' => json_encode($properties, JSON_UNESCAPED_UNICODE),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            $existing = TaxonomyTerm::query()->where('identifier', $identifier)->first();
-            if ($existing === null) {
-                continue;
-            }
-
-            // Nome e tassonomia si riallineano: un termine rinominato in Drupal, o rimasto fuori
-            // dalla tassonomia perché creato prima di lei, si rimette a posto da solo.
-            $existing->setTranslations('name', $name);
-            $existing->parent_id = $vocabulary->id;
-            $existing->properties = array_merge($existing->properties ?? [], $properties);
-
-            if ($existing->isDirty()) {
-                $existing->save();
             }
         }
     }
@@ -872,10 +823,11 @@ class SardegnaSentieriImportService
             ->all();
 
         if ($response->type !== null && $response->type !== '') {
-            $ids[] = $this->resolveActivityByIdentifier(
-                self::TYPE_ACTIVITY_PREFIX.$response->type,
-                ucfirst($response->type)
-            )->id;
+            $identifier = self::TYPE_ACTIVITIES[$response->type] ?? null;
+
+            if ($identifier !== null) {
+                $ids[] = $this->resolveActivityByIdentifier($identifier, ucfirst($response->type))->id;
+            }
         }
 
         if (in_array(self::CAMMINI_TERM_ID, $response->taxonomies->tipologia_itinerari, true)) {
@@ -948,7 +900,8 @@ class SardegnaSentieriImportService
      * - radice → ignorata (vedi sotto);
      * - figlio fra i nove delle scale di accessibilità → due relazioni: il grado in
      *   `inclusivity-difficulty` e la categoria in `inclusivity-disabilities`;
-     * - altro figlio → il termine `sardegnasentieri:tid:<tid>` nella sua tassonomia;
+     * - altro figlio → il termine che dichiara quel tid in `properties->source->drupal_tid`,
+     *   nella sua tassonomia;
      * - un tid che il modello non conosce → anomalia, non eccezione.
      *
      * Le righe che puntano a una radice (Trekking, Mountain Bike, ...) non
@@ -990,7 +943,11 @@ class SardegnaSentieriImportService
                 continue;
             }
 
-            $term = $this->classificationTerms()->get(self::DRUPAL_TERM_PREFIX.$tid);
+            // Un termine dichiara il tid della sua origine in `properties->source->drupal_tid`:
+            // e' li' che si riconosce, non nell'identifier, che e' il nome nostro. I termini che
+            // il tid non lo dichiarano si cercano ancora con la chiave storica.
+            $term = $this->termsByDrupalTid()->get($tid)
+                ?? $this->classificationTerms()->get(self::DRUPAL_TERM_PREFIX.$tid);
             // La tassonomia a cui il termine appartiene, non il vocabolario di Drupal.
             $taxonomy = $term?->parent?->identifier;
 
@@ -1089,8 +1046,13 @@ class SardegnaSentieriImportService
 
         // Avvertenze: erano una tassonomia a sé con il suo pivot, ora sono una tassonomia come le
         // altre e seguono la stessa regola di sostituzione (oc:8910).
+        // L'avvertenza si riconosce dal tid dichiarato in `properties->source->drupal_tid`, non
+        // dall'identifier, che e' il nome nostro. Un tid di cui `importWarningTaxonomies()` non
+        // ha creato il termine — il nome collideva con un altro — resta con la chiave storica e
+        // diventa un'anomalia `missing_term` poco sotto.
         $classification['terms'][self::WARNINGS_TAXONOMY] = array_map(
-            fn ($apiId) => self::WARNING_TERM_PREFIX.$apiId,
+            fn ($apiId) => $this->termsByDrupalTid()->get((string) $apiId)->identifier
+                ?? self::WARNING_TERM_PREFIX.$apiId,
             $response->taxonomies->tipologia_di_avvertenze ?? []
         );
 
@@ -1274,7 +1236,11 @@ class SardegnaSentieriImportService
             ->map(fn ($tid) => (string) $tid)
             ->reject(fn (string $tid) => $tid === self::CAMMINI_TERM_ID)
             ->unique()
-            ->map(fn (string $tid) => self::DRUPAL_TERM_PREFIX.$tid)
+            // Il termine si riconosce dal tid dichiarato in `properties`, non dall'identifier:
+            // un tid che l'elenco di sistema non prevede resta con la chiave storica e diventa
+            // un'anomalia `missing_term`.
+            ->map(fn (string $tid) => $this->termsByDrupalTid()->get($tid)->identifier
+                ?? self::DRUPAL_TERM_PREFIX.$tid)
             ->values()
             ->all();
     }
@@ -1311,6 +1277,159 @@ class SardegnaSentieriImportService
     }
 
     /**
+     * Le avvertenze di Drupal diventano termini della tassonomia `warnings` (oc:8910).
+     *
+     * L'identifier e' il nome nostro, ricavato dal nome inglese che Drupal porta con se'
+     * (`slippery rocks` -> `warnings-slippery-rocks`): un'avvertenza nuova alla fonte entra da
+     * sola, come e' sempre stato, ma senza il tid nel nome. Il termine si riconosce dal tid in
+     * `properties->source->drupal_tid`, quindi una rinomina a Drupal non fa nascere un doppione,
+     * e i tredici termini che l'elenco di sistema gia' dichiara tengono il nome scelto da noi.
+     *
+     * Si scrive con `insertOrIgnore` piu' rilettura, mai con `firstOrCreate`: due job che
+     * importano insieme violerebbero l'unicita', e sotto transazione PostgreSQL l'errore aborta
+     * la transazione (oc:8607).
+     */
+    private function importWarningTaxonomies(): void
+    {
+        $vocabulary = TaxonomyTerm::query()->taxonomies()->where('identifier', self::WARNINGS_TAXONOMY)->first();
+
+        if ($vocabulary === null) {
+            Log::channel('import')->warning('Tassonomia «'.self::WARNINGS_TAXONOMY.'» non trovata: avvertenze non importate.');
+
+            return;
+        }
+
+        foreach ($this->source->getTaxonomyWarnings() as $apiId => $term) {
+            if (! is_array($term)) {
+                continue;
+            }
+
+            $nameRaw = $term['name'] ?? null;
+            $name = is_array($nameRaw) ? $nameRaw : ['it' => (string) ($nameRaw ?? '')];
+
+            if (empty($name['it'])) {
+                continue;
+            }
+
+            $tid = (string) $apiId;
+            $properties = ['source' => ['drupal_tid' => (int) $apiId, 'vocabulary' => 'tipologia_di_avvertenze']];
+
+            // Gia' presente: si riconosce dal tid, non dal nome, che a Drupal possono cambiare.
+            $existing = $this->termsByDrupalTid()->get($tid)
+                ?? TaxonomyTerm::query()->where('identifier', self::WARNING_TERM_PREFIX.$apiId)->first();
+
+            if ($existing === null) {
+                $identifier = $this->warningIdentifier($name);
+
+                // Un identifier in italiano si importa lo stesso — il dato non si perde mai — ma
+                // va tradotto: la voce da aggiungere a `WARNING_NAME_TRANSLATIONS` la dice il log.
+                if (empty($name['en'])) {
+                    Log::channel('import')->warning('Avvertenza senza nome inglese: va aggiunta a WARNING_NAME_TRANSLATIONS.', [
+                        'tid' => $apiId,
+                        'name' => $name,
+                        'identifier' => $identifier,
+                    ]);
+                }
+
+                $now = now();
+                DB::table('taxonomy_terms')->insertOrIgnore([
+                    'parent_id' => $vocabulary->id,
+                    'identifier' => $identifier,
+                    'name' => json_encode($name, JSON_UNESCAPED_UNICODE),
+                    'properties' => json_encode($properties, JSON_UNESCAPED_UNICODE),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                $this->termsByIdentifier = null;
+                $this->termsByDrupalTid = null;
+                $existing = TaxonomyTerm::query()->where('identifier', $identifier)->first();
+
+                // L'insert puo' non aver inserito niente, perche' quell'identifier e' gia' di un
+                // altro termine: due avvertenze con lo stesso nome inglese, o un nome nuovo che
+                // collide con uno vecchio. Rubargli il tid lo staccherebbe dai suoi sentieri, che
+                // finirebbero in `missing_term`: meglio non importarla e dire quale nome serve.
+                $ofAnotherTerm = $existing !== null
+                    && ($existing->properties['source']['drupal_tid'] ?? (int) $apiId) !== (int) $apiId;
+
+                if ($ofAnotherTerm) {
+                    Log::channel('import')->warning('Avvertenza con un identifier gia\' usato da un altro termine: serve un nome diverso in WARNING_NAME_TRANSLATIONS.', [
+                        'tid' => $apiId,
+                        'name' => $name,
+                        'identifier' => $identifier,
+                        'tid_del_termine_esistente' => $existing->properties['source']['drupal_tid'] ?? null,
+                    ]);
+
+                    continue;
+                }
+            }
+
+            if ($existing === null) {
+                continue;
+            }
+
+            // Nome e tassonomia si riallineano: un termine rinominato in Drupal, o rimasto fuori
+            // dalla tassonomia perche' creato prima di lei, si rimette a posto da solo.
+            $existing->setTranslations('name', $name);
+            $existing->parent_id = $vocabulary->id;
+            $existing->properties = array_merge($existing->properties ?? [], $properties);
+
+            if ($existing->isDirty()) {
+                $existing->save();
+            }
+        }
+    }
+
+    /**
+     * Nome italiano -> suffisso dell'identifier, per le avvertenze che conosciamo.
+     *
+     * I termini delle avvertenze li crea l'import, perche' la sorgente del dato e' Drupal:
+     * duplicarli nell'elenco di sistema del comando vorrebbe dire tenere due copie che prima o
+     * poi divergono. Quello che resta nostro e' il nome, ed e' questa tabella: l'inglese di
+     * Drupal e' discorsivo («watch out for ticks», «shrubs obstructing the path») e non fa un
+     * buon identifier.
+     *
+     * Un'avvertenza che non e' qui prende lo slug del suo nome inglese, e se manca anche quello
+     * lo slug dell'italiano: il dato si importa sempre, un nome da tradurre e' un fastidio, una
+     * avvertenza persa e' un sentiero che non avverte di un pericolo. Il tid nel nome non ci
+     * torna in nessun caso, e il log dice quali voci aggiungere qui.
+     *
+     * @var array<string, string>
+     */
+    private const WARNING_NAME_TRANSLATIONS = [
+        'Placche scivolose' => 'slippery-rock',
+        "Scarsita d'acqua" => 'water-scarcity',
+        'Cinghiali' => 'wild-boar',
+        'Vegetazione invadente (traccia poco visibile a tratti)' => 'overgrown',
+        'Zecche' => 'ticks',
+        'Cani aggressivi' => 'aggressive-dogs',
+        'Rischio nebbia' => 'fog',
+        'Rischio fulmini' => 'lightning',
+        'Rischio alluvioni' => 'flood',
+        'Rischio incendi' => 'wildfire',
+        'Rischio neve' => 'snow',
+        'Rischio vento' => 'wind',
+        'Attraversamento stradale' => 'road-crossing',
+    ];
+
+    /**
+     * L'identifier di un'avvertenza: `warnings-` piu' il nome che le diamo noi, o lo slug del
+     * nome inglese, o quello dell'italiano. Il tid non entra mai nel nome.
+     *
+     * @param  array<string, string>  $name
+     */
+    private function warningIdentifier(array $name): string
+    {
+        $slug = self::WARNING_NAME_TRANSLATIONS[trim($name['it'] ?? '')] ?? '';
+
+        if ($slug === '') {
+            $slug = Str::slug($name['en'] ?? '') ?: Str::slug($name['it'] ?? '');
+        }
+
+        return self::WARNINGS_TAXONOMY.'-'.$slug;
+    }
+
+    /**
      * Le tassonomie del modello unico per identifier. Lette una volta per istanza.
      *
      * @return Collection<string, TaxonomyTerm>
@@ -1329,6 +1448,22 @@ class SardegnaSentieriImportService
     {
         return $this->termsByIdentifier ??= TaxonomyTerm::query()
             ->whereNotNull('parent_id')->with('parent')->get()->keyBy('identifier');
+    }
+
+    /**
+     * I termini che dichiarano da quale termine di Drupal vengono, indicizzati per quel tid.
+     *
+     * La corrispondenza vive nei dati, non in una costante qui: il comando dei termini la scrive
+     * in `properties->source->drupal_tid` quando semina le tassonomie, e l'import la rilegge. Il
+     * giorno che Drupal viene dismesso, basta smettere di scriverla.
+     *
+     * @return Collection<string, TaxonomyTerm>
+     */
+    private function termsByDrupalTid(): Collection
+    {
+        return $this->termsByDrupalTid ??= $this->classificationTerms()
+            ->filter(fn (TaxonomyTerm $term) => isset($term->properties['source']['drupal_tid']))
+            ->keyBy(fn (TaxonomyTerm $term) => (string) $term->properties['source']['drupal_tid']);
     }
 
     /**
@@ -1915,8 +2050,8 @@ class SardegnaSentieriImportService
         'public-transport' => 'txn-bus',
         'tlc' => 'communications-tower',
         'disabled-access' => 'txn-wheelchair',
-        'sardegnasentieri:type:sentiero' => 'txn-hiking',
-        'sardegnasentieri:type:itinerario' => 'txn-trail',
+        'trail' => 'txn-hiking',
+        'itinerary' => 'txn-trail',
         'accessible-trails' => 'txn-mobility-disability',
         'educational-trails' => 'txn-environmental-education',
     ];

@@ -527,7 +527,7 @@ it('rimuove le TaxonomyActivity quando la API restituisce lista vuota (fix P1)',
     $identifiers = $track->fresh()->taxonomyActivities()->pluck('identifier')->all();
     expect($identifiers)
         ->not->toContain('escursionismo')
-        ->toBe(['sardegnasentieri:type:sentiero']);
+        ->toBe(['trail']);
 });
 
 it('scrive l attività dei cammini sugli itinerari con il termine Cammini di Sardegna (oc:8827)', function () {
@@ -546,7 +546,7 @@ it('scrive l attività dei cammini sugli itinerari con il termine Cammini di Sar
 
     $identifiers = EcTrack::first()->taxonomyActivities()->pluck('identifier')->all();
     expect($identifiers)->toHaveCount(2)
-        ->toContain('sardegnasentieri:type:itinerario')
+        ->toContain('itinerary')
         ->toContain(SardegnaSentieriImportService::CAMMINO_ACTIVITY_IDENTIFIER);
 });
 
@@ -576,12 +576,12 @@ it('toglie l attività dei cammini quando il termine sparisce (oc:8827)', functi
     (makeServiceWith($client2))->importTrack(75);
 
     expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
-        ->toBe(['sardegnasentieri:type:itinerario']);
+        ->toBe(['itinerary']);
 });
 
 it('non accoda job dei layer quando l import scrive le attività (oc:8827)', function () {
     $activity = TaxonomyActivity::withoutEvents(fn () => TaxonomyActivity::create([
-        'identifier' => 'sardegnasentieri:type:sentiero',
+        'identifier' => 'trail',
         'name' => 'Sentiero',
     ]));
     $layer = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri', 'en' => 'Sentieri'], 'properties' => []]);
@@ -596,7 +596,7 @@ it('non accoda job dei layer quando l import scrive le attività (oc:8827)', fun
     (makeServiceWith($client))->importTrack(75);
 
     expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
-        ->toBe(['sardegnasentieri:type:sentiero']);
+        ->toBe(['trail']);
     Bus::assertNotDispatched(SyncAutoLayerAfterTrackTaxonomyChangeJob::class);
 });
 
@@ -872,13 +872,13 @@ it('assorbe la corsa di due job che creano insieme la stessa activity di tipo (o
             || ! str_starts_with(strtolower(trim($query->sql)), 'select')) {
             return;
         }
-        if (! in_array('sardegnasentieri:type:sentiero', $query->bindings, true)) {
+        if (! in_array('trail', $query->bindings, true)) {
             return;
         }
 
         $raced = true;
         DB::table('taxonomy_activities')->insert([
-            'identifier' => 'sardegnasentieri:type:sentiero',
+            'identifier' => 'trail',
             'name' => json_encode(['it' => 'Sentiero']),
             'created_at' => now(),
             'updated_at' => now(),
@@ -898,7 +898,7 @@ it('assorbe la corsa di due job che creano insieme la stessa activity di tipo (o
 
     // Una sola riga, e il tracciato ci e' agganciato: il job ha assorbito il
     // conflitto invece di morirci sopra.
-    expect(TaxonomyActivity::query()->where('identifier', 'sardegnasentieri:type:sentiero')->count())->toBe(1);
+    expect(TaxonomyActivity::query()->where('identifier', 'trail')->count())->toBe(1);
     expect(EcTrack::first()->taxonomyActivities()->pluck('identifier')->all())
-        ->toBe(['sardegnasentieri:type:sentiero']);
+        ->toBe(['trail']);
 });
