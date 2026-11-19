@@ -45,10 +45,21 @@ class SardegnaSentieriImportService
     public const IMPORT_APP_ID = 1;
 
     /** Identifier dell'attività che raggruppa i cammini (oc:8827). */
-    public const CAMMINO_ACTIVITY_IDENTIFIER = 'sardegnasentieri:cammino';
+    public const CAMMINO_ACTIVITY_IDENTIFIER = 'walk';
 
-    /** Prefisso dell'`identifier` delle attività che nascono dal tipo del tracciato (`sentiero`, `itinerario`). */
-    public const TYPE_ACTIVITY_PREFIX = 'sardegnasentieri:type:';
+    /**
+     * Tipo del tracciato in Drupal -> identifier dell'attività che ne nasce.
+     *
+     * L'identifier era `sardegnasentieri:type:<tipo>`: portava il nome della sorgente, che va
+     * dismessa, e una parola italiana. Il tipo alla fonte resta `sentiero` e `itinerario`, ed è
+     * questa mappa a tradurlo.
+     *
+     * @var array<string, string>
+     */
+    public const TYPE_ACTIVITIES = [
+        'sentiero' => 'trail',
+        'itinerario' => 'itinerary',
+    ];
 
     public const CAMMINO_ACTIVITY_NAME = 'Cammini di Sardegna';
 
@@ -814,10 +825,11 @@ class SardegnaSentieriImportService
             ->all();
 
         if ($response->type !== null && $response->type !== '') {
-            $ids[] = $this->resolveActivityByIdentifier(
-                self::TYPE_ACTIVITY_PREFIX.$response->type,
-                ucfirst($response->type)
-            )->id;
+            $identifier = self::TYPE_ACTIVITIES[$response->type] ?? null;
+
+            if ($identifier !== null) {
+                $ids[] = $this->resolveActivityByIdentifier($identifier, ucfirst($response->type))->id;
+            }
         }
 
         if (in_array(self::CAMMINI_TERM_ID, $response->taxonomies->tipologia_itinerari, true)) {
@@ -2040,8 +2052,8 @@ class SardegnaSentieriImportService
         'public-transport' => 'txn-bus',
         'tlc' => 'communications-tower',
         'disabled-access' => 'txn-wheelchair',
-        'sardegnasentieri:type:sentiero' => 'txn-hiking',
-        'sardegnasentieri:type:itinerario' => 'txn-trail',
+        'trail' => 'txn-hiking',
+        'itinerary' => 'txn-trail',
         'accessible-trails' => 'txn-mobility-disability',
         'educational-trails' => 'txn-environmental-education',
     ];

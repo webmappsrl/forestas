@@ -170,7 +170,7 @@ it('ignora una relazione verso una radice: nessun grado e nessuna attività in p
     // Le radici di tutti i modi di fruizione, sentiero didattico e mobilità dolce compresi.
     $track = importWithUsability([4064, 4061, 4065, 4062, 4060, 4059], nid: 75);
 
-    expect($withoutRows)->toBe(['sardegnasentieri:type:sentiero'])
+    expect($withoutRows)->toBe(['trail'])
         ->and(identifiersOf($track, 'mtb-difficulty'))->toBeEmpty()->and($track->fresh()->taxonomyTerms)->toHaveCount(1)
         ->and($track->fresh()->properties['forestas'] ?? [])->not->toHaveKey(SardegnaSentieriImportService::CLASSIFICATION_ANOMALIES_KEY)
         ->and($track->fresh()->taxonomyActivities->pluck('identifier')->sort()->values()->all())->toBe($withoutRows)

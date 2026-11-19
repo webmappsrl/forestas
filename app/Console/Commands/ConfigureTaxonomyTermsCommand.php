@@ -333,6 +333,7 @@ class ConfigureTaxonomyTermsCommand extends Command
             }
         }
 
+        $this->renameActivityIdentifiers($dry);
         $renamed = $this->alignActivityNames($dry);
         $enabled = $this->enableForApps($dry);
 
@@ -441,6 +442,48 @@ class ConfigureTaxonomyTermsCommand extends Command
      * (`properties.taxonomy.activity`). Cambiarlo cambia cosa mostrano: qui è un miglioramento
      * voluto — oggi le app ricevono «horse» — ma è un effetto che esce da Nova.
      */
+    /**
+     * Identifier delle attività cambiati nel tempo: vecchio => nuovo.
+     *
+     * Le tre righe che dicono il tipo di percorso portavano il nome della sorgente e una parola
+     * italiana (`sardegnasentieri:type:sentiero`). Si rinominano, non si ricreano: i layer
+     * «Sentieri», «Itinerari» e «Cammini di Sardegna» raccolgono le tracce proprio con queste
+     * attività, e una riga nuova accanto alla vecchia li lascerebbe vuoti.
+     *
+     * @var array<string, string>
+     */
+    private const RENAMED_ACTIVITIES = [
+        'sardegnasentieri:type:sentiero' => 'trail',
+        'sardegnasentieri:type:itinerario' => 'itinerary',
+        'sardegnasentieri:cammino' => 'walk',
+    ];
+
+    /**
+     * Rinomina le attività che hanno cambiato identifier, tenendosi le loro relazioni.
+     */
+    private function renameActivityIdentifiers(bool $dry): void
+    {
+        foreach (self::RENAMED_ACTIVITIES as $old => $new) {
+            $row = TaxonomyActivity::query()->where('identifier', $old)->first();
+
+            if ($row === null) {
+                continue;
+            }
+
+            if (TaxonomyActivity::query()->where('identifier', $new)->exists()) {
+                $this->warn(($dry ? '[dry-run] ' : '')."Esistono sia {$old} sia {$new}: non rinomino.");
+
+                continue;
+            }
+
+            $this->line(($dry ? '[dry-run] ' : '')."Rinomino l'attività {$old} -> {$new}");
+
+            if (! $dry) {
+                $row->forceFill(['identifier' => $new])->save();
+            }
+        }
+    }
+
     private function alignActivityNames(bool $dry): int
     {
         $renamed = 0;

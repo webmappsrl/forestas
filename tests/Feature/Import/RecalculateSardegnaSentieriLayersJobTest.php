@@ -131,8 +131,8 @@ function recalcTracks(Layer $layer): array
 }
 
 it('assegna a un layer le tracce con la sua attività e toglie le altre (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
-    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $track = recalcActivity('trail');
+    $itinerary = recalcActivity('itinerary');
     $layer = recalcLayer($track);
     $first = recalcTrack($track);
     $second = recalcTrack($track);
@@ -145,8 +145,8 @@ it('assegna a un layer le tracce con la sua attività e toglie le altre (oc:8827
 });
 
 it('aggiorna properties.layers delle tracce prima di finire (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
-    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $track = recalcActivity('trail');
+    $itinerary = recalcActivity('itinerary');
     $layer = recalcLayer($track);
     $first = recalcTrack($track);
     $second = recalcTrack($track);
@@ -174,7 +174,7 @@ it('non svuota un layer automatico senza attività né aree (oc:8827)', function
 });
 
 it('lascia vuoti i POI dei layer di tipologia (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     $layer = recalcLayer($track);
     recalcTrack($track);
     // Un POI con la stessa attività del layer: assignPoisByTaxonomy() lo aggancerebbe.
@@ -214,7 +214,7 @@ it('assegna i POI ai layer delle aree catastali (oc:8827)', function () {
 });
 
 it('accoda PBF e geometria una volta per layer, non per riga (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     recalcLayer($track);
     recalcTrack($track);
     recalcTrack($track);
@@ -227,7 +227,7 @@ it('accoda PBF e geometria una volta per layer, non per riga (oc:8827)', functio
 });
 
 it('rilanciato non cambia nulla (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     $layer = recalcLayer($track);
     recalcTrack($track);
     recalcTrack($track);
@@ -244,7 +244,7 @@ it('rilanciato non cambia nulla (oc:8827)', function () {
 });
 
 it('rilanciato senza cambiamenti non riaccoda PBF né geometria (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     recalcLayer($track);
     recalcLayer();
     recalcTrack($track);
@@ -260,7 +260,7 @@ it('rilanciato senza cambiamenti non riaccoda PBF né geometria (oc:8827)', func
 it('ripara properties.layers anche se il pivot è già corretto (oc:8827)', function () {
     // Il tentativo precedente è morto dopo aver scritto il pivot: le righe sono giuste,
     // properties.layers no. Il retry deve ripararlo e accodare geometria e PBF.
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     $layer = recalcLayer($track);
     $track = recalcTrack($track);
     recalcRow($layer, EcTrack::class, $track->id);
@@ -283,8 +283,8 @@ it('ripara properties.layers anche se il pivot è già corretto (oc:8827)', func
 });
 
 it('un layer i cui effetti falliscono non ferma gli altri (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
-    $itinerary = recalcActivity('sardegnasentieri:type:itinerario');
+    $track = recalcActivity('trail');
+    $itinerary = recalcActivity('itinerary');
     $broken = recalcLayer($track);
     $healthy = recalcLayer($itinerary);
     recalcTrack($track);
@@ -306,7 +306,7 @@ it('un layer i cui effetti falliscono non ferma gli altri (oc:8827)', function (
 });
 
 it('non svuota i POI di un layer di tipologia con poi_mode manuale (oc:8827)', function () {
-    $track = recalcActivity('sardegnasentieri:type:sentiero');
+    $track = recalcActivity('trail');
     $layer = recalcLayer($track);
     $layer->configuration = ['poi_mode' => 'manual'];
     $layer->saveQuietly();
