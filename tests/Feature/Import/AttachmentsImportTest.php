@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Dto\Import\SardegnaSentieriImageManifest;
 use App\Jobs\Import\ImportSardegnaSentieriPoiMediaJob;
 use App\Jobs\Import\ImportSardegnaSentieriTrackMediaJob;
+use App\Jobs\RefreshRelatedTrackCardsJob;
 use App\Models\Ente;
 use App\Models\User;
 use App\Services\Import\SardegnaSentieriMediaSyncService;
@@ -275,4 +276,56 @@ it('le miniature si registrano sulle immagini e non su allegati e video', functi
     expect($conversions($poi->getMedia('default')->first()))->toBeGreaterThan(0)
         ->and($conversions($poi->getMedia('attachments')->first()))->toBe(0)
         ->and($conversions($poi->getMedia('videos')->first()))->toBe(0);
+});
+
+it('riscrive il file della traccia dopo allegati e video, non solo dopo le foto', function () {
+    // Il primo dispatch sta prima dello scaricamento dei file pesanti, perché quelli possono
+    // sforare il timeout e la scrittura delle foto non deve restarne travolta. Il prezzo era che
+    // allegati e video non entravano mai nel file, fino al giro di import successivo: serve una
+    // seconda scrittura, a contenuto completo.
+    Bus::fake([UpdateEcTrackAwsJob::class]);
+    $track = EcTrack::withoutEvents(fn () => EcTrack::query()->create([
+        'name' => ['it' => 'Traccia'], 'properties' => [], 'app_id' => 1, 'user_id' => User::first()->id,
+        'geometry' => DB::raw("ST_GeomFromText('LINESTRING(9.1 41.1, 9.2 41.2)', 4326)"),
+    ]));
+
+    (new ImportSardegnaSentieriTrackMediaJob(
+        $track->id,
+        [],
+        [['url' => 'https://example.org/carta.pdf', 'title' => 'Carta', 'order' => 0]],
+        [['url' => 'https://example.org/clip.mp4', 'title' => 'Clip', 'order' => 0]],
+    ))->handle(app(SardegnaSentieriMediaSyncService::class));
+
+    Bus::assertDispatchedTimes(UpdateEcTrackAwsJob::class, 2);
+});
+
+it('riscrive il file della traccia anche quando lo scaricamento dei file pesanti fallisce', function () {
+    // L'ultimo tentativo fallito passa da `failed()`, timeout compresi: senza, una traccia le cui
+    // foto sono arrivate resterebbe con un file vecchio perché il job è morto sui video.
+    Bus::fake([UpdateEcTrackAwsJob::class]);
+    $track = EcTrack::withoutEvents(fn () => EcTrack::query()->create([
+        'name' => ['it' => 'Traccia'], 'properties' => [], 'app_id' => 1, 'user_id' => User::first()->id,
+        'geometry' => DB::raw("ST_GeomFromText('LINESTRING(9.1 41.1, 9.2 41.2)', 4326)"),
+    ]));
+
+    (new ImportSardegnaSentieriTrackMediaJob($track->id, [], [], []))
+        ->failed(new RuntimeException('scaricamento non riuscito'));
+
+    Bus::assertDispatched(UpdateEcTrackAwsJob::class);
+});
+
+it('aggiorna le card delle tracce vicine, che l import tiene spente durante le foto', function () {
+    // Le foto si sincronizzano dentro `withoutRefresh()`, contando sulla passata di fine import.
+    // Ma questo job gira fuori dal batch: se le foto di una traccia arrivano dopo quella passata,
+    // i file delle tracce che la mostrano fra i correlati restano con la card vecchia.
+    Bus::fake([UpdateEcTrackAwsJob::class, RefreshRelatedTrackCardsJob::class]);
+    $track = EcTrack::withoutEvents(fn () => EcTrack::query()->create([
+        'name' => ['it' => 'Traccia'], 'properties' => [], 'app_id' => 1, 'user_id' => User::first()->id,
+        'geometry' => DB::raw("ST_GeomFromText('LINESTRING(9.1 41.1, 9.2 41.2)', 4326)"),
+    ]));
+
+    (new ImportSardegnaSentieriTrackMediaJob($track->id, [], [], []))
+        ->handle(app(SardegnaSentieriMediaSyncService::class));
+
+    Bus::assertDispatched(RefreshRelatedTrackCardsJob::class);
 });
