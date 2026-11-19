@@ -160,7 +160,10 @@ it('nel file su AWS porta didascalia, autore e credits con le foto, non in fores
         ])
         ->toMediaCollection('default');
 
-    // Come lo scrive UpdateEcTrackAwsJob: EcTrackResource sulla classe di EC_TRACK_MODEL.
+    // Come lo scrive UpdateEcTrackAwsJob: EcTrackResource sulla classe di EC_TRACK_MODEL. Dal
+    // versionamento del file (oc:8997) la Resource prende anche la versione, e senza vale quella
+    // senza numero: è questa.
+    // I due file per versione sono provati in ForestasPropertiesInTrackVersionsTest.
     $class = config('wm-package.ec_track_model');
     $file = json_decode((new EcTrackResource($class::find($track->id)))->toJson(), true)['properties'];
 
