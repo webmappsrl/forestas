@@ -120,3 +120,6 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   (`SardegnaSentieriDatabaseSource::record()`), non con una query nuova: `DrupalRecordReader` legge
   già tutti i campi del tipo e le entità richiamate — vedi
   [docs/knowledge/copia-database-drupal.md](../../docs/knowledge/copia-database-drupal.md) (oc:8900)
+- **L'import salva gli enti con `saveQuietly()`, che salta Scout**: chi cambia un ente fuori da
+  `importOrUpdateEnte` e da `markRemovedEnti` deve chiamare `searchable()` / `unsearchable()` da sé,
+  altrimenti la ricerca degli enti resta vecchia (oc:8965)

@@ -34,7 +34,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$name of static method Laravel\\Nova\\Fields\\Field\:\:make\(\) expects string\|Stringable, array#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Nova/EcTrack.php
 
 		-

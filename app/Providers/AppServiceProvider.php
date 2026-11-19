@@ -10,6 +10,7 @@ use App\Observers\RelatedTrackCardObserver;
 use App\Observers\RelatedTrackMediaObserver;
 use App\Observers\RelatedTrackRouteTypeObserver;
 use App\Policies\RegistroCatastaleRowPolicy;
+use App\Search\EnteSearchIndex;
 use App\Services\Import\Source\SardegnaSentieriDatabaseSource;
 use App\Services\Import\Source\SardegnaSentieriSource;
 use App\Services\RegistroCatastale\AnomalyTypes\LinkOrfano;
@@ -19,6 +20,8 @@ use App\Services\RegistroCatastale\AnomalyTypes\RipiegoAmbiguo;
 use App\Services\RegistroCatastale\AnomalyTypes\TracciaSenzaCodice;
 use App\Services\RegistroCatastale\AnomalyTypes\ValoreNonSanitizzabile;
 use App\Services\RegistroCatastale\RegistroAnomalyTypes;
+use App\Services\TrailRegistry\InconsistencyTypes\MissingWalkability;
+use App\Services\TrailRegistry\WalkabilityInconsistencyService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\Combined\AllOf;
 use Dedoc\Scramble\Support\Generator\Header;
@@ -30,6 +33,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -41,6 +45,7 @@ use Wm\WmPackage\Models\Tile;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
 use Wm\WmPackage\Policies\TilePolicy;
+use Wm\WmPackage\TrailRegistry\Events\WalkabilityChanged;
 use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
 
 class AppServiceProvider extends ServiceProvider
@@ -69,6 +74,25 @@ class AppServiceProvider extends ServiceProvider
         // unisce ai suoi nella Resource Anomalie. Il nome porta il prefisso
         // della provenienza. Si unisce a quanto gia' in config invece di
         // sovrascrivere, nel caso la chiave abbia gia' altre voci.
+        // Il ricalcolo delle incongruenze non puo' aspettare il prossimo import:
+        // dipende anche dalla percorribilita', che si inserisce a mano da Nova
+        // (oc:8989). Il package emette l'evento, qui si reagisce.
+        Event::listen(WalkabilityChanged::class, function (): void {
+            app(WalkabilityInconsistencyService::class)->recalculate();
+        });
+
+        // Incongruenze catastali (oc:8989): due informazioni che il catasto
+        // pubblica sullo stesso sentiero e che insieme non reggono. Sono una
+        // famiglia a parte rispetto alle anomalie — quelle riguardano il codice
+        // e si correggono alla fonte, queste si risolvono qui inserendo il dato
+        // che manca.
+        config(['wm-package.features.trail_registry.inconsistency_types' => array_merge(
+            (array) config('wm-package.features.trail_registry.inconsistency_types', []),
+            [
+                MissingWalkability::TYPE => MissingWalkability::class,
+            ],
+        )]);
+
         config(['wm-package.features.trail_registry.anomaly_types' => array_merge(
             (array) config('wm-package.features.trail_registry.anomaly_types', []),
             [
@@ -106,13 +130,19 @@ class AppServiceProvider extends ServiceProvider
             ->get('ec/poi/{id}', [EcPoiDetailController::class, 'show'])
             ->name('default.api.ec.poi.json');
 
-        // Branch API riservato al SUS (oc:8333). Registrato qui e non in
-        // routes/api.php perche' bootstrap/app.php non carica quel file:
-        // stesso pattern di WmPackageServiceProvider.
+        // Branch API riservato al SUS (oc:8333), registrato qui con lo stesso
+        // pattern di WmPackageServiceProvider. Da oc:8965 bootstrap/app.php
+        // carica anche routes/api.php, dove stanno le rotte degli enti: il SUS
+        // e' rimasto qui perche' spostarlo era fuori da quel ticket.
         Route::name('sus.')
             ->middleware('api')
             ->prefix('api/v1/sus')
             ->group(base_path('routes/sus.php'));
+
+        // Indice degli enti (oc:8965): WmPackageServiceProvider::packageRegistered() sostituisce
+        // `elasticsearch.indices` con quella del package, quindi la chiave degli enti si aggiunge
+        // qui, nel boot, che gira dopo tutte le register, senza togliere le altre.
+        config(['elasticsearch.indices.mappings.'.EnteSearchIndex::NAME => EnteSearchIndex::mappings()]);
 
         // Lo strumento di prova del canale (vedi config/sus.php): fuori da
         // `api/v1/sus`, quindi fuori dalla documentazione e dal gruppo `api`,

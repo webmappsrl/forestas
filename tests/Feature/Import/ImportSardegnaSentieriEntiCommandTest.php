@@ -12,6 +12,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Laravel\Scout\EngineManager;
+use Laravel\Scout\Engines\Engine;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
@@ -115,6 +117,53 @@ it('con --only=tracks importa comunque gli enti', function () {
         Bus::chainedBatch(fn (PendingBatch $b) => $b->jobs->first() instanceof ImportSardegnaSentieriEnteJob),
         Bus::chainedBatch(fn (PendingBatch $b) => $b->jobs->count() === 1 && $b->jobs->first() instanceof ImportSardegnaSentieriTrackJob),
     ]);
+});
+
+it('con --only=enti accoda solo gli enti', function () {
+    // Per riscrivere le descrizioni già importate senza rimettere in coda POI e sentieri (oc:8965).
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], ['2' => '2026-10-30 10:00:00'], enti: ['5281' => '2026-10-30 10:00:00']);
+
+    $this->artisan('sardegnasentieri:import', ['--only' => 'enti'])->assertSuccessful();
+
+    Bus::assertNothingChained();
+    Bus::assertBatched(fn (PendingBatch $b) => $b->jobs->count() === 1 && $b->jobs->first() instanceof ImportSardegnaSentieriEnteJob);
+    Bus::assertBatchCount(1);
+});
+
+it('rifiuta --only=enti insieme a --reset', function () {
+    // Il reset tronca tracce e POI qualunque sia --only: con i soli enti non li reimporterebbe.
+    $ente = enteLocale('5281', '2026-10-30 10:00:00');
+    DB::table('enteables')->insert(['ente_id' => $ente->id, 'enteable_id' => 99, 'enteable_type' => 'Wm\\WmPackage\\Models\\EcTrack', 'ruolo' => 'gestore']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+
+    $this->artisan('sardegnasentieri:import', ['--only' => 'enti', '--reset' => true])->assertFailed();
+
+    expect(DB::table('enteables')->count())->toBe(1);
+    Bus::assertNothingBatched();
+});
+
+it('toglie dall indice gli enti spariti', function () {
+    $gone = enteLocale('123', '2026-01-01 00:00:00');
+    $engine = Mockery::spy(Engine::class);
+    app(EngineManager::class)->extend('spy', fn () => $engine);
+    config(['scout.driver' => 'spy']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+
+    $this->artisan('sardegnasentieri:import')->assertSuccessful();
+
+    $engine->shouldHaveReceived('delete')->withArgs(fn ($models) => $models->pluck('id')->all() === [$gone->id]);
+});
+
+it('rifiuta un valore di --only sconosciuto', function () {
+    // Un refuso (`--only=ente --reset`) troncherebbe tracce e POI senza reimportarli (review oc:8965).
+    $ente = enteLocale('5281', '2026-10-30 10:00:00');
+    DB::table('enteables')->insert(['ente_id' => $ente->id, 'enteable_id' => 99, 'enteable_type' => 'Wm\\WmPackage\\Models\\EcTrack', 'ruolo' => 'gestore']);
+    fakeSardegnaSentieriSource(['1836' => '2026-10-30 10:00:00'], [], enti: ['5281' => '2026-10-30 10:00:00']);
+
+    $this->artisan('sardegnasentieri:import', ['--only' => 'ente', '--reset' => true])->assertFailed();
+
+    expect(DB::table('enteables')->count())->toBe(1);
+    Bus::assertNothingBatched();
 });
 
 it('il reset svuota enteables e tiene gli enti', function () {

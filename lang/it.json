@@ -37,7 +37,6 @@
     "Suggested automatically: copy it before confirming, or replace it.": "Suggerita automaticamente: copiala prima di confermare, oppure sostituiscila.",
     "Import TaxonomyWhere (Cadastral areas)": "Import TaxonomyWhere (Aree Catastali)",
     "Cadastral areas": "Aree Catastali",
-    "Select cadastral area": "Seleziona area catastale",
     "Sheet": "Foglio",
     "Row": "Riga",
     "Rows": "Righe",
@@ -61,8 +60,6 @@
     "Unreadable registry value": "Valore del registro non interpretabile",
     "These are rows from the registro catastale Google Sheet that did not cleanly attach to a trail registry code: a number different from the sheet, a link that leads to no track, a track without an active code, a number the fallback cannot attribute to a single code, several sheet rows for the same code, or length or time values that cannot be interpreted. These are also corrected at the source — the sheet or the trail record — not here: the next import run makes them disappear on their own once the data is consistent again.": "Sono le righe del foglio Google del registro catastale che non si sono agganciate in modo pulito a un codice del Catasto: un numero diverso da quello sul foglio, un link che non porta a nessuna traccia, una traccia senza codice attivo, un numero che il ripiego non sa attribuire a un solo codice, più righe del foglio per lo stesso codice, o valori di lunghezza o tempi che non si riescono a interpretare. Anche queste si correggono alla fonte — il foglio o la scheda del sentiero — non da qui: il prossimo giro dell'import le fa sparire da sole quando il dato torna coerente.",
     "Layer": "Layer",
-    "Role": "Ruolo",
-    "Validation status": "Stato validazione",
     "Classifications": "Classificazioni",
     "Taxonomies": "Tassonomie",
     "Inclusivity": "Inclusività",
@@ -81,5 +78,14 @@
     "Application not found.": "Domanda non trovata.",
     "Not found.": "Risorsa non trovata.",
     "Access denied: a valid token of the channel client is required.": "Accesso non consentito: serve un token valido del client dello sportello.",
-    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere."
+    "Only an application under review can be approved or rejected.": "Solo una domanda in istruttoria si può approvare o respingere.",
+    "Validated trail with unknown walkability": "Sentiero validato con percorribilità sconosciuta",
+    "The registry declares this trail validated or certified, but nobody has recorded whether it can be walked.": "Il catasto dichiara questo sentiero validato o certificato, ma nessuno ha registrato se si cammina.",
+    "Why the status changed: it stays in the history, with your name and the date.": "Perché lo stato è cambiato: resta nello storico, con il tuo nome e la data.",
+    "Trail validation status": "Stato di validazione dei sentieri",
+    "Notice": "Avviso",
+    "Notice message": "Messaggio Avviso",
+    "Publish notice": "Pubblica avviso",
+    "Notice date": "Data avviso",
+    "Without an Italian message the notice is not shown on the website.": "Senza messaggio in italiano l'avviso non compare sul sito."
 }

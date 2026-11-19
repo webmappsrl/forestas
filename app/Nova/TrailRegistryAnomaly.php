@@ -7,13 +7,13 @@ use App\Services\RegistroCatastale\RegistroAnomalyTypes;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Wm\WmPackage\TrailRegistry\Nova\TrailRegistryAnomaly as WmTrailRegistryAnomaly;
+use Wm\WmPackage\TrailRegistry\Nova\TrailRegistryImportAnomaly;
 
 // Aggiunge la seconda provenienza «registro» (oc:8539) sopra quella del
-// Catasto gia' gestita dalla classe base: titolo, campo soggetto, testo
+// Catasto gia' gestita dalla Resource delle anomalie di import: titolo, campo soggetto, testo
 // della notice e filtro per provenienza. La uriKey resta quella fissa
 // della classe base, da cui il package continua a cercare questa Resource.
-class TrailRegistryAnomaly extends WmTrailRegistryAnomaly
+class TrailRegistryAnomaly extends TrailRegistryImportAnomaly
 {
     /**
      * Il titolo delle anomalie del registro non ha una traccia da nominare

@@ -28,3 +28,7 @@ paths:
   relatibili per ruolo), `HidesAppFromIndexTrait` (nasconde il campo `app` dall'index)
 - Le policy di `Role`, `Permission` e `Tile` sono registrate in `AppServiceProvider::boot()`; le
   policy progetto-specifiche si aggiungono lì con `Gate::policy(...)`
+- **Un modello con il trait `Searchable` fa passare la ricerca della sua Resource Nova per Scout**:
+  Nova lo attiva da sé (`Resource::usesScout()`), e `$search` viene ignorato; senza indice la ricerca
+  va in 500 e i campi non indicizzati non si trovano più. Le Resource di forestas che non estendono
+  quelle del package devono dichiarare `usesScout()` falso, come `AbstractEcResource` (oc:8965)

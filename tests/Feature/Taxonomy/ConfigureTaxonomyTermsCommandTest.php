@@ -2,7 +2,9 @@
 
 use App\Services\Import\SardegnaSentieriImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Wm\WmPackage\Models\App;
+use Wm\WmPackage\Models\EcTrack;
 use Wm\WmPackage\Models\TaxonomyActivity;
 use Wm\WmPackage\Models\TaxonomyTerm;
 
@@ -11,14 +13,14 @@ uses(RefreshDatabase::class);
 it('crea le dodici tassonomie e i loro termini', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
 
-    expect(TaxonomyTerm::taxonomies()->count())->toBe(12)
+    expect(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12)
         // Le avvertenze: la tassonomia nasce qui, i termini li porta l'import (oc:8910).
         ->and(TaxonomyTerm::where('identifier', 'warnings')->first()->children)->toHaveCount(0)
         // Stato di validazione (oc:8932): sette termini, uno solo per percorso.
         ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->single_choice)->toBeTrue()
         ->and(TaxonomyTerm::where('identifier', 'validation-status')->first()->children->pluck('identifier')->all())->toBe([
-            'validation-status-unverified', 'validation-status-not-walkable', 'validation-status-under-review',
-            'validation-status-pre-registration', 'validation-status-walkable', 'validation-status-validated',
+            'validation-status-unverified', 'validation-status-under-review',
+            'validation-status-pre-registration', 'validation-status-validated',
             'validation-status-certified',
         ])
         ->and(TaxonomyTerm::where('identifier', 'validation-status-pre-registration')->first()->getTranslation('name', 'it'))->toBe('In pre-accatastamento o manutenzione')
@@ -26,7 +28,7 @@ it('crea le dodici tassonomie e i loro termini', function () {
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-difficulty')->first()->single_choice)->toBeTrue()
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-disabilities')->first()->single_choice)->toBeFalse()
         ->and(TaxonomyTerm::where('identifier', 'mtb-difficulty')->first()->children)->toHaveCount(5)
-        ->and(TaxonomyTerm::where('identifier', 'sardegnasentieri:tid:4909')->first()->getTranslation('name', 'it'))->toBe('MC')
+        ->and(TaxonomyTerm::where('identifier', 'mtb-difficulty-MC')->first()->getTranslation('name', 'it'))->toBe('MC')
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-disabilities-sensory')->first()->icon)->toBeNull()
         ->and(TaxonomyTerm::where('identifier', 'inclusivity-disabilities-physical')->first()->icon)->toBe('txn-mobility-disability');
 });
@@ -59,12 +61,14 @@ it('con --fresh riparte da vuoto', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms --fresh')->assertSuccessful();
 
     expect(TaxonomyTerm::find($custom->id))->toBeNull()
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
+        ->and(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12);
 });
 
 it('con --dry-run non scrive niente', function () {
     $this->artisan('sardegnasentieri:configure-taxonomy-terms --dry-run')->assertSuccessful();
-    expect(TaxonomyTerm::count())->toBe(0);
+    // La famiglia della percorribilità e i suoi quattro termini li crea la
+    // migration del dominio, non questo comando: restano anche con --dry-run.
+    expect(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')->count())->toBe(0);
 });
 
 it('riallinea l\'icona delle tassonomie già create senza duplicare', function () {
@@ -77,7 +81,7 @@ it('riallinea l\'icona delle tassonomie già create senza duplicare', function (
     expect(TaxonomyTerm::count())->toBe($count)
         ->and(TaxonomyTerm::where('identifier', 'hiking-difficulty')->first()->icon)->toBe('txn-trekking')
         ->and(TaxonomyTerm::where('identifier', 'route-type')->first()->icon)->toBeNull()
-        ->and(TaxonomyTerm::where('identifier', 'sardegnasentieri:tid:4066')->first()->icon)->toBeNull();
+        ->and(TaxonomyTerm::where('identifier', 'hiking-difficulty-T')->first()->icon)->toBeNull();
 });
 
 it('porta il tipo percorso a scelta singola con i tre termini in ordine, aggiornando la tassonomia esistente', function () {
@@ -104,7 +108,49 @@ it('rinomina una chiave cambiata invece di creare un doppione', function () {
     expect(TaxonomyTerm::where('identifier', 'educational-trail-difficulty')->count())->toBe(0)
         // Stessa riga, non una nuova: le relazioni dei suoi termini restano dove sono.
         ->and(TaxonomyTerm::where('identifier', 'educational-trails-difficulty')->value('id'))->toBe($before->id)
-        ->and(TaxonomyTerm::taxonomies()->count())->toBe(12);
+        ->and(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12);
+});
+
+it('rinomina ogni termine che portava la chiave di Drupal, tenendosi le relazioni', function () {
+    // Il database di un ambiente gia' in esercizio: i termini hanno ancora la chiave di Drupal e
+    // le loro relazioni con i sentieri. Dopo il comando devono essere le stesse righe, con il
+    // nome nostro: una chiave dimenticata nella mappa farebbe nascere un termine vuoto accanto
+    // al vecchio, e le relazioni resterebbero sul vecchio.
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
+
+    $legacy = [
+        'hiking-difficulty-EE' => 'sardegnasentieri:tid:4068',
+        'mtb-difficulty-BC' => 'sardegnasentieri:tid:4910',
+        'horse-difficulty-easy' => 'sardegnasentieri:tid:4902',
+        'nordic-walking-difficulty-hard' => 'sardegnasentieri:tid:4907',
+        'soft-mobility-difficulty-medium' => 'sardegnasentieri:tid:4917',
+        'inclusivity-difficulty-AEE' => 'inclusivity-difficulty-aee',
+        'itinerary-type-long-distance' => 'sardegnasentieri:tid:4725',
+        'itinerary-type-spiritual' => 'sardegnasentieri:tid:4729',
+    ];
+
+    $ids = [];
+    foreach ($legacy as $current => $old) {
+        $term = TaxonomyTerm::where('identifier', $current)->firstOrFail();
+        $ids[$current] = $term->id;
+        $term->forceFill(['identifier' => $old])->saveQuietly();
+    }
+
+    $track = EcTrack::factory()->createQuietly([
+        'properties' => ['ref' => 'TEST'],
+        'geometry' => DB::raw("ST_GeomFromText('MULTILINESTRING Z((9.1 40.5 0, 9.2 40.5 0))', 4326)"),
+    ]);
+    $track->taxonomyTerms()->attach(array_values($ids));
+
+    $this->artisan('sardegnasentieri:configure-taxonomy-terms')->assertSuccessful();
+
+    foreach ($legacy as $current => $old) {
+        expect(TaxonomyTerm::where('identifier', $old)->count())->toBe(0, "{$old} e' rimasto")
+            ->and(TaxonomyTerm::where('identifier', $current)->value('id'))->toBe($ids[$current], "{$current} e' una riga nuova");
+    }
+
+    expect($track->fresh()->taxonomyTerms()->pluck('taxonomy_terms.id')->sort()->values()->all())
+        ->toBe(collect($ids)->sort()->values()->all());
 });
 
 it('dà alle attività il nome italiano, senza toccare quelle che ne hanno già uno', function () {

@@ -324,6 +324,23 @@ it('confronta i dati degli enti con lo shard', function () {
         ->assertExitCode(0);
 });
 
+it('non segnala uno slug accentato che lo shard ha salvato in ASCII', function () {
+    // L'import normalizza lo slug di Drupal (oc:8965): il confronto deve fare lo stesso.
+    $ente = Ente::create([
+        'sardegnasentieri_id' => '82', 'name' => ['it' => 'Comune di Lodè'], 'slug' => 'comune-di-lode',
+        'drupal_created_at' => '2021-03-04 09:00:00', 'properties' => [],
+    ]);
+
+    shardSources([], [], [82 => [
+        'created' => '2021-03-04 09:00:00', 'slug' => 'comune-di-lodè',
+        'title' => [['value' => 'Comune di Lodè']],
+    ]]);
+
+    $this->artisan('sardegnasentieri:compare-source', ['--only' => 'shard'])
+        ->doesntExpectOutputToContain('ente 82 slug')
+        ->assertExitCode(0);
+});
+
 it('segnala un ente con slug, immagini e collegamenti diversi', function () {
     Ente::create(['sardegnasentieri_id' => '30', 'name' => ['it' => 'GAL BMG'], 'slug' => 'altro', 'pagina_web_title' => 'Vecchio', 'drupal_created_at' => '2020-01-01 00:00:00', 'properties' => []]);
 

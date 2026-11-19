@@ -18,6 +18,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Token del sito WordPress (oc:8965)
+    |--------------------------------------------------------------------------
+    |
+    | Segreto condiviso con il sito WordPress per le rotte che chiama (oggi
+    | `api/v1/entes`), verificato da VerifyWpApiToken. Vuoto: le rotte rispondono
+    | 403. Va impostato nel
+    | `.env` prima del deploy: `php artisan optimize` congela la
+    | configurazione, e una variabile aggiunta dopo non viene letta.
+    |
+    */
+
+    'wp_api_token' => env('WP_API_TOKEN'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Dizionario delle traduzioni per i TaxonomyPoiType
     |--------------------------------------------------------------------------
     |

@@ -145,6 +145,20 @@ definitivamente»: da WP-CLI WPML non toglie la riga di traduzione), poi `applic
 di oc:8952 aggiunge solo il template della pagina di ricerca): è il 302 del child nuovo, con il plugin attivo, a
 portarlo a `/cerca-nel-sito`; con il child vecchio resta la ricerca di WordPress.
 
+### Enti sul sito (oc:8990)
+
+Al rilascio che porta le pagine degli enti (`/enti`, `/enti/<slug>`, tab «Enti» della ricerca), dopo il deploy
+dello shard con l'API degli enti (oc:8965, [deploy-automatico.md](deploy-automatico.md), «Il primo deploy dell'API
+degli enti»):
+
+- `WP_API_TOKEN` deve avere lo stesso valore nel `.env` dello shard e in `wp-forestas/.env`. Su UAT e su dev è già
+  scritto in tutti e due dal 17/11/2026: non si rigenera, altrimenti i due valori non coincidono più e l'API risponde
+  403;
+- i passi sul sito sono in
+  [`wp-forestas/docs/howto/messa-in-opera-degli-enti.md`](../../wp-forestas/docs/howto/messa-in-opera-degli-enti.md):
+  indice degli enti sullo shard, `applica --conferma` (mette nel cestino i contenuti di default), rewrite, WP-Cron,
+  `EMPTY_TRASH_DAYS`, verifica.
+
 ## Azzerare WordPress
 
 ```bash

@@ -2,58 +2,86 @@
 
 ## Come funziona oggi
 
-Nella lista Nova delle EC Tracce (anche nei pannelli delle tracce del dettaglio Ente) il menu dei
-filtri ha quattro voci: **Layer**, **Aree catastali**, **Ruolo** e **Stato validazione** (oc:8875).
-I primi due sostituiscono il filtro dei layer del package:
+Nella lista Nova delle EC Tracce, anche nelle relazioni delle tracce della detail view di un Ente
+(«Track gestiti» e le altre, che usano lo stesso `filters()`), il menu dei filtri legge i termini
+delle classificazioni scritti sulla traccia (oc:8988). Tutti i filtri usano il selettore del campo
+`Choice` del package, con ricerca, icone e chip dei valori scelti: come è fatto sta in
+`wm-package/src/Nova/Fields/Choice/README.md` («Il selettore nei filtri»).
 
-- **«Layer»** (`app/Nova/Filters/EcTrackLayerFilter.php`): stessa chiave del package
-  (`features_by_layer_ecTracks`), ma elenca solo i layer **non** legati a un'area catastale, cioè
-  le tipologie (Sentieri, Itinerari, Cammini di Sardegna, Sentieri accessibili);
-- **«Aree catastali»** (`app/Nova/Filters/EcTrackCadastralAreaFilter.php`): multiselect con
-  ricerca (`MultiselectFilter` di `outl1ne/nova-multiselect-filter`) con le `TaxonomyWhere` di
-  sorgente `geohub_conf_32` (`TaxonomyWhereLayersImportService::SOURCE_KEY`). Il valore è la lista
-  degli id delle aree scelte; le aree valgono in OR; i due filtri si combinano in AND. Il pacchetto
-  non ha l'italiano: i testi del componente sono in `lang/vendor/nova-multiselect-filter/it.json`.
+| Filtro | Classe | Scelta |
+|---|---|---|
+| Stato validazione | `TaxonomyTermFilter(EcTrack::VALIDATION_STATUS_TAXONOMY)` | singola |
+| Percorribilità | `TaxonomyTermFilter(<walkability_taxonomy>)`, solo con il dominio Catasto acceso | singola |
+| Tipo percorso | `TaxonomyTermFilter('route-type', multiple: true)` | multipla |
+| Attività | `app/Nova/Filters/EcTrackActivityFilter.php`, su `ChoiceFilter` | multipla |
+| Disabilità accolte | `TaxonomyTermFilter('inclusivity-disabilities', multiple: true)` | multipla |
+| Avvertenze | `TaxonomyTermFilter(SardegnaSentieriImportService::WARNINGS_TAXONOMY, multiple: true)` | multipla |
+| Aree catastali | `app/Nova/Filters/EcTrackCadastralAreaFilter.php`, su `ChoiceFilter` | multipla |
 
-Gli altri due:
+Nell'URL un filtro tassonomico ha la chiave `taxonomy_term_<identifier>`; attività e aree
+catastali hanno il nome della classe, come ogni filtro che non ridefinisce `key()`.
 
-- **«Ruolo»** (`app/Nova/Filters/EcTrackRuoloFilter.php`): tracce con almeno un ente in quel ruolo
-  (tabella `enteables`, scritta dall'import di Sardegna Sentieri); le tracce senza enti non hanno
-  un valore che le trovi;
-- **«Stato validazione»** (`app/Nova/Filters/EcTrackValidationStatusFilter.php`): tracce con quel
-  termine della famiglia `validation-status` (oc:8932); le tracce senza stato non hanno un valore
-  che le trovi.
+La **Difficoltà di accessibilità** (`inclusivity-difficulty`) non è più nel menu: tolta su
+richiesta subito dopo oc:8988, insieme all'aggiunta di Attività e Avvertenze. Un link salvato con
+quel filtro non filtra più.
 
-Non ci sono il filtro **App** (il campo del package è reso non filtrabile in
-`App\Nova\EcTrack::fields()`; colonna, dettaglio e form restano, e sulle altre liste il filtro
-c'è ancora) né **Include/Exclude per id** (scartati in `App\Nova\EcTrack::filters()`).
+- **I valori dello stesso filtro valgono in OR, filtri diversi in AND.** Una traccia senza termini
+  in quella tassonomia non esce da un filtro attivo.
+- **Il valore di un filtro tassonomico è l'identifier del termine**, che è stabile fra ambienti e
+  finisce nell'URL. Un link con soli identifier non validi (un termine rinominato o ritirato) dà
+  un elenco vuoto, mai tutte le tracce.
+- **Il titolo di un filtro tassonomico è il nome della tassonomia**: le tassonomie di forestas hanno
+  solo il nome italiano (`ConfigureTaxonomyTermsCommand`), quindi il menu resta in italiano anche
+  con l'interfaccia in inglese, come i campi delle stesse tassonomie nel form.
+- **La Percorribilità segue il dominio Catasto**: c'è solo con
+  `wm-package.features.trail_registry.enabled`, e l'identifier si legge da
+  `wm-package.features.trail_registry.walkability_taxonomy`, la stessa config che usano l'import e
+  il dominio. A dominio spento la tassonomia non esiste e il filtro non avrebbe opzioni.
+- **Lo «Stato validazione» del filtro propone tutti i termini della famiglia**, anche
+  `validation-status-walkable` e `-not-walkable`, ritirati da oc:8989, finché esistono: servono a
+  trovare le tracce che li hanno ancora. Il campo «Stato» del form propone invece solo i termini
+  dichiarati (`EcTrack::validationStatusTerms()`). I ritirati restano in tabella se lo storico dei
+  cambi di stato li nomina, e scelti nel filtro danno zero tracce, perché l'import non li scrive più.
+- **Le attività stanno ancora in `taxonomy_activities`**, non in `taxonomy_terms`: per questo il
+  filtro non è un `TaxonomyTermFilter` ma una sottoclasse di `ChoiceFilter` che legge la relazione
+  `taxonomyActivities`. Il valore è l'identifier dell'attività; un identifier che non esiste dà un
+  elenco vuoto. Fra le opzioni ci sono anche «Itinerario», «Sentiero» e «Cammini di Sardegna», le
+  attività scritte dall'import, che si sovrappongono al Tipo percorso.
+- **Le aree catastali** sono le `TaxonomyWhere` di sorgente `geohub_conf_32`
+  (`TaxonomyWhereLayersImportService::SOURCE_KEY`), in ordine di nome. Il valore è la lista degli
+  id delle aree. La chiave e il formato sono quelli del vecchio filtro outline, quindi i link
+  salvati con le aree continuano a filtrare e mostrano le chip anche con gli id scritti come
+  numeri: li converte in stringa il componente del filtro.
+- **Non ci sono** il filtro **Layer**, il filtro **Ruolo**, il filtro **App** (il campo del package
+  è reso non filtrabile in `App\Nova\EcTrack::fields()`) né **Include/Exclude per id**:
+  `App\Nova\EcTrack::filters()` scarta dal menu del package `FeaturesByLayerFilter`,
+  `FeaturesIncludeByIds` e `FeaturesExcludeByIds`.
+- **I link salvati con Layer, Ruolo o il vecchio Stato validazione non filtrano più**: Nova abbina
+  i filtri dell'URL per `key()` e scarta in silenzio quelli che non conosce
+  (`vendor/laravel/nova/src/Filters/FilterDecoder.php`). Un preferito «tracce da validare» apre
+  la lista con tutte le tracce.
 
-`App\Nova\EcTrack::filters()` **sostituisce** il filtro del package invece di aggiungerne uno:
-con due filtri sulla stessa chiave Nova applicherebbe il primo che trova
-(`vendor/laravel/nova/src/Filters/FilterDecoder.php:43-45`).
+Con i filtri del menu si ottiene il contenuto dei quattro layer di tipologia:
 
-Il filtro dei layer restituisce le tracce **del layer**, non le candidate di `onLayer()`
-(oc:8825):
+| Layer | Filtro |
+|---|---|
+| Sentieri | Tipo percorso = Sentiero |
+| Itinerari | Tipo percorso = Itinerario |
+| Cammini di Sardegna | Tipo percorso = Cammino |
+| Sentieri Accessibili | Attività = «Sentieri (accessibili) per tutti» (`accessible-trails`) |
 
-1. layer in modalità manuale (`Layer::isAutoTrackMode()` falso) → le tracce associate
-   (tabella `layerables`);
-2. layer in automatico con un'attività o aree in `properties.taxonomy_where` → `onLayer()`;
-3. layer in automatico senza filtro ma con tracce associate → le tracce associate;
-4. altrimenti → `onLayer()`.
-
-Con i layer configurati (sotto) tutti e quattro i layer di tipologia passano dal punto 2.
+Il layer «Sentieri Accessibili» resta definito dalla scala della difficoltà di accessibilità
+(sezione sotto). Il filtro dell'attività `accessible-trails` lo approssima: l'import scrive
+l'attività dai termini di `field_tipologia_sentiero`, e la scala dai campi dell'inclusività, quindi
+le due cose possono non coincidere su ogni traccia. In locale, il 17/11: 2 tracce con l'attività,
+4 con un grado della scala, 2 in comune.
 
 ### Come le tracce finiscono nei layer (oc:8827)
 
-Un layer di tipologia è definito dai termini che gli danno il contenuto. Fino a oc:8827 erano
-attività; dal modello unico delle classificazioni (oc:8910) sono termini di `taxonomy_terms`:
-
-| Layer | Termini |
-|---|---|
-| Sentieri | `route-type-trail` |
-| Itinerari | `route-type-itinerary` |
-| Cammini di Sardegna | `route-type-walk` |
-| Sentieri Accessibili | `inclusivity-difficulty-at`, `-ae`, `-aee` |
+I layer non servono più ai filtri della lista, ma restano il contenuto dell'app. Un layer di
+tipologia è definito dai termini che gli danno il contenuto. Fino a oc:8827 erano attività; dal
+modello unico delle classificazioni (oc:8910) sono termini di `taxonomy_terms`, gli stessi della
+tabella sopra.
 
 Dentro una stessa tassonomia i termini sono in OR, fra tassonomie diverse in AND: per questo il
 layer dei percorsi accessibili prende tutta la scala, e vale come «ha una difficoltà di
@@ -79,6 +107,8 @@ accessibilità, qualunque sia». «Accessibile» non è un'attività né un camp
 - **il reset notturno** non tronca più `taxonomy_activities`: le attività restano con il loro id,
   e con loro le relazioni dei layer; cancella a mano le righe di tracce e POI in
   `taxonomy_activityables` e `layerables`, che dopo `RESTART IDENTITY` indicherebbero altri record.
+  Toglie anche i legami di tracce e POI in `taxonomy_termables` (i termini restano): l'import li
+  riscrive.
 
 Il filtro per area non ricalcola la geometria: legge `properties->taxonomy_where`, scritto da
 `GeometryComputationService::syncTaxonomyWhere()` del package. Una traccia esce se nel suo
@@ -114,25 +144,33 @@ Vincoli:
 
 ## Perché così
 
-- **Due filtri custom in Forestas, nessuna modifica al package** (oc:8806): deciso allo scrum del
-  21/10.
+- **I filtri leggono i termini della traccia, non i layer** (oc:8988): il filtro per layer era un
+  passaggio indiretto — i layer si costruiscono dalle tassonomie — e aveva già dato risultati
+  sbagliati e sovrapposizioni (oc:8827). Allo scrum del 16/11 Giuseppe: «non voglio più mettere un
+  filtro per layer. Ok, c'abbiamo ora le tassonomie, usiamo quelle».
+- **Un solo filtro generico nel package, richiamato una volta per tassonomia** (oc:8988): con la
+  tabella unica `taxonomy_terms` lo stesso codice copre tutte le tassonomie (scrum 16/11: «il
+  filtro deve essere uno che funziona per tutti»), e il selettore è lo stesso del form.
+- **Percorribilità e Stato validazione separati, a scelta singola** (oc:8988): il cliente li aveva
+  chiesti separati in oc:8827 (28/10), e con oc:8989 la percorribilità è una famiglia a sé. Allo
+  scrum del 17/11 Giuseppe: «tutti e due i filtri mettili single choice […] poi se c'è da
+  cambiare lo cambiamo».
+- **Niente filtro Ruolo** (oc:8988): al cliente non serviva (oc:8827, 02/11: «Continuo a non
+  capire l'utilità del filtro "Ruoli"»). Allo scrum del 17/11 Giuseppe ha detto che sarebbe più
+  utile sugli enti, ma per ora va tolto.
+- **Aree catastali sul selettore di `Choice`** (oc:8988): alla call del 16/11 Giuseppe, sul
+  componente outline: «smettiamo di usarlo, cioè là dove c'è da fare una select si usa il choice
+  field». Le aree non sono termini di `taxonomy_terms`, quindi estendono il filtro di base del
+  package (`ChoiceFilter`) invece di `TaxonomyTermFilter`, con la stessa chiave del vecchio filtro
+  per non rompere i link salvati. Il segnaposto della ricerca è quello degli altri filtri.
 - **Aree a scelta multipla, in OR, e «passa per l'area» anche per un tratto breve** (oc:8806):
   review del 26/10. Il cliente chiede «i cammini delle aree B, G e T»; il criterio geometrico è
   l'unico valido anche per cammini e itinerari, che non hanno codice catastale.
-- **Multiselect con ricerca invece delle checkbox** (oc:8825): richiesta di Giuseppe Bonfanti
-  allo scrum del 27/10. Le checkbox occupano spazio in proporzione al numero di aree, e un filtro
-  per province ne aggiungerebbe altre.
-- **Il pacchetto e non la multiselect nativa di Nova** (oc:8825): la nativa (`MultiSelectFilter`,
-  da un campo `MultiSelect` filtrabile) è una `<select multiple>` senza ricerca, in cui si sceglie
-  più di una voce solo con Cmd/Ctrl+clic. `outl1ne/nova-multiselect-field`, già nel progetto, è
-  un campo e non offre un filtro.
+- **Ricerca invece delle checkbox** (oc:8825): richiesta di Giuseppe Bonfanti allo scrum del 27/10.
+  Le checkbox occupano spazio in proporzione al numero di aree, e un filtro per province ne
+  aggiungerebbe altre.
 - **Si legge la sorgente della voce, non solo la chiave** (oc:8806): la chiave da sola collide con
   gli `osm2cai_id` (in locale ZNUB2 ha `osm2cai_id = 81`, l'id di Area T).
-- **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806): un
-  layer legato a una `TaxonomyWhere` di altra sorgente resta una tipologia.
-- **Le tipologie restano attività** (oc:8827, **superata da oc:8910**): la tassonomia dedicata era
-  stata proposta allo scrum del 29/10 e rimandata a un ticket a parte, che è oc:8910. Oggi
-  «Tipo percorso» esiste e i layer si legano ai suoi termini.
 - **Il reset riconfigura i layer da sé** (oc:8910): è l'import con `--reset` a chiamare
   `configure-layers`, prima del batch. Il passo manuale dopo il reset notturno non c'è più, ed era
   l'unico modo di rimediare ai layer rimasti senza filtri.
@@ -149,8 +187,6 @@ Vincoli:
   se la ricrea».
 - **Configurazione con un comando idempotente** (oc:8827): gli ambienti sono tre, e il comando la
   rende ripetibile su un database nuovo.
-- **I layer con un filtro automatico restano su `onLayer()`** (oc:8825): il filtro di Nova li
-  legge dal filtro e non da `layerables`, che si aggiorna solo a fine batch.
 - **Niente filtro App sulla lista EC Tracce** (oc:8875): forestas ha una sola app, e il filtro
   restituiva sempre tutte le tracce. Si toglie in forestas perché il package è condiviso.
 - **Niente Include/Exclude per id** (oc:8875): servivano al vecchio campo che associa le tracce ai
@@ -159,6 +195,34 @@ Vincoli:
 
 ## Come ci siamo arrivati
 
+- **Le tipologie restano attività** (oc:8827, **superata da oc:8910**): la tassonomia dedicata era
+  stata proposta allo scrum del 29/10 e rimandata a un ticket a parte, che è oc:8910. Oggi
+  «Tipo percorso» esiste e i layer si legano ai suoi termini.
+- **Filtro «Layer» sulle tipologie** (oc:8806 e oc:8825, superato da oc:8988):
+  `EcTrackLayerFilter`, con la stessa chiave del package (`features_by_layer_ecTracks`), elencava
+  solo i layer non legati a un'area catastale e restituiva le tracce del layer con una regola a
+  quattro passi: layer manuale → tracce associate in `layerables`; automatico con attività o aree →
+  `onLayer()`; automatico senza filtro ma con tracce associate → le associate; altrimenti
+  `onLayer()`. Sostituiva il filtro del package invece di affiancarlo, perché con due filtri sulla
+  stessa chiave Nova applica il primo che trova. Abbandonato perché il risultato dipendeva da come
+  il layer era configurato e non da cosa c'è scritto sulla traccia.
+- **Due filtri custom in Forestas, nessuna modifica al package** (oc:8806, superata da oc:8988):
+  deciso allo scrum del 21/10. Oggi il filtro generico sta nel package, e forestas lo richiama.
+- **Multiselect di `outl1ne/nova-multiselect-filter` per le aree** (oc:8825, superato da oc:8988):
+  scelto perché la multiselect nativa di Nova è una `<select multiple>` senza ricerca, in cui si
+  sceglie più di una voce solo con Cmd/Ctrl+clic, e `outl1ne/nova-multiselect-field` è un campo e
+  non offre un filtro. Il pacchetto non aveva l'italiano, e i suoi testi stavano in
+  `lang/vendor/nova-multiselect-filter/it.json`. Tolto con il passaggio al selettore di `Choice`.
+- **Filtro «Ruolo»** (oc:8875, superato da oc:8988): `EcTrackRuoloFilter`, tracce con almeno un
+  ente in quel ruolo (`enteables`). Tolto perché al cliente non serviva.
+- **Filtro «Stato validazione» con l'identifier scritto nel codice** (oc:8932, superato da
+  oc:8988): `EcTrackValidationStatusFilter` proponeva solo gli stati dichiarati dal comando dei
+  termini, che oggi stanno in `EcTrack::validationStatusTerms()` per il campo del form.
+- **I layer con un filtro automatico restano su `onLayer()`** (oc:8825, superata da oc:8988 insieme
+  al filtro dei layer): il filtro di Nova li leggeva dal filtro e non da `layerables`, che si
+  aggiorna solo a fine batch.
+- **Il filtro dei layer esclude solo i layer legati a un'area `geohub_conf_32`** (oc:8806, superata
+  da oc:8988): un layer legato a una `TaxonomyWhere` di altra sorgente restava una tipologia.
 - **Si corregge il filtro, non la configurazione dei layer** (oc:8825, superata da oc:8827):
   un'attività «cammino» non esisteva e la configurazione andava ripetuta su ogni ambiente; Cammini
   e Sentieri accessibili mostravano le righe di `layerables`. Su UAT il 30/10 erano righe del 9/9
@@ -171,9 +235,8 @@ Vincoli:
 - **Tracce associate per tutti i layer, poi `onLayer()` se non ce ne sono** (oc:8825, superata):
   era la prima regola; avrebbe spostato anche Sentieri e Itinerari sulla copia in `layerables`,
   aggiornata in differita.
-- **Area a scelta singola, con una tendina** (oc:8806, superata): era la proposta dello scrum del
-  21/10; nella review del 26/10 si è passati alla scelta multipla perché il cliente combina più
-  aree.
+- **Area a scelta singola** (oc:8806, superata): era la proposta dello scrum del 21/10; nella
+  review del 26/10 si è passati alla scelta multipla perché il cliente combina più aree.
 - **Checkbox (`BooleanFilter` di Nova)** (oc:8806, superata da oc:8825): davano la scelta multipla
   ma una casella per area, tutte sempre aperte nel menu dei filtri.
 - **Codice catastale come criterio dell'area** (oc:8806, scartata): vale solo per i sentieri;

@@ -19,7 +19,7 @@ use Wm\WmPackage\Models\TaxonomyWhereable;
 /**
  * Lega ogni layer di tipologia dell'app di import ai termini che lo definiscono (oc:8910).
  *
- * Prima legava i layer alle attività storiche (`sardegnasentieri:type:*`), che il modello unico
+ * Prima legava i layer alle attività storiche (`trail`, `itinerary`, `walk`), che il modello unico
  * ha sostituito: oggi «Sentiero», «Itinerario» e «Cammino» sono termini di «Tipo percorso», e
  * «accessibile» non è un'attività ma la conseguenza di avere una difficoltà di accessibilità —
  * per questo il layer dei percorsi accessibili prende tutti e tre i termini della scala: dentro
@@ -32,7 +32,7 @@ use Wm\WmPackage\Models\TaxonomyWhereable;
  * in `LAYER_TERMS` non deve stare sul layer. Un criterio in più non si somma, si moltiplica —
  * `LayerService` mette attività, zone e termini in AND — quindi un'attività rimasta dalla versione
  * precedente di questo comando taglia il layer in silenzio: su un ambiente dove quella girava,
- * «Sentieri» avrebbe il termine `route-type-trail` *e* l'attività `sardegnasentieri:type:sentiero`,
+ * «Sentieri» avrebbe il termine `route-type-trail` *e* l'attività `trail`,
  * e terrebbe la sola intersezione. Per questo le altre tassonomie del layer si staccano. Se un
  * criterio deve restare, si aggiunge qui, non a mano sulla scheda.
  *
@@ -56,9 +56,9 @@ class ConfigureSardegnaSentieriLayersCommand extends Command
         'Itinerari' => ['route-type-itinerary'],
         'Cammini di Sardegna' => ['route-type-walk'],
         'Sentieri Accessibili' => [
-            'inclusivity-difficulty-at',
-            'inclusivity-difficulty-ae',
-            'inclusivity-difficulty-aee',
+            'inclusivity-difficulty-AT',
+            'inclusivity-difficulty-AE',
+            'inclusivity-difficulty-AEE',
         ],
     ];
 
