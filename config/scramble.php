@@ -213,6 +213,31 @@ return [
         file. Vanno rispettati comunque, perche' il controllo verra' aggiunto e da quel momento un file
         fuori formato sara' rifiutato.
 
+        ## I valori ammessi dei campi a scelta chiusa
+
+        Quattro campi accettano solo uno di pochi identificativi. Un valore diverso e' rifiutato
+        con `422`, anche se la frase italiana corrispondente e' quella giusta: si manda
+        l'identificativo, non l'etichetta.
+
+        | Campo | Identificativo | Che cosa significa |
+        |---|---|---|
+        | 38 — `existing_signage` | `good_condition` | c'e' ed e' in buono stato |
+        | | `dilapidated` | c'e' ed e' fatiscente |
+        | | `absent` | non c'e' |
+        | 47 — `soggetto_gestore` | `applicant` | il richiedente |
+        | | `municipalities` | i comuni territorialmente competenti selezionati |
+        | | `third_party` | altro soggetto terzo |
+        | | `forestas` | Forestas |
+        | 49 — `soggetto_rilevatore` | `applicant` | il richiedente |
+        | | `other_surveyor` | altro soggetto rilevatore |
+        | 53 — `soggetto_manutentore` | `applicant` | il richiedente, se soggetto giuridico |
+        | | `municipalities` | i comuni territorialmente competenti selezionati |
+        | | `other_legal_entity` | altro soggetto giuridico |
+        | | `forestas` | Forestas |
+
+        Gli altri due campi a scelta chiusa hanno una sezione propria: le attivita' (campo 36) e i
+        livelli di difficolta' (campo 37), piu' avanti.
+
         ## I campi che diventano obbligatori
 
         Alcuni campi sono obbligatori solo in base al valore di un altro. Se mancano, la creazione
