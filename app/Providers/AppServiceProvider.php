@@ -73,6 +73,16 @@ class AppServiceProvider extends ServiceProvider
             document: 'docs/api/sus.json',
         );
 
+        // Stampa PDF delle schede (oc:8982, R17 e R20): la mappa sta da sola in una pagina A4 al vivo,
+        // senza margini, testata né piè di pagina (la pagina 2 della traccia, l'ultima del POI). Il
+        // servizio mappe la disegna già a questa misura e la view la stende sulla pagina intera
+        // (\ForestasMappaPagina nel preambolo). Colori, font e stili di testo stanno nel preambolo
+        // delle view (resources/views/vendor/wm-package/print/).
+        config([
+            'wm-package.features.print.map.width_mm' => 210,
+            'wm-package.features.print.map.height_mm' => 297,
+        ]);
+
         // Tipi di anomalia del registro catastale (oc:8539): il package li
         // unisce ai suoi nella Resource Anomalie. Il nome porta il prefisso
         // della provenienza. Si unisce a quanto gia' in config invece di

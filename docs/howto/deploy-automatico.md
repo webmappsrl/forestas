@@ -18,10 +18,11 @@ si lanciano anche a mano, da GitHub, Actions, il workflow e «Run workflow».
 Il workflow riutilizzabile `deploy.yml` si collega al server via SSH e fa, sull'host:
 
 1. `git pull --ff-only` del branch e `git submodule update --init wm-package`;
-2. `scripts/deploy.sh` nel container `php-<APP_NAME>`: dipendenze, `migrate --force`, cache,
-   riavvio di Horizon, con il sito in manutenzione solo durante quei passi;
-3. `scripts/wordpress-up.sh`, solo se il puntatore di `wp-forestas` e' cambiato;
-4. uno smoke test: `/up` e `/docs/api/sus` devono rispondere.
+2. `docker compose build php horizon` (sempre: con la cache e' quasi istantanea) e `up -d php`;
+3. `scripts/deploy.sh` nel container `php-<APP_NAME>`: dipendenze, `migrate --force`, cache,
+   riavvio di Horizon, con il sito in manutenzione solo durante quei passi; poi `up -d horizon`;
+4. `scripts/wordpress-up.sh`, solo se il puntatore di `wp-forestas` e' cambiato;
+5. uno smoke test: `/up` e `/docs/api/sus` devono rispondere.
 
 Alla fine, riuscito o no, l'esito arriva nel canale Slack (`notify-slack.yml`, come su maphub):
 test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
@@ -63,6 +64,21 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
   4. riscrivere le descrizioni con la loro formattazione, che l'import prima toglieva:
      `docker exec php-forestas php artisan sardegnasentieri:import --only=enti --force`. Su UAT
      il reset notturno riscrive comunque gli enti ogni notte, ma il passo evita di aspettarlo.
+
+## Il primo deploy della stampa PDF (oc:8982)
+
+- **Prima del deploy**, nel `.env` del server: `WM_PRINT_ENABLED=true` e `WM_PRINT_QUEUE=print`: il
+  supervisor `print` di Horizon esiste solo a dominio acceso. Dove la configurazione è congelata
+  (`php artisan optimize` di `deploy_prod.sh`), un cambio di queste variabili vale solo dal deploy
+  successivo.
+- **Il primo deploy ricostruisce l'immagine** (TeX Live): qualche minuto, entro il `command_timeout`
+  di 30m del workflow. Dai deploy successivi la build usa la cache.
+- Sull'host servono Docker Compose >= 2.17 (`additional_contexts`) e `bash` (lo script remoto usa
+  `source` e array).
+- Se la build fallisce il deploy si ferma, e rilanciarlo ricostruisce di nuovo. A mano, sull'host:
+  `source scripts/compose-args.sh` (con `SHARD=php-<APP_NAME>`), poi
+  `docker compose "${ARGS[@]}" build php horizon`, `up -d php` e `up -d horizon`.
+- Su AWS il `print_url` compare nei JSON delle tracce solo dopo la loro rigenerazione.
 
 ## Configurazione una tantum
 

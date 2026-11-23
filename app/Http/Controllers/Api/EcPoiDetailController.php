@@ -9,6 +9,7 @@ use App\Models\EcPoi;
 use App\Support\ForestasPoiDetail;
 use Illuminate\Http\JsonResponse;
 use Wm\WmPackage\Services\DetailTaxonomiesService;
+use Wm\WmPackage\Services\Print\PrintService;
 
 /**
  * Il dettaglio pubblico del POI, `api/ec/poi/{id}` (oc:8959). Sostituisce la rotta del package
@@ -39,6 +40,12 @@ class EcPoiDetailController extends Controller
         // Il nid di Drupal esce in `forestas.sardegnasentieri_id`, con lo stesso nome delle tracce;
         // i layer riguardano le app, non la scheda.
         unset($properties['out_source_feature_id'], $properties['sardegnasentieri_id'], $properties['layers']);
+        // La scheda PDF (oc:8982): il package mette `print_url` solo nel dettaglio della traccia,
+        // perché non ha un dettaglio POI proprio. A dominio `print` spento la chiave non c'è.
+        $printUrl = PrintService::sheetUrl('ec-poi', $poi->id);
+        if ($printUrl !== null) {
+            $properties['print_url'] = $printUrl;
+        }
 
         $geojson['properties'] = $properties;
 
