@@ -13,6 +13,7 @@ use App\Jobs\Import\RecalculateSardegnaSentieriLayersJob;
 use App\Jobs\Import\ResolveSardegnaSentieriRelationsJob;
 use App\Models\Ente;
 use App\Models\User;
+use App\Services\Import\GeographicAreasImportService;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Services\Import\Source\DrupalDumpLock;
 use App\Services\Import\Source\SardegnaSentieriSource;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
+use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
 use Wm\WmPackage\Jobs\TaxonomyWhere\SyncTaxonomyWhereJob;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcPoi;
@@ -43,6 +45,9 @@ class ImportSardegnaSentieriCommand extends Command
      * Oltre quest'età il lock della copia è di una ricarica fallita (oc:8900).
      */
     private const STALE_LOCK_HOURS = 2;
+
+    /** Valore di `--only` che porta solo le aree geografiche da Geohub (oc:9001). */
+    private const ONLY_GEOGRAPHIC_AREAS = 'aree';
 
     /** Tipi morph con cui tracce e POI compaiono nelle pivot: nome del model del progetto e del package. */
     private const TRACK_AND_POI_MORPH_TYPES = [
@@ -78,7 +83,7 @@ class ImportSardegnaSentieriCommand extends Command
      */
     protected $signature = 'sardegnasentieri:import
                             {--force : Reimport all ignoring updated_at}
-                            {--only= : Import only pois, tracks or enti (enti are always imported)}
+                            {--only= : Import only pois, tracks, enti or aree (enti are always imported, except with aree)}
                             {--reset : Truncate all imported data before importing (implies --force)}';
 
     /**
@@ -100,8 +105,8 @@ class ImportSardegnaSentieriCommand extends Command
         // Un valore sconosciuto di `--only` si comporterebbe come «solo enti»: con `--reset`
         // troncherebbe tracce e POI senza reimportarli (oc:8965).
         $only = $this->option('only');
-        if ($only !== null && ! in_array($only, ['pois', 'tracks', 'enti'], true)) {
-            $this->error("--only={$only} non è valido: usa pois, tracks o enti.");
+        if ($only !== null && ! in_array($only, ['pois', 'tracks', 'enti', self::ONLY_GEOGRAPHIC_AREAS], true)) {
+            $this->error("--only={$only} non è valido: usa pois, tracks, enti o aree.");
 
             return self::FAILURE;
         }
@@ -112,6 +117,28 @@ class ImportSardegnaSentieriCommand extends Command
             $this->error('--only=enti non si combina con --reset: il reset tronca anche tracce e POI. Usa --only=enti --force.');
 
             return self::FAILURE;
+        }
+
+        // Stesso motivo di `--only=enti`: con le sole aree il reset cancellerebbe tracce e POI
+        // senza reimportarli (oc:9001).
+        if ($this->option('reset') && $only === self::ONLY_GEOGRAPHIC_AREAS) {
+            $this->error('--only=aree non si combina con --reset: il reset tronca anche tracce e POI.');
+
+            return self::FAILURE;
+        }
+
+        // Le aree vengono da Geohub, non dalla copia Drupal: `--only=aree` gira prima del lock,
+        // dei prerequisiti e della raggiungibilità della copia, che in locale è spenta di default
+        // (oc:9001). I layer nascono vuoti: li riempie il ricalcolo, come a fine import.
+        if ($only === self::ONLY_GEOGRAPHIC_AREAS) {
+            // Lanciato a mano per verificare: un passo fallito deve dirlo con l'esito.
+            if ($this->importGeographicAreas($runId) === null) {
+                return self::FAILURE;
+            }
+
+            $this->dispatchGeographicAreasChain();
+
+            return self::SUCCESS;
         }
 
         // Prima di tutto, anche del `--reset`: una copia a metà ricarica
@@ -185,6 +212,10 @@ class ImportSardegnaSentieriCommand extends Command
             $this->call('sardegnasentieri:configure-layers', ['--no-recalc' => true]);
         }
 
+        // Prima dei job: con `--reset` le tracce sono già state troncate e i layer nuovi nascono
+        // senza job per riga; li riempie la catena di fine batch (oc:9001).
+        $geographicLayersCreated = $this->importGeographicAreas($runId) ?? 0;
+
         $this->info('Importing taxonomies...');
         $importService->importAll();
         $this->info('Taxonomies imported.');
@@ -214,6 +245,12 @@ class ImportSardegnaSentieriCommand extends Command
 
         if ($jobs === []) {
             $this->info('Nessun job da importare.');
+
+            // Senza job non c'è la catena di fine batch che riempie i layer: quelli appena nati
+            // resterebbero vuoti fino al primo giro con qualcosa da importare (oc:9001).
+            if ($geographicLayersCreated > 0) {
+                $this->dispatchGeographicAreasChain();
+            }
 
             if ($enteJobs !== []) {
                 $this->entiBatch($enteJobs)->dispatch();
@@ -941,5 +978,48 @@ class ImportSardegnaSentieriCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * Il passo delle aree geografiche (oc:9001). Un errore, per esempio Geohub che non risponde,
+     * finisce nel log e non si rilancia: decide il chiamante. Il giro normale prosegue, perché
+     * tracce e POI non dipendono dalle aree; `--only=aree` esce con errore.
+     *
+     * @return int|null i layer creati, null se il passo è fallito
+     */
+    private function importGeographicAreas(string $runId): ?int
+    {
+        $this->info('Importing geographic areas...');
+
+        try {
+            $result = app(GeographicAreasImportService::class)->run();
+        } catch (\Throwable $e) {
+            $this->warn("Aree geografiche non importate: {$e->getMessage()}");
+            Log::channel('import')->error("[sardegnasentieri:{$runId}] Aree geografiche non importate, l'import prosegue.", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $this->info("Geographic areas imported, layers created: {$result['layers_created']}.");
+        Log::channel('import')->info("[sardegnasentieri:{$runId}] Aree geografiche importate.", $result);
+
+        return $result['layers_created'];
+    }
+
+    /**
+     * Fuori dalla catena di fine batch (`--only=aree`, o un giro senza job): luoghi di tracce e
+     * POI, layer e reindex, come `configure-layers`. Senza il reindex l'API di ricerca filtra
+     * ancora sul vecchio `layers` dell'indice, e il click su un'area apre un layer senza percorsi
+     * (oc:9001).
+     */
+    private function dispatchGeographicAreasChain(): void
+    {
+        Bus::chain([
+            new SyncTaxonomyWhereJob,
+            new RecalculateSardegnaSentieriLayersJob,
+            new RegenerateTaxonomyWhereOutputsJob(SardegnaSentieriImportService::IMPORT_APP_ID),
+        ])->onQueue(ImportSardegnaSentieriTrackJob::QUEUE)->dispatch();
     }
 }
