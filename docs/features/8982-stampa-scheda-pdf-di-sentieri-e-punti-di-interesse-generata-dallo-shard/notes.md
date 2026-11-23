@@ -36,6 +36,9 @@ le deviazioni del package sono nel `notes.md` di `wm-package`.
 - **20/11** — Mappa a tutta pagina 1 tranne la testata; via correlati. **23/11** — scelta opzione A (stato su due righe).
 - **23/11** — Call del team: foglio fronte e retro per l'infopoint; pagina 1 con i dati senza descrizione, pagina 2 con la sola mappa A4 al vivo (il servizio delle mappe la restituisce già nella misura); pochi dati catastali; QR code e link al sito (R20). Con la riduzione in scala della pagina 1 come rete di sicurezza (scelta mia: piuttosto che una terza facciata).
 - **23/11** — Credito di OpenStreetMap tenuto sulla pagina della mappa, piccolo nell'angolo, anche se la mappa va «senza nulla»: lo chiede la licenza ODbL. Si toglie con una riga in `\ForestasMappaPagina`.
+- **23/11** — Il QR code e l'indirizzo stampati sono `properties.forestas.url` (dettaglio di Forestas): oggi la pagina di sardegnasentieri.it, e quando il sito passerà a WordPress lì ci sarà il nuovo indirizzo (decisione del dev). Lo shard non costruisce l'URL; senza `url`, o con un valore non http(s), la scheda esce senza rimando. Scartata la variabile `WP_SITE_URL` con il redirect del plugin.
+- **23/11** — La mappa a pagina intera: il package chiede al servizio delle mappe `width_mm` 210 e `height_mm` 297; un'immagine in proporzione A4 copre il foglio, una di proporzioni diverse lascia una fascia bianca sui lati corti (`keepaspectratio`).
+- **23/11** — Scheda del POI su due pagine come quella del percorso (R21): «Il punto in breve» e le foto (al massimo sei) in pagina 1, la mappa in pagina 2. Il QR code resta anche qui (scelta mia, per il «rimando alla pagina sempre presente» della call): si toglie con una riga nella view.
 - **Tabella di conversione** (da confermare con Alessio): partially-walkable → 3, unknown senza livello, walkable → 4, not-walkable → 1 (dal design system).
 - **Parcheggiati (ancora validi):**
   - Build completo di `ForestasTrackDetail` (video, enti…) anche per la stampa: una sola fonte, lavoro in più nel Job.
@@ -51,12 +54,10 @@ le deviazioni del package sono nel `notes.md` di `wm-package`.
 - oc:9000 mergiato prima o nello stesso rilascio (scala della validazione «su 5»).
 - Compose ≥ 2.17 e **bash** sugli host di dev e UAT, non verificabili da qui. Con Compose più vecchio la build fallisce con errore chiaro.
 - `WM_PRINT_ENABLED=true` e `WM_PRINT_QUEUE=print` nel `.env` del server, più il servizio mappe (`WM_PRINT_MAP_DRIVER`, `WM_PRINT_MAP_SERVICE_URL`, `WM_PRINT_MAP_SERVICE_TOKEN`): oggi il driver è `fake`.
-- `WP_SITE_URL` nel `.env` del server (indirizzo del sito WordPress, base del QR code delle schede).
 - Dopo il deploy, rigenerazione dei JSON come in `docs/howto/deploy-automatico.md`.
 
 ## Aperti
 
-- **URL della pagina del sito nel QR code**: oggi provvisorio, `<WP_SITE_URL>/?wmwp_detail=<track|poi>&wmwp_id=<nid>` (con `/en/` in inglese), cioè il redirect del plugin wp-package verso lo slug, documentato solo come test manuale nel piano di oc:8969 e non verificato sul codice del plugin. Con il nid di Drupal come chiave (non cambia con il reset notturno). Va confermato, e va aggiunto `WP_SITE_URL` al `.env` dei server.
 
 - **Chiavi di traduzione generiche** (`lang/*.json`) che cambiano le label Nova a dominio spento: decide il dev.
 - **Chi può lanciare l'Action Nova** di generazione (oggi chiunque acceda alla Resource).

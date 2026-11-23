@@ -171,15 +171,19 @@ lunga, con la descrizione, si rimanda a quando la chiederà il cliente.
      «Sentiero per tutti» come in R17, al più più compatti; «Il sentiero in breve»; pochi dati
      catastali e altimetrici, solo quelli che non sono già sopra e che ci stanno (Partenza, Arrivo,
      Andata e ritorno, Difficoltà; per i sentieri Codice catastale e Data del rilievo; le righe
-     senza dato non escono); il **rimando alla pagina del sito**, QR code e indirizzo. Se il
+     senza dato non escono); il **rimando alla pagina del sito**, QR code e indirizzo, presi da `properties.forestas.url`
+     (oggi sardegnasentieri.it, poi il nuovo sito); senza indirizzo non c'è rimando. Se il
      contenuto non ci sta, si riduce in scala quanto basta invece di traboccare;
   2. pagina 2: **la sola mappa, A4 al vivo** (210 x 297 mm, senza margini, testata né piè di
      pagina), nella misura che restituisce il servizio delle mappe, con il credito di
      OpenStreetMap piccolo nell'angolo (lo chiede la licenza).
 
   Escono descrizione, informazioni utili, roadbook, attività e avvertenze, le tabelle complete dei
-  dati catastali e la galleria. La scheda di `EcPoi` tiene i suoi contenuti, con il rimando al sito
-  in fondo e la mappa nell'ultima pagina, da sola, come quella del percorso.
+  dati catastali e la galleria.
+- <a id="r21"></a>**R21** — Anche la scheda di `EcPoi` è di **due pagine esatte** (dev, 23/11): pagina 1
+  con la testata, «Il punto in breve», il rimando al sito (QR code e indirizzo) e al massimo sei
+  foto, ridotta in scala se non ci sta; pagina 2 con la sola mappa, A4 al vivo. Escono la
+  descrizione e «come arrivare». **Supera R19 per l'ordine dei contenuti.**
 
 ### Requisiti superati dalla risposta del 18/11
 

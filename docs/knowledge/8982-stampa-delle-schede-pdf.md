@@ -65,19 +65,20 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   Andata e ritorno, Difficoltà; per i sentieri Codice catastale e Data del rilievo; senza righe vuote), in griglia,
   con a destra il QR code e sotto l'indirizzo della pagina del sito. **Pagina 2**: la sola mappa. Niente
   descrizione, informazioni utili, roadbook, attività e avvertenze né galleria. Itinerario e cammino cambiano
-  titoli come sul sito; l'itinerario non ha il blocco di stato né i dati del catasto. Il POI (`wp-package/poi.php`):
-  testata, «Il punto in breve», «Il punto di interesse», galleria, rimando al sito, e in fondo la mappa da sola.
+  titoli come sul sito; l'itinerario non ha il blocco di stato né i dati del catasto. Il POI (`wp-package/poi.php`, R21),
+  anche lui su due pagine: in pagina 1 testata, «Il punto in breve» con il QR code e l'indirizzo, al massimo sei
+  foto; in pagina 2 la mappa. Niente descrizione né «come arrivare».
   **Le schede non hanno** i punti di interesse correlati né i percorsi correlati o vicini.
-- **La pagina 1 non trabocca**: tutto il contenuto sta nell'ambiente `ForestasPaginaUnica` (preambolo), che lo
+- **La pagina 1 non trabocca** (traccia e POI): tutto il contenuto sta nell'ambiente `ForestasPaginaUnica` (preambolo), che lo
   compone in un box e, se è più alto dello specchio (avviso, inclusività e nome lungo insieme), lo riduce in scala
   quanto basta. Il box ha altezza zero sopra la linea di base (minipage `[t]`): il limite toglie il `\topskip`,
   altrimenti LaTeX lo manda alla pagina dopo e la pagina 1 resta bianca. Nelle griglie (`ForestasGriglia`,
   `\ForestasDato`) serve `\leavevmode` in testa alla cella: un `\color` in modo verticale fa scendere la cella di
   una riga.
-- **Rimando al sito**: `config('forestas.wp_site_url')` (`WP_SITE_URL`); vuoto, niente QR né indirizzo. L'URL è
-  costruito in `ForestasPrintSheet::link()`; la forma è provvisoria (vedi le note del ticket): il redirect del
-  plugin `?wmwp_detail=<track|poi>&wmwp_id=<nid>`, con il nid di Drupal come chiave, che non cambia con il reset
-  notturno. Il QR code è del pacchetto `qrcode`, che vuole escaped `# % & _ ~ $ ^ { } \`.
+- **Rimando al sito**: l'URL è `properties.forestas.url` (`ForestasTrackDetail` / `ForestasPoiDetail`), lo stesso
+  del dettaglio: oggi la pagina di sardegnasentieri.it, quando il sito passerà a WordPress il nuovo indirizzo. Lo
+  shard non lo costruisce (lo slug del sito lo calcola il plugin wp-package). Senza `url`, o se non è http(s),
+  niente QR né indirizzo. Il QR code è del pacchetto `qrcode`, che vuole escaped `# % & _ ~ $ ^ { } \`.
 - **Scale come il sito** (registro degli stati del tema, `inc/statuses.php`, branch di oc:9000; lo stato di
   assenza vale 0): validazione 0-5 (non verificato 0, in revisione 2, pre-accatastamento 3, validato 4,
   certificato 5); percorribilità 0-4 (sconosciuta o assente 0, non percorribile 2, parzialmente 3,
@@ -100,9 +101,10 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   d'obbligo per la licenza, sta piccolo nell'angolo in basso a destra. `eso-pic` e `qrcode` arrivano con
   `texlive-xetex` (dipendenze di `texlive-latex-recommended` e `texlive-pictures`), già installato dallo script
   del package. La cella dell'accessibilità ha larghezza esplicita (`\multicolumn` con `p{}`): una colonna `X` in
-  un `\multicolumn` non prende la larghezza delle due colonne. Il test
-  `wm-package/tests/Feature/Print/PrintAppThemeTest.php` («174x98 by default») lanciato da forestas fallisce per
-  questa configurazione: verifica i default del package.
+  un `\multicolumn` non prende la larghezza delle due colonne.
+- **I test di stampa del package girano nella sua suite** (`Wm\WmPackage\Tests\TestCase`, Testbench, database
+  `wm_package`): si lanciano dalla cartella del package con `vendor/bin/pest tests/Feature/Print tests/Unit/Print`,
+  non da forestas, dove manca il loro `tests/Pest.php`.
 - Il **logotipo è testo**, non immagine: lettere colorate per ruolo (S terra, A verde, R blu, D terra,
   E oro, G blu, N terra, A oro, peso 700) e coda «Sentieri» in Light, omessa nel piè di pagina (corpo piccolo).
 - Per il POI la rotta del package carica `Wm\WmPackage\Models\EcPoi`, che non ha le relazioni di Forestas:
@@ -122,8 +124,6 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
 - Senza scrivere sul DB: da tinker, `PrintService::generate($model, 'it')` con il modello caricato
   (`App\Models\EcTrack::find(...)`); è sincrono e scrive solo il PDF sullo storage `wmfe`. Serve
   `WM_PRINT_ENABLED=true`. La rotta `/print/...` invece accoda il Job: serve un worker sulla coda `print`.
-  Per vedere il QR code senza toccare il `.env`: `config(['forestas.wp_site_url' => 'https://wp.forestas.uat.maphub.it'])`
-  nella stessa sessione, prima di `generate()`.
 - Per vedere la scheda **senza la personalizzazione**:
   `View::replaceNamespace('wm-package', base_path('wm-package/resources/views'))` prima di `generate()`, così
   non si usano gli override di Forestas.

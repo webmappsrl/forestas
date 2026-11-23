@@ -6,12 +6,13 @@
   usano quelle, più $forestas, calcolato da `ForestasPoiDetail::build()` come nel dettaglio
   pubblico, e $sheet, gli stessi dati già escaped per LaTeX (`App\Support\ForestasPrintSheet`).
 
-  Modello: la pagina del POI del sito WordPress (tema forestas-child, wp-package/poi.php), su pagine
-  A4: la testata (logotipo, etichetta di tipo, area, nome, località, filetto oro), «Il punto in breve»
-  (tipologia, comune, area geografica, codice, enti), «Il punto di interesse» (descrizione, come
-  arrivare), la galleria e il rimando alla pagina del sito (QR code e indirizzo); in fondo la mappa,
-  da sola in una pagina A4 al vivo, come nella scheda del percorso. Non ci sono i percorsi vicini né i
-  punti di interesse correlati. Le parti senza dati non compaiono.
+  Modello: la pagina del POI del sito WordPress (tema forestas-child, wp-package/poi.php), condensata
+  come la scheda del percorso in un foglio A4 di due pagine (oc:8982, R21): pagina 1 con la testata
+  (logotipo, etichetta di tipo, area, nome, località, filetto oro), «Il punto in breve» (tipologia,
+  comune, area geografica, codice, enti) con a destra il QR code della pagina del sito e sotto
+  l'indirizzo, poi al massimo sei foto; pagina 2 con la sola mappa, A4 al vivo. Niente descrizione né
+  «come arrivare». Non ci sono i percorsi vicini né i punti di interesse correlati. Le parti senza dati
+  non compaiono.
 
   La rotta del package risolve `ec-poi` con il modello del package: `poiModel()` carica quello di
   Forestas, che ha le relazioni (enti, POI correlati, percorsi vicini).
@@ -25,6 +26,8 @@
     $l = $sheet['labels'];
     // Variabili del contratto lette senza `??`: se il package le rinomina la view si rompe subito.
     $credit = $labels['© OpenStreetMap contributors, Webmapp'];
+    // Due righe da tre: con la testata e «Il punto in breve» la pagina 1 basta (oc:8982, R21).
+    $photos = array_slice($photos, 0, 6);
 @endphp
 \documentclass[10pt,a4paper]{article}
 @foreach ($styleFiles as $styleName)
@@ -36,6 +39,8 @@
     'copyright' => $l['Footer copyright'],
 ])
 \begin{document}
+{{-- Pagina 1: tutto in un box che, se non ci sta, si riduce in scala (ForestasPaginaUnica). --}}
+\begin{ForestasPaginaUnica}
 {{-- Testata. --}}
 \noindent\ForestasLogotipo{16pt}\hfill\ForestasOcchiello{{!! $l['Point of interest sheet'] !!}}
 \ForestasFiletto
@@ -49,8 +54,10 @@
 \begingroup\color{ink-2}\ForestasStileSottotitolo {!! $sheet['location'] !!}\par\endgroup
 @endif
 \FilettoOro
+{{-- «Il punto in breve», con a destra il QR code della pagina del sito e sotto l'indirizzo. --}}
 
 \TitoloSezione{{!! $l['At a glance'] !!}}
+\par\nointerlineskip\vspace{4pt}\noindent\begin{minipage}[t]{\dimexpr\linewidth-@if ($sheet['link'])28mm @else 0mm @endif\relax}\vspace{0pt}
 \begin{Tabella}
 @foreach ($sheet['rows'] as $row)
 \RigaTabella{{!! $row['label'] !!}}{{!! $row['value'] !!}}
@@ -59,20 +66,14 @@
 \RigaTabella{{!! $stat['label'] !!}}{{!! $stat['value'] !!}}
 @endforeach
 \end{Tabella}
-@if (trim((string) $descriptionLatex) !== '' || $sheet['directions'])
+@if ($sheet['link'])
+\ForestasIndirizzo{{!! $l['See the page on the website'] !!}}{{!! $sheet['link']['text'] !!}}
+@endif
+\end{minipage}@if ($sheet['link'])\hfill\begin{minipage}[t]{22mm}\vspace{0pt}\ForestasQr{{!! $sheet['link']['qr'] !!}}\end{minipage}@endif
 
-\TitoloSezione{{!! $l['The point of interest'] !!}}
-@if (trim((string) $descriptionLatex) !== '')
-\ForestasSottotitolo{{!! $labels['Description'] !!}}
-{!! $descriptionLatex !!}
-@endif
-@if ($sheet['directions'])
-
-\ForestasSottotitolo{{!! $l['Directions'] !!}}
-{!! $sheet['directions'] !!}
-@endif
-@endif
+\par
 @if ($photos !== [])
+{{-- Foto: al massimo sei, tre per riga. --}}
 
 \TitoloSezione{{!! $l['Photogallery'] !!}}
 \noindent
@@ -81,13 +82,9 @@
 @endforeach
 \par
 @endif
-@if ($sheet['link'])
-{{-- Rimando alla pagina del sito: QR code e indirizzo. --}}
-\par\vspace{12pt}\noindent\ForestasQr{{!! $sheet['link']['qr'] !!}}
-\ForestasIndirizzo{{!! $l['See the page on the website'] !!}}{{!! $sheet['link']['text'] !!}}
-@endif
+\end{ForestasPaginaUnica}
 @if ($mapFile)
-{{-- La mappa da sola, A4 al vivo, nell'ultima pagina (come la scheda del percorso). --}}
+{{-- Pagina 2: la mappa da sola, A4 al vivo, come nella scheda del percorso. --}}
 \ForestasMappaPagina{{!! $mapFile !!}}{{!! $credit !!}}
 @endif
 \end{document}

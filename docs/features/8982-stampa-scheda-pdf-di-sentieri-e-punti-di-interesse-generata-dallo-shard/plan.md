@@ -135,11 +135,10 @@ Dopo il Task 21 del package (tema dell'App, mappa configurabile, niente token).
 - [ ] **Step 5:** pagina di conoscenza e guida aggiornate (niente token; view dal design system).
 - [ ] **Step 6 (dev):** `git commit -m "feat(oc:8982): schede di Forestas sul modello del sito"`
 
-### Task 7: Foglio fronte e retro (R20)
+### Task 7: Foglio fronte e retro (R20, R21)
 
 **Files:**
-- Modify: `app/Providers/AppServiceProvider.php` (mappa 210 x 297), `config/forestas.php`
-  (`wp_site_url`, `WP_SITE_URL`), `app/Support/ForestasPrintSheet.php` (`keyData`, `link`; via
+- Modify: `app/Providers/AppServiceProvider.php` (mappa 210 x 297), `app/Support/ForestasPrintSheet.php` (`keyData`, `link`; via
   roadbook, gruppi, informazioni utili, avvertenze), `resources/views/vendor/wm-package/print/{ec-track,ec-poi}.blade.php`,
   `partials/preamble.blade.php` (`\ForestasMappaPagina`, `ForestasPaginaUnica`, `ForestasGriglia`,
   `\ForestasDato`, `\ForestasQr`, `\ForestasIndirizzo`; via `\ForestasMappa`, `\ForestasGruppo`,
@@ -148,12 +147,13 @@ Dopo il Task 21 del package (tema dell'App, mappa configurabile, niente token).
 
 - [x] **Step 1:** test: ordine del foglio (pagina 1 fino al rimando, poi la sola mappa); niente
   descrizione, roadbook, attività e avvertenze, galleria; dati brevi senza righe vuote e senza le
-  misure ripetute; link per nid o id, per lingua, assente senza sito; compilazione reale del caso
+  misure ripetute; link da `properties.forestas.url`, assente se manca o non è http(s); compilazione reale del caso
   più pieno in due pagine esatte, con la mappa da sola in pagina 2.
 - [x] **Step 2:** preambolo, view e `ForestasPrintSheet`.
 - [x] **Step 3:** PDF reali (tracce 1, 42, 768 e POI 80, senza scritture sul DB) guardati a vista.
-- [ ] **Step 4 (dev):** confermare la forma dell'URL del sito (vedi notes, «Aperti»), poi
-  `git commit -m "feat(oc:8982): scheda del percorso su un foglio fronte e retro"`
+- [x] **Step 3b (R21):** scheda del POI su due pagine: test dell'ordine, del limite di sei foto e della
+  compilazione reale in due pagine esatte.
+- [ ] **Step 4 (dev):** `git commit -m "feat(oc:8982): scheda del percorso su un foglio fronte e retro"`
 
 ## Verifica finale
 

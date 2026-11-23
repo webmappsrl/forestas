@@ -20,7 +20,7 @@ use Wm\WmPackage\TrailRegistry\Services\WalkabilityService;
 /**
  * I dati di Forestas per le schede PDF (oc:8982), pronti per gli override delle view di stampa
  * (`resources/views/vendor/wm-package/print/`). Ogni stringa restituita è già LaTeX-sicura
- * (`LatexText::escape()` o `::fromHtml()`): la view la stampa con `{!! !!}`. Le parti senza dati
+ * (`LatexText::escape()`): la view la stampa con `{!! !!}`. Le parti senza dati
  * escono vuote (null o lista vuota) e la view non le mostra; i dati delle tabelle che il sito
  * mostra sempre escono con il trattino «—».
  *
@@ -170,7 +170,7 @@ final class ForestasPrintSheet
             'facts' => self::facts($track, $locale),
             'dataTitle' => self::label(['itinerario' => 'Itinerary data', 'cammino' => 'Walk data'][$kind] ?? 'Register and elevation data', $locale),
             'keyData' => self::keyData($track, $kind, $forestas, $locale),
-            'link' => self::link('track', $forestas['sardegnasentieri_id'] ?? null, (int) $track->id, $locale),
+            'link' => self::link($forestas['url'] ?? null, $locale),
             'labels' => self::labels($locale),
         ];
     }
@@ -203,8 +203,7 @@ final class ForestasPrintSheet
             'area' => self::areaText($places['areas'], $locale),
             'location' => self::locationText($places, $locale),
             'rows' => $rows,
-            'directions' => self::html(self::localized($forestas['directions'] ?? null, $locale)),
-            'link' => self::link('poi', $forestas['sardegnasentieri_id'] ?? null, (int) $poi->id, $locale),
+            'link' => self::link($forestas['url'] ?? null, $locale),
             'labels' => $labels,
         ];
     }
@@ -219,9 +218,9 @@ final class ForestasPrintSheet
         $keys = [
             'Notice', 'Walkability', 'Trail register validation', 'Accessibility', 'Not yet available',
             'Not classified', 'status updated on', 'Note:', 'Photogallery', 'See the page on the website',
-            'Trail for everyone', 'Inclusivity score', 'Directions', 'Code',
+            'Trail for everyone', 'Inclusivity score', 'Code',
             'Point of interest sheet', 'Point of interest', 'Point type', 'Municipality',
-            'Geographic area', 'At a glance', 'The point of interest', 'Map',
+            'Geographic area', 'At a glance',
         ];
         $labels = [];
         foreach ($keys as $key) {
@@ -417,30 +416,27 @@ final class ForestasPrintSheet
     }
 
     /**
-     * Il rimando alla pagina di dettaglio del sito WordPress: l'URL per il QR code (caratteri speciali
-     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile (escaped per LaTeX). Null se il sito
-     * non è configurato (`forestas.wp_site_url`).
+     * Il rimando alla pagina di dettaglio del sito pubblico: l'URL per il QR code (caratteri speciali
+     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, senza schema (escaped per LaTeX).
      *
-     * PROVVISORIO (oc:8982): l'URL con lo slug lo costruisce il plugin wp-package
-     * (`wmwp_detail_url()`), che lo shard non conosce. Qui si usa il redirect del plugin
-     * `?wmwp_detail=<tipo>&wmwp_id=<chiave>`, con il nid di Drupal come chiave stabile (non cambia
-     * con il reset notturno di dev e UAT; filtro `wmwp_detail_source` del tema) e l'id dello shard per
-     * gli elementi creati in Nova. Da confermare sul codice del plugin.
+     * L'URL è quello dei dati, `properties.forestas.url` (`ForestasTrackDetail` / `ForestasPoiDetail`):
+     * oggi l'import ci scrive la pagina di sardegnasentieri.it, e quando il sito passerà a WordPress ci
+     * sarà il nuovo indirizzo (decisione del dev, 23/11). Lo shard non lo costruisce. Null se manca o
+     * se non è un indirizzo http(s): un dato importato finisce stampato in un QR code.
      *
      * @return array{qr: string, text: string}|null
      */
-    private static function link(string $type, mixed $nid, int $id, string $locale): ?array
+    private static function link(mixed $url, string $locale): ?array
     {
-        $base = config('forestas.wp_site_url');
-        if (! is_string($base) || trim($base) === '') {
+        $url = self::localized($url, $locale);
+        $url = $url === null ? '' : trim($url);
+        if (! preg_match('#^https?://[^\s/$.?\#].\S*$#i', $url)) {
             return null;
         }
-        $key = is_scalar($nid) && trim((string) $nid) !== '' ? trim((string) $nid) : (string) $id;
-        $url = rtrim(trim($base), '/').($locale === 'it' ? '' : '/'.$locale).'/?wmwp_detail='.$type.'&wmwp_id='.rawurlencode($key);
 
         return [
             'qr' => strtr($url, ['\\' => '\\\\', '#' => '\\#', '%' => '\\%', '&' => '\\&', '_' => '\\_', '~' => '\\~', '$' => '\\$', '^' => '\\^', '{' => '\\{', '}' => '\\}']),
-            'text' => LatexText::escape(preg_replace('#^https?://#', '', $url) ?? $url),
+            'text' => LatexText::escape(preg_replace('#^https?://#i', '', $url) ?? $url),
         ];
     }
 
@@ -689,13 +685,6 @@ final class ForestasPrintSheet
         $text = trim((string) $value);
 
         return $text === '' ? null : LatexText::escape($text);
-    }
-
-    private static function html(?string $html): ?string
-    {
-        $latex = LatexText::fromHtml($html);
-
-        return trim($latex) === '' ? null : $latex;
     }
 
     private static function date(mixed $value): ?string

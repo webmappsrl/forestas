@@ -71,9 +71,6 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
   supervisor `print` di Horizon esiste solo a dominio acceso. Dove la configurazione è congelata
   (`php artisan optimize` di `deploy_prod.sh`), un cambio di queste variabili vale solo dal deploy
   successivo.
-- **Sempre prima del deploy**, `WP_SITE_URL` con l'indirizzo del sito WordPress di quell'ambiente, senza barra
-  finale (su UAT `https://wp.forestas.uat.maphub.it`): è la base del QR code e del link stampati nelle schede.
-  Vuota, le schede escono senza rimando al sito.
 - **Il primo deploy ricostruisce l'immagine** (TeX Live): qualche minuto, entro il `command_timeout`
   di 30m del workflow. Dai deploy successivi la build usa la cache.
 - Sull'host servono Docker Compose >= 2.17 (`additional_contexts`) e `bash` (lo script remoto usa

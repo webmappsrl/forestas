@@ -45,8 +45,6 @@ beforeEach(function () {
     Storage::fake('s3');
     // Mappa dal renderer finto del package: un .env.testing con il driver http farebbe chiamate di rete.
     config(['wm-package.features.print.map_service.driver' => 'fake']);
-    // Senza sito configurato le schede escono senza rimando: i test che lo vogliono lo accendono.
-    config(['forestas.wp_site_url' => null]);
     App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
 
     // Compilatore finto: cattura il sorgente e restituisce un PDF finto; con `$real` compila davvero.
@@ -267,10 +265,9 @@ describe('la mappa: una pagina a sé, A4 al vivo', function () {
 
 describe('scheda del sentiero', function () {
     it('segue l\'ordine del foglio: in pagina 1 testata, stato, in breve, dati e rimando; poi la mappa', function () {
-        config(['forestas.wp_site_url' => 'https://wp.example.test']);
         $track = printOverrideTrack(
             ['forestas_registry_code' => 'Z-NU-B-401', 'forestas_inclusivity_physical' => 40, 'forestas_inclusivity_aids' => 30, 'forestas_inclusivity_digital' => 20],
-            ['not_accessible' => true, 'not_accessible_message' => ['it' => 'Sentiero chiuso per frana']],
+            ['not_accessible' => true, 'not_accessible_message' => ['it' => 'Sentiero chiuso per frana'], 'forestas' => ['url' => 'https://www.example.test/sentieri/monte-corrasi']],
         );
         printOverrideTerm($track, 'hiking-difficulty', 'hiking-difficulty-e', 'E');
 
@@ -524,24 +521,19 @@ describe('scheda del sentiero', function () {
         expect($itineraryTex)->not->toContain('\ForestasDato{Codice catastale}');
     });
 
-    it('rimanda alla pagina del sito con il QR code e l\'indirizzo, per nid o id e per lingua', function () {
-        config(['forestas.wp_site_url' => 'https://wp.example.test/']);
-        $track = printOverrideTrack([], ['sardegnasentieri_id' => 1043]);
-        $nova = printOverrideTrack();
-        $poi = printOverridePoi(['out_source_feature_id' => 5211]);
+    it('rimanda alla pagina del sito dei dati (properties.forestas.url) con il QR code e l\'indirizzo', function () {
+        $track = printOverrideTrack([], ['forestas' => ['url' => 'https://www.example.test/sentieri/salita-sul-monte-corrasi-b_401?x=1&y=100%']]);
+        $poi = printOverridePoi(['forestas' => ['url' => 'https://www.example.test/da-vedere/san-mauro']]);
 
         expect(printOverrideBody(printOverrideRender($track)))
-            ->toContain('\ForestasQr{https://wp.example.test/?wmwp\_detail=track\&wmwp\_id=1043}')
-            ->toContain('{wp.example.test/?wmwp\_detail=track\&wmwp\_id=1043}')
-            // Senza nid (creato in Nova) la chiave è l'id dello shard.
-            ->and(printOverrideBody(printOverrideRender($nova)))->toContain('wmwp\_id='.$nova->id.'}')
-            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\ForestasQr{https://wp.example.test/?wmwp\_detail=poi\&wmwp\_id=5211}');
+            // Nel QR i caratteri speciali di LaTeX escaped come vuole il pacchetto qrcode.
+            ->toContain('\ForestasQr{https://www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
+            // Nell'indirizzo leggibile senza schema.
+            ->toContain('{www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
+            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\ForestasQr{https://www.example.test/da-vedere/san-mauro}');
 
-        $sheet = ForestasPrintSheet::track($track, ForestasTrackDetail::build($track), 'en');
-        expect($sheet['link']['text'])->toBe('wp.example.test/en/?wmwp\_detail=track\&wmwp\_id=1043');
-
-        config(['forestas.wp_site_url' => null]);
-        foreach ([printOverrideTrack(), printOverridePoi()] as $model) {
+        // Senza indirizzo (creato in Nova) o con un indirizzo che non è http(s): niente rimando.
+        foreach ([printOverrideTrack(), printOverridePoi(), printOverrideTrack([], ['forestas' => ['url' => 'javascript:alert(1)']])] as $model) {
             $tex = printOverrideBody(printOverrideRender($model));
             expect($tex)->not->toContain('\ForestasQr');
             expect($tex)->not->toContain('\ForestasIndirizzo');
@@ -612,24 +604,28 @@ describe('scheda del sentiero', function () {
 });
 
 describe('scheda del punto di interesse', function () {
-    it('ha lo stesso linguaggio grafico: testata, «Il punto in breve», il resto e in fondo la mappa', function () {
+    it('sta in un foglio: pagina 1 con testata, «Il punto in breve», rimando e foto; pagina 2 con la mappa', function () {
         $poi = printOverridePoi([
             'taxonomy_where' => [
                 'R40182' => ['en' => 'Sorgono', '_admin_level' => 8],
                 '81' => ['it' => 'Area T (Centrale)'],
             ],
             'description' => ['it' => '<p>Un santuario.</p>'],
+            'forestas' => ['url' => 'https://www.example.test/da-vedere/san-mauro', 'come_arrivare' => ['it' => 'Dalla statale 128.']],
         ]);
 
         $full = printOverrideRenderWith($poi, ['photos' => ['photo-1.jpg']]);
         $tex = printOverrideBody($full);
 
         $positions = array_map(fn ($needle) => printOverridePos($tex, $needle), [
+            '\begin{ForestasPaginaUnica}',
             '\ForestasLogotipo{',
             '\TitoloScheda{Nuraghe Serbissi}',
             '\TitoloSezione{Il punto in breve}',
-            '\TitoloSezione{Il punto di interesse}',
+            '\ForestasIndirizzo',
+            '\ForestasQr',
             '\TitoloSezione{Galleria fotografica}',
+            '\end{ForestasPaginaUnica}',
             '\ForestasMappaPagina{map.png}',
         ]);
         $sorted = $positions;
@@ -639,8 +635,20 @@ describe('scheda del punto di interesse', function () {
             ->and($tex)->toContain('\RigaTabella{Comune}{Sorgono}')
             ->toContain('\RigaTabella{Area geografica}{Area T (Centrale)}')
             ->toContain('\RigaTabella{Tipologia}{—}')
-            ->toContain('Un santuario.')
             ->and($full)->toContain('\colorlet{forestas-tipo}{tipo-da-vedere}');
+        // Niente descrizione né «come arrivare».
+        foreach (['Un santuario.', 'Dalla statale', 'Il punto di interesse}', 'Come arrivare'] as $absent) {
+            expect($tex)->not->toContain($absent);
+        }
+    });
+
+    it('mette al massimo sei foto, due righe da tre', function () {
+        $photos = array_map(fn ($n) => "photo-{$n}.jpg", range(1, 8));
+        $tex = printOverrideBody(printOverrideRenderWith(printOverridePoi(), ['photos' => $photos]));
+
+        expect($tex)->toContain('{photo-6.jpg}')
+            ->and(substr_count($tex, '\includegraphics'))->toBe(6);
+        expect($tex)->not->toContain('{photo-7.jpg}');
     });
 
     it('usa la view di Forestas anche con il modello EcPoi del package', function () {
@@ -690,7 +698,6 @@ it('mette le foto del POI a tre per riga, senza spazi fra una foto e l\'altra', 
 it('compila la scheda della traccia e del POI con il preambolo vero', function () {
     $this->compiler->real = true;
     // Con il rimando al sito, per compilare anche il QR code (pacchetto qrcode).
-    config(['forestas.wp_site_url' => 'https://wp.example.test']);
     $track = printOverrideTrack([
         'forestas_registry_code' => 'Z-NU-B-401',
         'forestas_inclusivity_physical' => 40,
@@ -701,6 +708,7 @@ it('compila la scheda della traccia e del POI con il preambolo vero', function (
         'not_accessible_message' => ['it' => 'Frana & 100% #1'],
         'distance' => 6.6, 'ascent' => 1008, 'duration_forward' => 285, 'ele_min' => 435, 'ele_max' => 1432,
         'config_detail' => [['box_type' => 'info', 'items' => [['title' => ['it' => 'Tappa 1'], 'content' => ['it' => '<p>Si sale.</p>']]]]],
+        'forestas' => ['url' => 'https://www.example.test/sentieri/monte-corrasi'],
     ]);
     printOverrideTerm($track, 'walkability-status', 'walkability-status-walkable', 'Percorribile');
     printOverrideTerm($track, 'validation-status', 'validation-status-pre-registration', 'In pre-accatastamento');
@@ -718,7 +726,6 @@ it('compila la scheda della traccia e del POI con il preambolo vero', function (
 
 it('compila un foglio di due facciate: i dati in pagina 1, anche quando sono tanti, e la sola mappa in pagina 2', function () {
     $this->compiler->real = true;
-    config(['forestas.wp_site_url' => 'https://wp.example.test']);
     // Il caso più pieno: avviso, «Sentiero per tutti», nome e località lunghi, tutti i dati brevi.
     $track = printOverrideTrack([
         'name' => ['it' => 'Sca Martini, bivio 324 - Ollastus (D 334) e ritorno per la valle del rio'],
@@ -730,6 +737,7 @@ it('compila un foglio di due facciate: i dati in pagina 1, anche quando sono tan
         'distance' => 6.6, 'ascent' => 1008, 'duration_forward' => 285, 'ele_min' => 435, 'ele_max' => 1432,
         'from' => ['it' => 'Oliena (Su Carmene)'], 'to' => ['it' => 'Corrasi - Punto di partenza B-402'], 'roundtrip' => false,
         'description' => ['it' => '<p>Il sentiero sale.</p>'],
+        'forestas' => ['url' => 'https://www.example.test/sentieri/sca-martini-bivio-324-ollastus-d-334'],
         'taxonomy_where' => [
             'R1' => ['it' => 'Villasimius', '_admin_level' => 8], 'R2' => ['it' => 'Villaputzu', '_admin_level' => 8],
             'R3' => ['it' => 'Arzana', '_admin_level' => 8], 'R4' => ['it' => 'Lanusei', '_admin_level' => 8],
@@ -759,7 +767,7 @@ it('compila un foglio di due facciate: i dati in pagina 1, anche quando sono tan
     // mappa, con il credito; né testata né piè di pagina.
     expect($pages)->toBe(2);
     expect($one)->toContain('scamartini')->toContain('validazionecatastale')->toContain('ilsentieroinbreve')
-        ->toContain('codicecatastale')->toContain('wp.example.test')
+        ->toContain('codicecatastale')->toContain('www.example.test/sentieri')
         ->and(strpos($one, 'sentierochiusoperfrana'))->toBeLessThan(strpos($one, 'validazionecatastale'))
         ->and(strpos($one, 'validazionecatastale'))->toBeLessThan(strpos($one, 'ilsentieroinbreve'));
     expect($one)->not->toContain('openstreetmap');
@@ -767,6 +775,30 @@ it('compila un foglio di due facciate: i dati in pagina 1, anche quando sono tan
     expect($two)->toContain('openstreetmap');
     expect($two)->not->toContain('scamartini');
     expect($two)->not->toContain('regioneautonoma');
+})->skip(! is_executable('/usr/bin/xelatex') || trim((string) shell_exec('command -v gs')) === '', 'xelatex o ghostscript non installati');
+
+it('compila la scheda del POI in due facciate, con la sola mappa in pagina 2', function () {
+    $this->compiler->real = true;
+    $poi = printOverridePoi([
+        'description' => ['it' => '<p>'.str_repeat('Un santuario campestre molto lungo da descrivere. ', 80).'</p>'],
+        'forestas' => ['url' => 'https://www.example.test/da-vedere/san-mauro'],
+        'taxonomy_where' => ['R40182' => ['it' => 'Sorgono', '_admin_level' => 8], '81' => ['it' => 'Area T (Centrale)']],
+    ]);
+
+    app(PrintService::class)->generate($poi, 'it');
+    $pdf = tempnam(sys_get_temp_dir(), 'scheda').'.pdf';
+    file_put_contents($pdf, $this->compiler->pdf);
+    $pages = (int) trim((string) shell_exec(sprintf('gs -q -dNODISPLAY -dNOSAFER -c %s 2>/dev/null', escapeshellarg('('.$pdf.') (r) file runpdfbegin pdfpagecount = quit'))));
+    $page = fn (int $n) => mb_strtolower((string) preg_replace('/\s+/u', '', (string) shell_exec(sprintf('gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -dFirstPage=%d -dLastPage=%d -sOutputFile=- %s 2>/dev/null', $n, $n, escapeshellarg($pdf)))));
+    $one = $page(1);
+    $two = $page(2);
+    @unlink($pdf);
+
+    expect($pages)->toBe(2);
+    expect($one)->toContain('nuragheserbissi')->toContain('ilpuntoinbreve')->toContain('www.example.test/da-vedere');
+    expect($one)->not->toContain('santuariocampestre');
+    expect($two)->toContain('openstreetmap');
+    expect($two)->not->toContain('nuragheserbissi');
 })->skip(! is_executable('/usr/bin/xelatex') || trim((string) shell_exec('command -v gs')) === '', 'xelatex o ghostscript non installati');
 
 it('compila la mappa d\'insieme del package', function () {
