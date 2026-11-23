@@ -206,7 +206,7 @@ it('non offre fra le attività i tipi di percorso, ma non li cancella', function
     // Si scrive come fa l'import, con insertOrIgnore: salvando da Eloquent l'observer passa
     // l'identifier per Str::slug() e i due punti diventano trattini, quindi la riga non
     // somiglierebbe a quelle vere.
-    $identifier = SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero';
+    $identifier = SardegnaSentieriImportService::TYPE_ACTIVITIES['sentiero'];
     DB::table('taxonomy_activities')->insert([
         'identifier' => $identifier,
         'name' => json_encode(['it' => 'Sentiero']),
@@ -229,7 +229,7 @@ it('non offre fra le attività i tipi di percorso, ma non li cancella', function
 
 it('non stacca un\'attività nascosta quando si salva la scheda', function () {
     // Il tipo percorso non compare fra le options: salvando, non deve sparire dal contenuto.
-    $identifier = SardegnaSentieriImportService::TYPE_ACTIVITY_PREFIX.'sentiero';
+    $identifier = SardegnaSentieriImportService::TYPE_ACTIVITIES['sentiero'];
     DB::table('taxonomy_activities')->insert([
         'identifier' => $identifier,
         'name' => json_encode(['it' => 'Sentiero']),

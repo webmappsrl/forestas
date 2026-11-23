@@ -37,6 +37,14 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
 - **I rilasci di WordPress con passi propri**, come `applica --conferma` e `pagine --conferma` di
   `wp-forestas/bin/wordpress-config.sh`: vedi [messa-in-opera-wordpress-uat.md](messa-in-opera-wordpress-uat.md).
 - **Le variabili nuove nei `.env`** dei server.
+- **Il primo deploy delle versioni del JSON della traccia (oc:8997)**, su ogni server:
+  **prima del deploy**, scrivere nel `.env` del server `WMFE_TRACK_VERSIONS=legacy,v1`. Il deploy
+  esegue `php artisan optimize`, che congela la configurazione: una variabile aggiunta dopo non
+  viene letta, e senza di essa lo shard continua a scrivere il solo file senza versione, senza
+  nessun segnale. I file della `v1` nascono poi da soli al primo reset notturno; per vederli
+  subito si lancia una volta l'Action Nova «Update Tracks on AWS» sulla lista delle EC Tracce.
+  Se su un server il reset notturno venisse spento (`SARDEGNASENTIERI_DAILY_RESET`), quell'Action
+  diventerebbe obbligatoria dopo ogni deploy che introduce una versione nuova.
 - **Il primo deploy dell'API degli enti (oc:8965)**, su ogni server, in quest'ordine:
   1. **prima del deploy**, scrivere nel `.env` del server `WP_API_TOKEN` con un valore generato
      da `openssl rand -hex 32`, e passarlo a chi configura il sito WordPress. Il deploy esegue

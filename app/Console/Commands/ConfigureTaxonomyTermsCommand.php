@@ -23,8 +23,11 @@ use Wm\WmPackage\Models\TaxonomyTerm;
  * l'eccezione: sotto transazione PostgreSQL una violazione di unicità aborta la transazione
  * (oc:8607).
  *
- * I termini che vengono da Drupal portano `sardegnasentieri:tid:<tid>`; gli altri un identifier
- * semantico, perché la corrispondenza molti-a-uno con Drupal vive nell'import.
+ * Ogni termine ha un identifier nostro: per le scale di difficoltà è il valore che il SUS manda
+ * nel campo 37 della domanda (`mtb-difficulty-BC`, `horse-difficulty-easy`), per gli altri un
+ * nome semantico. Il term id di Drupal, che prima faceva da identifier, resta in
+ * `properties->source->drupal_tid`: è un dato di provenienza, e l'import ci riconosce il termine
+ * quando la sorgente lo cita. Le chiavi vecchie si rinominano, vedi `RENAMED`.
  */
 class ConfigureTaxonomyTermsCommand extends Command
 {
@@ -34,32 +37,43 @@ class ConfigureTaxonomyTermsCommand extends Command
 
     protected $description = 'Crea (o allinea) le tassonomie e i termini del modello unico delle classificazioni';
 
-    private const DRUPAL = 'sardegnasentieri:tid:';
-
     /**
-     * Elenco di sistema. Termine: [nome, identifier, sort_order, icona|null].
+     * Elenco di sistema. Termine: [nome, identifier, sort_order, icona|null, tid di Drupal|null].
      *
-     * @return list<array{identifier: string, icon?: string|null, name: string, single_choice: bool, properties?: array<string, mixed>, terms: list<array{0: string, 1: string, 2: int, 3?: string|null}>}>
+     * L'identifier e' il nome che diamo noi al termine, e per le scale di difficolta' e' il
+     * valore che il SUS manda nel campo 37: guardando la riga si sa cosa arriva dall'API. Il tid
+     * di Drupal, che prima era l'identifier, resta scritto in `properties->source->drupal_tid`:
+     * serve all'import per riconoscere il termine alla fonte, ed e' un dato di provenienza, non
+     * il nome della cosa. Quando Drupal verra' dismesso, sparisce senza toccare altro.
+     *
+     * @return list<array{identifier: string, icon?: string|null, name: string, single_choice: bool, properties?: array<string, mixed>, terms: list<array{0: string, 1: string, 2: int, 3?: string|null, 4?: int|null}>}>
      */
     public static function taxonomies(): array
     {
-        $d = fn (int $tid): string => self::DRUPAL.$tid;
-
         return [
             ['identifier' => 'hiking-difficulty', 'icon' => 'txn-trekking', 'name' => 'Difficoltà escursionistica', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
-                ['T', $d(4066), 0], ['E', $d(4067), 1], ['EE', $d(4068), 2], ['EEA', $d(4069), 3],
+                ['T', 'hiking-difficulty-T', 0, null, 4066], ['E', 'hiking-difficulty-E', 1, null, 4067],
+                ['EE', 'hiking-difficulty-EE', 2, null, 4068], ['EEA', 'hiking-difficulty-EEA', 3, null, 4069],
             ]],
             ['identifier' => 'mtb-difficulty', 'icon' => 'txn-mtb', 'name' => 'Difficoltà mountain bike', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['mtb']]], 'terms' => [
-                ['TC', $d(4908), 0], ['MC', $d(4909), 1], ['BC', $d(4910), 2], ['OC', $d(4911), 3], ['EC', $d(4912), 4],
+                ['TC', 'mtb-difficulty-TC', 0, null, 4908], ['MC', 'mtb-difficulty-MC', 1, null, 4909],
+                ['BC', 'mtb-difficulty-BC', 2, null, 4910], ['OC', 'mtb-difficulty-OC', 3, null, 4911],
+                ['EC', 'mtb-difficulty-EC', 4, null, 4912],
             ]],
             ['identifier' => 'horse-difficulty', 'icon' => 'txn-horse-riding', 'name' => 'Difficoltà ippovia', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['horse']]], 'terms' => [
-                ['Facile', $d(4902), 0], ['Medio', $d(4903), 1], ['Difficile', $d(4904), 2],
+                ['Facile', 'horse-difficulty-easy', 0, null, 4902],
+                ['Medio', 'horse-difficulty-medium', 1, null, 4903],
+                ['Difficile', 'horse-difficulty-hard', 2, null, 4904],
             ]],
             ['identifier' => 'nordic-walking-difficulty', 'icon' => 'txn-nordic-walking', 'name' => 'Difficoltà Nordic Walking', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['nordic-walking']]], 'terms' => [
-                ['Facile', $d(4905), 0], ['Medio', $d(4906), 1], ['Impegnativo', $d(4907), 2],
+                ['Facile', 'nordic-walking-difficulty-easy', 0, null, 4905],
+                ['Medio', 'nordic-walking-difficulty-medium', 1, null, 4906],
+                ['Impegnativo', 'nordic-walking-difficulty-hard', 2, null, 4907],
             ]],
             ['identifier' => 'soft-mobility-difficulty', 'icon' => 'txn-family', 'name' => 'Difficoltà mobilità dolce', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['hiking']]], 'terms' => [
-                ['Facile', $d(4916), 0], ['Medio', $d(4917), 1], ['Difficile', $d(4918), 2],
+                ['Facile', 'soft-mobility-difficulty-easy', 0, null, 4916],
+                ['Medio', 'soft-mobility-difficulty-medium', 1, null, 4917],
+                ['Difficile', 'soft-mobility-difficulty-hard', 2, null, 4918],
             ]],
             ['identifier' => 'educational-trails-difficulty', 'icon' => 'txn-environmental-education', 'name' => 'Difficoltà sentiero didattico', 'single_choice' => true, 'properties' => ['tab' => 'Activities', 'depends_on' => ['legacy' => 'activities', 'terms' => ['educational-trails']]], 'terms' => [
                 ['Facile', 'educational-trails-difficulty-easy', 0],
@@ -69,9 +83,9 @@ class ConfigureTaxonomyTermsCommand extends Command
             // Il tab in cui la tassonomia si mostra sulla scheda di un contenuto: è un dato, non
             // un elenco di identifier nel codice della Resource (oc:8910).
             ['identifier' => 'inclusivity-difficulty', 'icon' => 'txn-wheelchair', 'name' => 'Difficoltà di accessibilità', 'single_choice' => true, 'properties' => ['tab' => 'Inclusivity'], 'terms' => [
-                ['AT', 'inclusivity-difficulty-at', 0],
-                ['AE', 'inclusivity-difficulty-ae', 1],
-                ['AEE', 'inclusivity-difficulty-aee', 2],
+                ['AT', 'inclusivity-difficulty-AT', 0],
+                ['AE', 'inclusivity-difficulty-AE', 1],
+                ['AEE', 'inclusivity-difficulty-AEE', 2],
             ]],
             ['identifier' => 'inclusivity-disabilities', 'icon' => 'txn-mobility-disability', 'name' => 'Disabilità accolte', 'single_choice' => false, 'properties' => ['tab' => 'Inclusivity'], 'terms' => [
                 ['Fisica e motoria', 'inclusivity-disabilities-physical', 0, 'txn-mobility-disability'],
@@ -93,17 +107,20 @@ class ConfigureTaxonomyTermsCommand extends Command
             ['identifier' => 'itinerary-type', 'name' => 'Tipologia itinerario', 'single_choice' => false, 'properties' => [
                 'depends_on' => ['taxonomy' => 'route-type', 'terms' => ['route-type-itinerary', 'route-type-walk']],
             ], 'terms' => [
-                ['Itinerari escursionistici di lunga percorrenza (a tappe)', $d(4725), 0],
-                ['Itinerari tematici (proposta di visita dei territori)', $d(4727), 1],
-                ['Vicino alle Città o attorno ai Borghi', $d(4731), 2],
-                ['Passeggiate Geo-Minerarie', $d(4732), 3],
-                ['Circuiti di Mountain Bike', $d(4726), 4],
-                ['Orienteering ed altro "outdoor"', $d(4730), 5],
-                ['Vie della Transumanza', $d(4724), 6],
-                ['Itinerari dello Spirito e altre Destinazioni', $d(4729), 7],
+                ['Itinerari escursionistici di lunga percorrenza (a tappe)', 'itinerary-type-long-distance', 0, null, 4725],
+                ['Itinerari tematici (proposta di visita dei territori)', 'itinerary-type-thematic', 1, null, 4727],
+                ['Vicino alle Città o attorno ai Borghi', 'itinerary-type-urban', 2, null, 4731],
+                ['Passeggiate Geo-Minerarie', 'itinerary-type-geomining', 3, null, 4732],
+                ['Circuiti di Mountain Bike', 'itinerary-type-mtb', 4, null, 4726],
+                ['Orienteering ed altro "outdoor"', 'itinerary-type-orienteering', 5, null, 4730],
+                ['Vie della Transumanza', 'itinerary-type-transhumance', 6, null, 4724],
+                ['Itinerari dello Spirito e altre Destinazioni', 'itinerary-type-spiritual', 7, null, 4729],
             ]],
-            // Avvertenze: la tassonomia nasce qui, i termini li porta l'import da Drupal
-            // (`sardegnasentieri:warning:<tid>`) e cambiano con la sorgente (oc:8910).
+            // Avvertenze: la tassonomia nasce qui, i termini li porta l'import. Non si
+            // duplicano in questo elenco: la sorgente del dato e' Drupal, e una copia qui
+            // sarebbe un derivato che prima o poi dice una cosa diversa dall'originale. Quello
+            // che resta nostro e' il nome: l'import lo ricava dal nome inglese, o dalla
+            // mappatura in `SardegnaSentieriImportService`, mai dal tid (oc:8910).
             ['identifier' => 'warnings', 'icon' => 'txn-alert', 'name' => 'Avvertenze', 'single_choice' => false, 'terms' => []],
             // Stato di validazione del percorso (oc:8932): era la colonna `stato_validazione` con un
             // enum. Uno stato solo per percorso. I termini hanno un identifier semantico perché
@@ -199,6 +216,56 @@ class ConfigureTaxonomyTermsCommand extends Command
         'educational-trail-difficulty-easy' => 'educational-trails-difficulty-easy',
         'educational-trail-difficulty-medium' => 'educational-trails-difficulty-medium',
         'educational-trail-difficulty-hard' => 'educational-trails-difficulty-hard',
+
+        // Le scale di difficolta' sono il valore che il SUS manda nel campo 37 della domanda:
+        // l'identifier e' quel valore, e il tid di Drupal — che prima faceva da identifier —
+        // resta in `properties->source->drupal_tid` come dato di provenienza.
+        'sardegnasentieri:tid:4066' => 'hiking-difficulty-T',
+        'sardegnasentieri:tid:4067' => 'hiking-difficulty-E',
+        'sardegnasentieri:tid:4068' => 'hiking-difficulty-EE',
+        'sardegnasentieri:tid:4069' => 'hiking-difficulty-EEA',
+        'sardegnasentieri:tid:4908' => 'mtb-difficulty-TC',
+        'sardegnasentieri:tid:4909' => 'mtb-difficulty-MC',
+        'sardegnasentieri:tid:4910' => 'mtb-difficulty-BC',
+        'sardegnasentieri:tid:4911' => 'mtb-difficulty-OC',
+        'sardegnasentieri:tid:4912' => 'mtb-difficulty-EC',
+        'sardegnasentieri:tid:4902' => 'horse-difficulty-easy',
+        'sardegnasentieri:tid:4903' => 'horse-difficulty-medium',
+        'sardegnasentieri:tid:4904' => 'horse-difficulty-hard',
+        'sardegnasentieri:tid:4905' => 'nordic-walking-difficulty-easy',
+        'sardegnasentieri:tid:4906' => 'nordic-walking-difficulty-medium',
+        'sardegnasentieri:tid:4907' => 'nordic-walking-difficulty-hard',
+        'sardegnasentieri:tid:4916' => 'soft-mobility-difficulty-easy',
+        'sardegnasentieri:tid:4917' => 'soft-mobility-difficulty-medium',
+        // I gradi di accessibilita' erano gia' parlanti, ma minuscoli: ora l'identifier e' il
+        // valore dell'API, che e' la sigla com'e' scritta nel format.
+        'inclusivity-difficulty-at' => 'inclusivity-difficulty-AT',
+        'inclusivity-difficulty-ae' => 'inclusivity-difficulty-AE',
+        'inclusivity-difficulty-aee' => 'inclusivity-difficulty-AEE',
+
+        // Tipologie di itinerario e avvertenze: il nome e' nostro, il tid resta in `properties`.
+        'sardegnasentieri:tid:4725' => 'itinerary-type-long-distance',
+        'sardegnasentieri:tid:4727' => 'itinerary-type-thematic',
+        'sardegnasentieri:tid:4731' => 'itinerary-type-urban',
+        'sardegnasentieri:tid:4732' => 'itinerary-type-geomining',
+        'sardegnasentieri:tid:4726' => 'itinerary-type-mtb',
+        'sardegnasentieri:tid:4730' => 'itinerary-type-orienteering',
+        'sardegnasentieri:tid:4724' => 'itinerary-type-transhumance',
+        'sardegnasentieri:tid:4729' => 'itinerary-type-spiritual',
+        'sardegnasentieri:warning:4714' => 'warnings-slippery-rock',
+        'sardegnasentieri:warning:4715' => 'warnings-water-scarcity',
+        'sardegnasentieri:warning:4716' => 'warnings-wild-boar',
+        'sardegnasentieri:warning:4717' => 'warnings-overgrown',
+        'sardegnasentieri:warning:4718' => 'warnings-ticks',
+        'sardegnasentieri:warning:4719' => 'warnings-aggressive-dogs',
+        'sardegnasentieri:warning:4720' => 'warnings-fog',
+        'sardegnasentieri:warning:4721' => 'warnings-lightning',
+        'sardegnasentieri:warning:4722' => 'warnings-flood',
+        'sardegnasentieri:warning:4723' => 'warnings-wildfire',
+        'sardegnasentieri:warning:4974' => 'warnings-snow',
+        'sardegnasentieri:warning:4975' => 'warnings-wind',
+        'sardegnasentieri:warning:5021' => 'warnings-road-crossing',
+        'sardegnasentieri:tid:4918' => 'soft-mobility-difficulty-hard',
     ];
 
     /**
@@ -254,16 +321,18 @@ class ConfigureTaxonomyTermsCommand extends Command
             foreach ($taxonomy['terms'] as $term) {
                 [$name, $identifier, $order] = $term;
                 $icon = $term[3] ?? null;
+                $drupalTid = $term[4] ?? null;
                 $this->align($identifier, $taxonomyId, [
                     'name' => $name,
                     'single_choice' => false,
                     'sort_order' => $order,
                     'icon' => $icon,
-                    'properties' => null,
+                    'properties' => $drupalTid === null ? null : ['source' => ['drupal_tid' => $drupalTid]],
                 ], $dry, $created, $updated);
             }
         }
 
+        $this->renameActivityIdentifiers($dry);
         $renamed = $this->alignActivityNames($dry);
         $enabled = $this->enableForApps($dry);
 
@@ -372,6 +441,48 @@ class ConfigureTaxonomyTermsCommand extends Command
      * (`properties.taxonomy.activity`). Cambiarlo cambia cosa mostrano: qui è un miglioramento
      * voluto — oggi le app ricevono «horse» — ma è un effetto che esce da Nova.
      */
+    /**
+     * Identifier delle attività cambiati nel tempo: vecchio => nuovo.
+     *
+     * Le tre righe che dicono il tipo di percorso portavano il nome della sorgente e una parola
+     * italiana (`sardegnasentieri:type:sentiero`). Si rinominano, non si ricreano: i layer
+     * «Sentieri», «Itinerari» e «Cammini di Sardegna» raccolgono le tracce proprio con queste
+     * attività, e una riga nuova accanto alla vecchia li lascerebbe vuoti.
+     *
+     * @var array<string, string>
+     */
+    private const RENAMED_ACTIVITIES = [
+        'sardegnasentieri:type:sentiero' => 'trail',
+        'sardegnasentieri:type:itinerario' => 'itinerary',
+        'sardegnasentieri:cammino' => 'walk',
+    ];
+
+    /**
+     * Rinomina le attività che hanno cambiato identifier, tenendosi le loro relazioni.
+     */
+    private function renameActivityIdentifiers(bool $dry): void
+    {
+        foreach (self::RENAMED_ACTIVITIES as $old => $new) {
+            $row = TaxonomyActivity::query()->where('identifier', $old)->first();
+
+            if ($row === null) {
+                continue;
+            }
+
+            if (TaxonomyActivity::query()->where('identifier', $new)->exists()) {
+                $this->warn(($dry ? '[dry-run] ' : '')."Esistono sia {$old} sia {$new}: non rinomino.");
+
+                continue;
+            }
+
+            $this->line(($dry ? '[dry-run] ' : '')."Rinomino l'attività {$old} -> {$new}");
+
+            if (! $dry) {
+                $row->forceFill(['identifier' => $new])->save();
+            }
+        }
+    }
+
     private function alignActivityNames(bool $dry): int
     {
         $renamed = 0;

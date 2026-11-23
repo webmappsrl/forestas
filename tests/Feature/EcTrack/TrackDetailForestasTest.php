@@ -160,7 +160,10 @@ it('nel file su AWS porta didascalia, autore e credits con le foto, non in fores
         ])
         ->toMediaCollection('default');
 
-    // Come lo scrive UpdateEcTrackAwsJob: EcTrackResource sulla classe di EC_TRACK_MODEL.
+    // Come lo scrive UpdateEcTrackAwsJob: EcTrackResource sulla classe di EC_TRACK_MODEL. Dal
+    // versionamento del file (oc:8997) la Resource prende anche la versione, e senza vale quella
+    // senza numero: è questa.
+    // I due file per versione sono provati in ForestasPropertiesInTrackVersionsTest.
     $class = config('wm-package.ec_track_model');
     $file = json_decode((new EcTrackResource($class::find($track->id)))->toJson(), true)['properties'];
 
@@ -314,7 +317,7 @@ it('porta in layer_name il nome del layer di tipologia della traccia, in tutte l
     // Un layer d'area e uno per inclusività non sono il layer di appartenenza.
     $area = Layer::factory()->createQuietly(['name' => ['it' => 'Area D (Sud-OVEST)'], 'properties' => []]);
     $accessible = Layer::factory()->createQuietly(['name' => ['it' => 'Sentieri Accessibili'], 'properties' => []]);
-    $accessible->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'inclusivity-difficulty-at')->value('id'));
+    $accessible->taxonomyTerms()->attach(TaxonomyTerm::where('identifier', 'inclusivity-difficulty-AT')->value('id'));
     foreach ([$area, $accessible, $walks] as $layer) {
         DB::table('layerables')->insert(['layer_id' => $layer->id, 'layerable_type' => 'App\\Models\\EcTrack', 'layerable_id' => $track->id]);
     }

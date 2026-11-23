@@ -6,6 +6,7 @@ namespace App\Services\Import;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Wm\WmPackage\Models\App;
 use Wm\WmPackage\Models\EcTrack;
@@ -14,11 +15,22 @@ use Wm\WmPackage\Services\GeometryComputationService;
 
 class TaxonomyWhereLayersImportService
 {
-    private const GEOJSON_URL = 'https://geohub.webmapp.it/api/export/taxonomy/geojson/32/AreeCatastaliconLayers.geojson';
-
     private const CONFIG_URL = 'https://wmfe.s3.eu-central-1.amazonaws.com/geohub/conf/32.json';
 
+    /** Fonte delle aree catastali: la usano anche il filtro Nova e l'action delle catastali. */
     public const SOURCE_KEY = 'geohub_conf_32';
+
+    /**
+     * Fonte delle aree geografiche (oc:9001): distinta da quella delle catastali, così sito e app
+     * distinguono i due insiemi con un dato e non dal nome.
+     */
+    public const GEOGRAPHIC_AREAS_SOURCE_KEY = 'geohub_conf_32_geographic_areas';
+
+    /** Geojson di Geohub per ogni fonte: i poligoni portano il `layer_id` del layer in `32.json`. */
+    private const GEOJSON_URLS = [
+        self::SOURCE_KEY => 'https://geohub.webmapp.it/api/export/taxonomy/geojson/32/AreeCatastaliconLayers.geojson',
+        self::GEOGRAPHIC_AREAS_SOURCE_KEY => 'https://geohub.webmapp.it/api/export/taxonomy/geojson/32/AreeGeograficheConLayers.geojson',
+    ];
 
     /**
      * @return array{
@@ -31,8 +43,11 @@ class TaxonomyWhereLayersImportService
      *   synced_tracks:int
      * }
      */
-    public function import(?int $appId = null): array
+    public function import(?int $appId = null, string $sourceKey = self::SOURCE_KEY): array
     {
+        $geojsonUrl = self::GEOJSON_URLS[$sourceKey]
+            ?? throw new \InvalidArgumentException("Fonte delle aree sconosciuta: {$sourceKey}");
+
         $counters = [
             'created' => 0,
             'updated' => 0,
@@ -43,7 +58,7 @@ class TaxonomyWhereLayersImportService
             'synced_tracks' => 0,
         ];
 
-        $geojson = $this->fetchJson(self::GEOJSON_URL);
+        $geojson = $this->fetchJson($geojsonUrl);
         $config = $this->fetchJson(self::CONFIG_URL);
         $layersById = $this->indexLayersById($config['MAP']['layers'] ?? []);
         $features = $geojson['features'] ?? [];
@@ -84,7 +99,7 @@ class TaxonomyWhereLayersImportService
                 ?? ['it' => $externalLayerId, 'en' => $externalLayerId];
 
             $propertiesPayload = array_filter([
-                'source' => self::SOURCE_KEY,
+                'source' => $sourceKey,
                 'external_layer_id' => $externalLayerId,
                 // Backward-friendly alias in case old data/scripts already read "layer_id".
                 'layer_id' => $externalLayerId,
@@ -96,25 +111,40 @@ class TaxonomyWhereLayersImportService
             ], static fn ($value) => $value !== null);
 
             try {
-                $taxonomyWhere = $this->findExisting($externalLayerId);
-                if ($taxonomyWhere) {
-                    $taxonomyWhere->update([
-                        'name' => $name,
-                        'properties' => array_merge($taxonomyWhere->properties ?? [], $propertiesPayload),
-                    ]);
-                    $this->assignTaxonomyUser($taxonomyWhere, $appUserId);
-                    $counters['updated']++;
-                } else {
-                    $taxonomyWhere = TaxonomyWhere::create([
-                        'name' => $name,
-                        'properties' => $propertiesPayload,
-                    ]);
-                    $this->assignTaxonomyUser($taxonomyWhere, $appUserId);
-                    $counters['created']++;
-                }
+                // Una transazione per area: se PostGIS rifiuta la geometria, l'area non resta
+                // creata senza geometria, e l'errore non aborta la transazione di chi chiama
+                // (Postgres 25P02), che farebbe fallire anche il ricollegamento delle tracce (oc:9001).
+                $outcome = DB::transaction(function () use ($sourceKey, $externalLayerId, $name, $propertiesPayload, $appUserId, $geometry): string {
+                    $taxonomyWhere = $this->findExisting($sourceKey, $externalLayerId);
+                    if ($taxonomyWhere) {
+                        $taxonomyWhere->update([
+                            'name' => $name,
+                            'properties' => array_merge($taxonomyWhere->properties ?? [], $propertiesPayload),
+                        ]);
+                        $outcome = 'updated';
+                    } else {
+                        $taxonomyWhere = TaxonomyWhere::create([
+                            'name' => $name,
+                            'properties' => $propertiesPayload,
+                        ]);
+                        $outcome = 'created';
+                    }
 
-                $this->updateGeometry($taxonomyWhere->id, $geometry);
+                    $this->assignTaxonomyUser($taxonomyWhere, $appUserId);
+                    $this->updateGeometry($taxonomyWhere->id, $geometry);
+
+                    return $outcome;
+                });
+                $counters[$outcome]++;
             } catch (\Throwable $e) {
+                // Senza questa riga l'area mancava dallo shard e l'import finiva senza errori: nel
+                // giro notturno nessuno guarda i contatori (oc:9001).
+                Log::channel('import')->error('Area non importata', [
+                    'source' => $sourceKey,
+                    'layer_id' => $externalLayerId,
+                    'name' => $name['it'] ?? reset($name),
+                    'error' => $e->getMessage(),
+                ]);
                 $counters['errors']++;
             }
         }
@@ -124,6 +154,8 @@ class TaxonomyWhereLayersImportService
         $counters['synced_tracks'] = GeometryComputationService::make()->syncTaxonomyWhere(
             config('wm-package.ec_track_model', EcTrack::class)
         );
+
+        Log::channel('import')->info('Import delle aree completato', ['source' => $sourceKey] + $counters);
 
         return $counters;
     }
@@ -169,12 +201,12 @@ class TaxonomyWhereLayersImportService
         return $indexed;
     }
 
-    private function findExisting(string $externalLayerId): ?TaxonomyWhere
+    private function findExisting(string $sourceKey, string $externalLayerId): ?TaxonomyWhere
     {
         return TaxonomyWhere::query()
             ->whereRaw(
                 "(properties->>'source' = ?) AND ((properties->>'external_layer_id' = ?) OR (properties->>'layer_id' = ?))",
-                [self::SOURCE_KEY, $externalLayerId, $externalLayerId]
+                [$sourceKey, $externalLayerId, $externalLayerId]
             )
             ->first();
     }

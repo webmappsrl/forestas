@@ -123,3 +123,9 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **L'import salva gli enti con `saveQuietly()`, che salta Scout**: chi cambia un ente fuori da
   `importOrUpdateEnte` e da `markRemovedEnti` deve chiamare `searchable()` / `unsearchable()` da sé,
   altrimenti la ricerca degli enti resta vecchia (oc:8965)
+- **Il passo delle aree geografiche gira a ogni esecuzione, con e senza `--reset`, e i layer che
+  crea nascono vuoti.** `--only=aree` gira senza la copia Drupal e non si combina con `--reset`.
+  Un nuovo percorso che crea quei layer fuori dalla catena di fine batch deve accodare
+  `SyncTaxonomyWhereJob` → `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob`,
+  come fa il comando: altrimenti restano vuoti e la ricerca non trova i loro percorsi — vedi
+  [docs/knowledge/9001-aree-geografiche-nell-import.md](../../docs/knowledge/9001-aree-geografiche-nell-import.md) (oc:9001)

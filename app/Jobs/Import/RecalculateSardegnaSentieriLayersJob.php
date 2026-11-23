@@ -26,10 +26,11 @@ use Wm\WmPackage\Services\PBFGeneratorService;
  *
  * Per ogni layer dell'app di import in `track_mode` auto con almeno un'attività o un'area
  * (`taxonomyWheres`) riallinea `layerables` alle tracce che rispettano il filtro. I POI si
- * assegnano solo ai layer delle aree catastali; sui layer di tipologia con `poi_mode` auto il
- * pivot dei POI si svuota, qualunque attività portino. Poi riallinea sempre `properties.layers`
- * delle feature (a diff: salva solo quelle diverse). Dal confronto del pivot con il giro prima
- * dipendono solo geometria e PBF: si accodano una volta per layer, se il pivot o
+ * assegnano ai layer delle aree con `poi_mode` auto, cioè quelli delle aree catastali: i layer
+ * delle aree geografiche nascono in manuale e restano senza POI (oc:9001); sui layer di tipologia
+ * con `poi_mode` auto il pivot dei POI si svuota, qualunque attività portino. Poi riallinea sempre
+ * `properties.layers` delle feature (a diff: salva solo quelle diverse). Dal confronto del pivot
+ * con il giro prima dipendono solo geometria e PBF: si accodano una volta per layer, se il pivot o
  * `properties.layers` di qualche feature sono cambiati (`regeneratePbfsForLayer()` su un layer
  * vuoto rigenera i PBF dell'intera app, e il job gira a ogni batch orario). Se un tentativo muore
  * dopo il pivot, il retry ripara comunque `properties.layers` e accoda geometria e PBF.
@@ -127,7 +128,8 @@ class RecalculateSardegnaSentieriLayersJob implements ShouldQueue
 
     /**
      * Riscrive il pivot del layer, senza eventi. Spec oc:8827: POI solo sui layer delle aree
-     * catastali; svuotati su quelli di tipologia, a meno che i POI siano gestiti a mano.
+     * catastali; svuotati su quelli di tipologia, a meno che i POI siano gestiti a mano. I layer
+     * delle aree geografiche hanno i POI in manuale, e `assignPoisByTaxonomy()` li salta (oc:9001).
      */
     private function writePivot(LayerService $layerService, Layer $layer): void
     {

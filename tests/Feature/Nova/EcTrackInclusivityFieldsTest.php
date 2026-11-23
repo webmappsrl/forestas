@@ -141,7 +141,7 @@ function validationError(string $attribute, array $input): ?string
 it('rifiuta al salvataggio una tipologia itinerario su un sentiero, non solo la nasconde', function () {
     $track = TaxonomyTerm::where('identifier', 'route-type-trail')->value('id');
     $itinerary = TaxonomyTerm::where('identifier', 'route-type-itinerary')->value('id');
-    $tipologia = TaxonomyTerm::where('identifier', 'sardegnasentieri:tid:4725')->value('id');
+    $tipologia = TaxonomyTerm::where('identifier', 'itinerary-type-long-distance')->value('id');
 
     expect(validationError('taxonomy_itinerary_type', [
         'taxonomy_route_type' => $track,

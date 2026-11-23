@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Controllers\Api\EcPoiDetailController;
 use App\Http\Controllers\Api\Sus\SusTestDecisionController;
+use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
 use App\Observers\RelatedTrackCardObserver;
@@ -42,6 +43,8 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\TaxonomyTermable;
 use Wm\WmPackage\Models\Tile;
+use Wm\WmPackage\Policies\EcPoiPolicy;
+use Wm\WmPackage\Policies\EcTrackPolicy;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
 use Wm\WmPackage\Policies\TilePolicy;
@@ -125,6 +128,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Tile::class, TilePolicy::class);
         Gate::policy(RegistroCatastaleRow::class, RegistroCatastaleRowPolicy::class);
+
+        // Senza una policy registrata Nova autorizza chiunque non sia Guest: un Validator poteva
+        // modificare in Nova POI e tracce di altri utenti. Si registrano i modelli di forestas,
+        // che sono quelli montati dalle Resource (oc:8181 nel package).
+        Gate::policy(EcPoi::class, EcPoiPolicy::class);
+        Gate::policy(EcTrack::class, EcTrackPolicy::class);
 
         // Card dei sentieri correlati nei file delle tracce (oc:8959): quando cambia una traccia,
         // la sua prima foto o il suo tipo di percorso, si riscrivono i file di chi la mostra.

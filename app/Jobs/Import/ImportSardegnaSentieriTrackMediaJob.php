@@ -82,5 +82,33 @@ class ImportSardegnaSentieriTrackMediaJob implements ShouldQueue
 
         $sync->syncImportedFiles($track, SardegnaSentieriMediaSyncService::ATTACHMENTS_COLLECTION, $this->attachments);
         $sync->syncImportedFiles($track, SardegnaSentieriMediaSyncService::VIDEOS_COLLECTION, $this->videos);
+
+        // Seconda scrittura, a contenuto completo: la prima e' avvenuta prima dei file pesanti e
+        // porta solo le foto, quindi allegati e video non entrerebbero mai nel file — fino al
+        // giro di import successivo, che li troverebbe gia' scaricati e non riscriverebbe niente.
+        UpdateEcTrackAwsJob::dispatch($track);
+
+        // Le card delle tracce vicine: le foto si sincronizzano dentro `withoutRefresh()`,
+        // contando sulla passata di fine import. Ma questo job gira fuori dal batch, e se le foto
+        // arrivano dopo quella passata i file di chi mostra questa traccia fra i correlati
+        // restano con la card vecchia. Il job e' unico per traccia, quindi non si accumula.
+        RelatedTrackCards::refresh($track->id);
+    }
+
+    /**
+     * L'ultimo tentativo fallito, timeout compresi.
+     *
+     * Senza, una traccia le cui foto sono arrivate ma i cui video hanno fatto sforare il job
+     * resterebbe con il file scritto a meta' e nessuno a rimetterlo a posto: il giro dopo i media
+     * risultano gia' presi e non si riscrive niente. Non ripara il contenuto mancante, ma
+     * riallinea il file a cio' che la traccia ha davvero.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        $track = EcTrack::query()->find($this->ecTrackId);
+
+        if ($track !== null) {
+            UpdateEcTrackAwsJob::dispatch($track);
+        }
     }
 }

@@ -140,7 +140,7 @@ it('il reset conserva le attività e le loro relazioni con i layer (oc:8827)', f
     Bus::fake();
 
     $activityId = DB::table('taxonomy_activities')->insertGetId([
-        'identifier' => 'sardegnasentieri:type:sentiero',
+        'identifier' => 'trail',
         'name' => json_encode(['it' => 'Sentiero']),
         'created_at' => now(),
         'updated_at' => now(),
@@ -157,7 +157,7 @@ it('il reset conserva le attività e le loro relazioni con i layer (oc:8827)', f
 
     Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
-    expect(DB::table('taxonomy_activities')->where('identifier', 'sardegnasentieri:type:sentiero')->value('id'))->toBe($activityId)
+    expect(DB::table('taxonomy_activities')->where('identifier', 'trail')->value('id'))->toBe($activityId)
         ->and(DB::table('taxonomy_activityables')
             ->where('taxonomy_activity_id', $activityId)
             ->orderBy('taxonomy_activityable_type')
@@ -169,7 +169,7 @@ it('il reset cancella le relazioni di tracce e POI con attività e layer (oc:882
     Bus::fake();
 
     $activityId = DB::table('taxonomy_activities')->insertGetId([
-        'identifier' => 'sardegnasentieri:type:sentiero',
+        'identifier' => 'trail',
         'name' => json_encode(['it' => 'Sentiero']),
         'created_at' => now(),
         'updated_at' => now(),
