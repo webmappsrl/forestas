@@ -112,5 +112,6 @@ Al secondo giro i numeri restano gli stessi e nel log i layer creati sono 0.
 - **Overlay `generated`**: il file caricato da Geohub porta i `layer_id` di Geohub, che sullo shard
   non esistono; generato, porta quelli dello shard.
 - **Due filtri diversi sul sito**: aree catastali e aree geografiche sono filtri separati su
-  wp-forestas. In uscita i luoghi stanno tutti in `taxonomyWheres`, come su Geohub; dividerli per
-  tipo è oc:9020.
+  wp-forestas. In uscita i luoghi stanno tutti in `taxonomyWheres`, come su Geohub, e l'indice non
+  cambia: come la webapp, il sito filtra un'area con la sua FeatureCollection (`layer_id`) e il
+  campo `layers` dei risultati della ricerca (scrum del 23/11, oc:9018).

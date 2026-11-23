@@ -140,14 +140,20 @@ Argument #1 ($appId) must be of type int, null given`, da
 `wm-package/src/Http/Controllers/Api/V1/AppAPIController.php:96`. La v2
 (`api/v2/app/1/pois.geojson`) risponde.
 
-### Luoghi divisi per tipo: oc:9020
+### Filtri delle aree sul sito: oc:9018 (oc:9020 scartato)
 
 Il 20/11 si è deciso di lasciare tutti i luoghi in `taxonomyWheres`, come su Geohub (verificato
 sul DB di produzione di Geohub: il percorso 14356 ha regione, provincia, quattro comuni e due aree
-geografiche), e di dividere i luoghi per tipo in oc:9020 (backlog, tag 692): campo
-`taxonomyWheresByType` raggruppato con `TaxonomyWhereDisplayService::categoryOf()`, valori
-`{ value, name }`. Da portare su UAT insieme a oc:9001 (deciso il 23/11, prima era «da chiudere
-prima di aggiornare UAT»).
+geografiche), e di dividere i luoghi per tipo in oc:9020 con un campo nuovo nell'indice,
+`taxonomyWheresByType`.
+
+Allo scrum del 23/11 Giuseppe ha scartato quella strada: niente dati nuovi in Elastic, il sito
+deve funzionare come la webapp. Chiama la ricerca una volta e scarica una volta le
+FeatureCollection delle aree. Ogni area del geojson ha il `layer_id` del suo layer, e ogni percorso
+nei risultati della ricerca ha già i suoi `layers`: il filtro di un'area tiene i percorsi il cui
+`layers` contiene quel `layer_id` (verificato in locale: un percorso con `layers` `[3, 11, 18]` sta
+in «Area D» e in «Iglesiente e Marganai»). oc:9020 è `rejected`, e il lavoro è stato aggiunto a
+oc:9018 (sito), da portare su UAT insieme a oc:9001.
 
 ### L'indice di ricerca del dev ha percorsi che il DB non ha
 

@@ -262,5 +262,5 @@ Layer, FeatureCollection), il comando lo chiama a ogni giro e con `--only=aree`.
 - [ ] **Step 2:** dopo il deploy su dev, lo stesso comando sul dev; nella webapp del dev il click
   su un'area geografica (es. Goceano) apre il layer con descrizione e percorsi; gli overlay non
   sono neri.
-- [ ] **Step 3:** lo stesso su UAT, insieme a oc:9020 (vedi rischio «Comune» nell'overview).
+- [ ] **Step 3:** lo stesso su UAT, insieme a oc:9018 (vedi rischio «Comune» nell'overview).
 - [ ] **Step 4: commit proposti:** `docs(oc:9001): …` e, a sé, `chore(oc:9001): puntatore di wm-package con colori e Crea Layer`.

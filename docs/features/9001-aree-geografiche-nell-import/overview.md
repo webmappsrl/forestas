@@ -49,7 +49,7 @@ Drupal.
       identifier), e l'action Nova delle catastali continua a funzionare com'è
 - [x] Le 39 aree geografiche nascono come Taxonomy Where con `source =
       geohub_conf_32_geographic_areas`, distinta da quella delle catastali (`geohub_conf_32`), così
-      sito e app possono distinguere i due insiemi con un dato e non dal nome (oc:9020)
+      sito e app possono distinguere i due insiemi con un dato e non dal nome
 - [x] Nome, `subtitle`, `description` e `feature_image` dell'area vengono da `32.json`, come per
       le catastali
 - [x] Il passo crea il Layer di un'area solo se l'area non ne ha già uno, così i giri successivi
@@ -99,8 +99,9 @@ Drupal.
   Geohub, le aree geografiche finiscono in `taxonomyWheres` di tracce (indice di ricerca) e POI
   (`pois.geojson`) insieme a regione, province, comuni, aree catastali e settori CAI. Il tema di
   wp-forestas divide quella lista per nome (`themes/forestas-child/inc/search.php:604-628`) e mette
-  fra i comuni ogni nome che non riconosce. Si risolve con i luoghi divisi per tipo (oc:9020), da
-  portare su UAT insieme a questo ticket; su dev si vede finché oc:9020 non è chiuso.
+  fra i comuni ogni nome che non riconosce. Si risolve nel sito con oc:9018 (filtri delle aree
+  dalle FeatureCollection e da `layers`, scrum del 23/11; oc:9020 scartato), da portare su UAT
+  insieme a questo ticket; su dev si vede finché oc:9018 non è chiuso.
 - **Home vuota su un ambiente nuovo.** Se `config_home` è vuota, `AppConfigService` costruisce la
   home con tutti i layer dell'app, e i 39 delle aree geografiche ci finirebbero. Su dev e UAT
   `config_home` è compilata; un ambiente nuovo va configurato come gli altri.
@@ -114,8 +115,8 @@ Drupal.
 - Modifiche al sito WordPress (`wp-forestas`): aree catastali e aree geografiche devono essere due
   filtri separati. Le modifiche necessarie si annotano in `notes.md`, e a fine lavoro si decide se
   aprire un ticket nuovo o aggiungerle a oc:9018.
-- I luoghi divisi per tipo in uscita (indice di ricerca delle tracce, `pois.geojson`): oc:9020.
-  `taxonomyWheres` resta com'è, con tutti i luoghi, come su Geohub.
+- I filtri delle aree sul sito: oc:9018, con le FeatureCollection e `layers` come la webapp
+  (scrum del 23/11). `taxonomyWheres` resta com'è, con tutti i luoghi, come su Geohub.
 - Le altre FeatureCollection in modalità `upload` (`aree_forestali`, `aree_montane`,
   `aree_no_caccia`): restano come sono.
 - Il filtro per layer dell'app (`app_filter_layers`): resta com'è.
