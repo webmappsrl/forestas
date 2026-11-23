@@ -35,6 +35,9 @@ final class ForestasPrintSheet
     /** Il segno dei dati mancanti, come sul sito (`forestas_dettaglio_valore()`). */
     public const MISSING = '—';
 
+    /** Foto della scheda del POI: due righe da tre, quante ne stanno nella pagina 1 (R21). */
+    public const POI_PHOTOS = 6;
+
     /**
      * Le attività della riga «Difficoltà» dei dati brevi, con il nome che dà il sito
      * (`forestas_dettaglio_difficolta()`): tassonomia => chiave di traduzione.
@@ -216,8 +219,7 @@ final class ForestasPrintSheet
     public static function labels(string $locale): array
     {
         $keys = [
-            'Notice', 'Walkability', 'Trail register validation', 'Accessibility', 'Not yet available',
-            'Not classified', 'status updated on', 'Note:', 'Photogallery', 'See the page on the website',
+            'Notice', 'Walkability', 'Trail register validation', 'Accessibility', 'Photogallery', 'See the page on the website',
             'Trail for everyone', 'Inclusivity score', 'Code',
             'Point of interest sheet', 'Point of interest', 'Point type', 'Municipality',
             'Geographic area', 'At a glance',

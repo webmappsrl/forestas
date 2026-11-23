@@ -27,37 +27,26 @@
     // Variabili del contratto lette senza `??`: se il package le rinomina la view si rompe subito.
     $credit = $labels['© OpenStreetMap contributors, Webmapp'];
     // Due righe da tre: con la testata e «Il punto in breve» la pagina 1 basta (oc:8982, R21).
-    $photos = array_slice($photos, 0, 6);
+    $photos = array_slice($photos, 0, \App\Support\ForestasPrintSheet::POI_PHOTOS);
 @endphp
-\documentclass[10pt,a4paper]{article}
-@foreach ($styleFiles as $styleName)
-\usepackage{{!! $styleName !!}}
-@endforeach
-\definecolor{wmprimary}{HTML}{{!! strtoupper($primaryColor) !!}}
-@include('wm-package::print.partials.preamble', [
-    'sectionColor' => $sheet['type']['color'],
-    'copyright' => $l['Footer copyright'],
-])
+@include('wm-package::print.partials.head', ['sectionColor' => $sheet['type']['color'], 'copyright' => $l['Footer copyright']])
 \begin{document}
 {{-- Pagina 1: tutto in un box che, se non ci sta, si riduce in scala (ForestasPaginaUnica). --}}
 \begin{ForestasPaginaUnica}
 {{-- Testata. --}}
-\noindent\ForestasLogotipo{16pt}\hfill\ForestasOcchiello{{!! $l['Point of interest sheet'] !!}}
-\ForestasFiletto
-\vspace{8pt}
-\noindent\ForestasEtichettaTipo{{!! $sheet['type']['text'] !!}}@if ($sheet['area'])\hspace{6pt}\ForestasOcchiello{{!! $sheet['area'] !!}}@endif
-
-
-\vspace{2pt}
-\TitoloScheda{{!! $name !!}}
-@if ($sheet['location'])
-\begingroup\color{ink-2}\ForestasStileSottotitolo {!! $sheet['location'] !!}\par\endgroup
-@endif
-\FilettoOro
+@include('wm-package::print.partials.header', [
+    'sheetLabel' => $l['Point of interest sheet'],
+    'typeText' => $sheet['type']['text'],
+    'ref' => null,
+    'area' => $sheet['area'],
+    'badge' => null,
+    'title' => $name,
+    'location' => $sheet['location'],
+])
 {{-- «Il punto in breve», con a destra il QR code della pagina del sito e sotto l'indirizzo. --}}
 
 \TitoloSezione{{!! $l['At a glance'] !!}}
-\par\nointerlineskip\vspace{4pt}\noindent\begin{minipage}[t]{\dimexpr\linewidth-@if ($sheet['link'])28mm @else 0mm @endif\relax}\vspace{0pt}
+\begin{ForestasConRimando}{{!! $sheet['link']['qr'] ?? '' !!}}
 \begin{Tabella}
 @foreach ($sheet['rows'] as $row)
 \RigaTabella{{!! $row['label'] !!}}{{!! $row['value'] !!}}
@@ -69,7 +58,7 @@
 @if ($sheet['link'])
 \ForestasIndirizzo{{!! $l['See the page on the website'] !!}}{{!! $sheet['link']['text'] !!}}
 @endif
-\end{minipage}@if ($sheet['link'])\hfill\begin{minipage}[t]{22mm}\vspace{0pt}\ForestasQr{{!! $sheet['link']['qr'] !!}}\end{minipage}@endif
+\end{ForestasConRimando}
 
 \par
 @if ($photos !== [])

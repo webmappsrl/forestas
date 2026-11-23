@@ -286,7 +286,7 @@ describe('scheda del sentiero', function () {
             '\ForestasOcchiello{Dati catastali e altimetrici}',
             '\ForestasDato{Codice catastale}{Z-NU-B-401}',
             '\ForestasIndirizzo',
-            '\ForestasQr',
+            '\end{ForestasConRimando}',
             '\end{ForestasPaginaUnica}',
             '\ForestasMappaPagina{map.png}',
         ];
@@ -527,15 +527,16 @@ describe('scheda del sentiero', function () {
 
         expect(printOverrideBody(printOverrideRender($track)))
             // Nel QR i caratteri speciali di LaTeX escaped come vuole il pacchetto qrcode.
-            ->toContain('\ForestasQr{https://www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
+            ->toContain('\begin{ForestasConRimando}{https://www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
             // Nell'indirizzo leggibile senza schema.
             ->toContain('{www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
-            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\ForestasQr{https://www.example.test/da-vedere/san-mauro}');
+            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/da-vedere/san-mauro}');
 
         // Senza indirizzo (creato in Nova) o con un indirizzo che non è http(s): niente rimando.
         foreach ([printOverrideTrack(), printOverridePoi(), printOverrideTrack([], ['forestas' => ['url' => 'javascript:alert(1)']])] as $model) {
             $tex = printOverrideBody(printOverrideRender($model));
-            expect($tex)->not->toContain('\ForestasQr');
+            // Nessun QR code: l'ambiente del rimando, se c'è, ha l'URL vuoto.
+            expect($tex)->not->toMatch('/ForestasConRimando\}\{[^}]/');
             expect($tex)->not->toContain('\ForestasIndirizzo');
         }
     });
@@ -623,7 +624,7 @@ describe('scheda del punto di interesse', function () {
             '\TitoloScheda{Nuraghe Serbissi}',
             '\TitoloSezione{Il punto in breve}',
             '\ForestasIndirizzo',
-            '\ForestasQr',
+            '\end{ForestasConRimando}',
             '\TitoloSezione{Galleria fotografica}',
             '\end{ForestasPaginaUnica}',
             '\ForestasMappaPagina{map.png}',

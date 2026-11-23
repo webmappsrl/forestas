@@ -64,3 +64,13 @@ le deviazioni del package sono nel `notes.md` di `wm-package`.
 - **Conferma con Alessio** di «parzialmente percorribile» = 3.
 - **Corsivo degli `<em>` redazionali** mantenuto (non si distingue il sardo dall'enfasi), scostamento dal README §4 del design system: decide il dev.
 - **Ticket a parte non più necessario:** la pagina del tema di stampa è abbandonata con la revisione del 20/11.
+
+## Pulizia dopo la review del 23/11
+
+- Tolti dal preambolo `\ForestasSottotitolo`, `\ForestasDidascalia` e cinque colori del design system non
+  usati (`sar-terra-testo`, `sar-oro-testo`, `surf-3`, `tipo-da-sapere`, `tipo-news`); tolte da
+  `ForestasPrintSheet::labels()` quattro chiavi lette solo con `label()`.
+- Testata, apertura del documento e griglia dei dati in partial (`head`, `header`, `grid`); dati con il QR
+  code nell'ambiente `ForestasConRimando`. Le due griglie avevano stacchi diversi senza motivo (4 e 6 pt):
+  ora 5 pt. Le sei foto del POI sono `ForestasPrintSheet::POI_PHOTOS`.
+

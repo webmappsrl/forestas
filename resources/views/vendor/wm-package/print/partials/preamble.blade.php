@@ -31,13 +31,12 @@
 \RequirePackage{eso-pic}
 \RequirePackage{qrcode}
 
-% Colori del design system: valori esatti di tokens.json (tema chiaro).
+% Colori del design system usati dalle schede: valori esatti di tokens.json (tema chiaro). Gli altri
+% token (sar-terra-testo, sar-oro-testo, surf-3, tipo-da-sapere, tipo-news) si aggiungono quando servono.
 \definecolor{sar-blu}{HTML}{254877}
 \definecolor{sar-verde}{HTML}{566D27}
 \definecolor{sar-terra}{HTML}{CA5C30}
 \definecolor{sar-oro}{HTML}{E9A33F}
-\definecolor{sar-terra-testo}{HTML}{C0572E}
-\definecolor{sar-oro-testo}{HTML}{8A5A00}
 \definecolor{st-4}{HTML}{4B6B22}
 \definecolor{st-3}{HTML}{8A5A00}
 \definecolor{st-2}{HTML}{7A6A55}
@@ -46,8 +45,6 @@
 \definecolor{tipo-itinerario}{HTML}{58810B}
 \definecolor{tipo-cammino}{HTML}{1A416F}
 \definecolor{tipo-da-vedere}{HTML}{B7117F}
-\definecolor{tipo-da-sapere}{HTML}{0F6E6A}
-\definecolor{tipo-news}{HTML}{C2410C}
 \definecolor{ink}{HTML}{1A1A1A}
 \definecolor{ink-2}{HTML}{4A4A4A}
 \definecolor{ink-3}{HTML}{767676}
@@ -55,7 +52,6 @@
 \definecolor{line-2}{HTML}{EEEBE5}
 \definecolor{surf}{HTML}{FFFFFF}
 \definecolor{surf-2}{HTML}{F7F5F1}
-\definecolor{surf-3}{HTML}{EFEDE7}
 \colorlet{forestas-tipo}{{!! $sectionColor !!}}
 % Ruoli di wm-print sui colori del design system (testo ink, didascalie ink-3, linee line, filetti oro).
 \colorlet{wmtitle}{ink}\colorlet{wmaccent}{ink}\colorlet{wmrule}{sar-oro}
@@ -106,9 +102,6 @@
 \ForestasSpazio{45mm}\vspace{10pt}%
 \sbox{\ForestasBox}{\begin{minipage}[t]{\dimexpr\linewidth-11.25pt\relax}\vspace{0pt}\vspace{3pt}\raggedright\color{ink}\ForestasStileTitoloSezione #1\par\vspace{4pt}\end{minipage}}%
 \noindent\begingroup\color{forestas-tipo}\rule[-\dp\ForestasBox]{2.25pt}{\dimexpr\ht\ForestasBox+\dp\ForestasBox\relax}\endgroup\hspace{9pt}\usebox{\ForestasBox}\par\nopagebreak\vspace{2pt}\nopagebreak}
-
-% Sottotitolo dentro una sezione: sottotitolo dei token.
-\newcommand{\ForestasSottotitolo}[1]{\par\ForestasSpazio{25mm}\vspace{4pt}\begingroup\color{ink}\ForestasStileSottotitolo #1\par\endgroup\nopagebreak}
 
 % Etichetta di tipo: testo bianco su tinta piena del tipo (tipo-* ammette il testo bianco), raggio 2 px.
 \newcommand{\ForestasEtichettaTipo}[1]{\tikz[baseline=(t.base)]\node[fill=forestas-tipo,rounded corners=1.5pt,inner xsep=4pt,inner ysep=2.5pt,text=white](t){\ForestasStileOcchiello\MakeUppercase{#1}};}
@@ -204,6 +197,12 @@
 % QR code del rimando alla pagina del sito: #1 l'URL con i caratteri speciali di qrcode escaped.
 \newcommand{\ForestasQr}[1]{\qrcode[height=22mm]{#1}}
 
+% Dati con il rimando alla pagina del sito: il contenuto a sinistra, il QR code (#1, l'URL escaped per
+% qrcode) a destra. Con #1 vuoto il contenuto prende tutta la larghezza e il QR non c'è.
+\NewDocumentEnvironment{ForestasConRimando}{m}{\par\nointerlineskip\vspace{4pt}\noindent
+\begin{minipage}[t]{\dimexpr\linewidth-\if\relax\detokenize{#1}\relax 0mm\else 28mm\fi\relax}\vspace{0pt}}{\end{minipage}%
+\if\relax\detokenize{#1}\relax\else\hfill\begin{minipage}[t]{22mm}\vspace{0pt}\ForestasQr{#1}\end{minipage}\fi\par}
+
 % Indirizzo del rimando, sotto i dati: #1 l'invito, #2 l'URL leggibile (escaped per LaTeX).
 \newcommand{\ForestasIndirizzo}[2]{\par\vspace{6pt}\ForestasStileDidascalia\leavevmode\ForestasOcchiello{#1}\par\begingroup\color{ink}\ForestasStileDidascalia\bfseries #2\par\endgroup}
 
@@ -222,9 +221,6 @@
 \endtabularx\par
 }
 \renewcommand{\RigaTabella}[2]{#1 & #2\\\hline}
-
-% Didascalia: corpo didascalia dei token, in ink-3.
-\newcommand{\ForestasDidascalia}[1]{\par\begingroup\color{ink-3}\ForestasStileDidascalia #1\par\endgroup}
 
 % Piè di pagina (PieDiPagina): filetto oro in testa, logotipo e numero di pagina, poi il
 % copyright RAS in didascalia ink-3. Il credito della mappa sta sotto la mappa.

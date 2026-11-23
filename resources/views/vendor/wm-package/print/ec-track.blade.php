@@ -41,32 +41,20 @@
         $accessibility['disabilities'],
     ));
 @endphp
-\documentclass[10pt,a4paper]{article}
-@foreach ($styleFiles as $styleName)
-\usepackage{{!! $styleName !!}}
-@endforeach
-\definecolor{wmprimary}{HTML}{{!! strtoupper($primaryColor) !!}}
-@include('wm-package::print.partials.preamble', [
-    'sectionColor' => $sheet['type']['color'],
-    'copyright' => $l['Footer copyright'],
-])
+@include('wm-package::print.partials.head', ['sectionColor' => $sheet['type']['color'], 'copyright' => $l['Footer copyright']])
 \begin{document}
 {{-- Pagina 1: tutto in un box che, se non ci sta, si riduce in scala (ForestasPaginaUnica). --}}
 \begin{ForestasPaginaUnica}
 {{-- 1. Testata. --}}
-\noindent\ForestasLogotipo{16pt}\hfill\ForestasOcchiello{{!! $sheet['sheetLabel'] !!}}
-\ForestasFiletto
-\vspace{8pt}
-\noindent\ForestasEtichettaTipo{{!! $sheet['type']['text'] !!}}@if ($sheet['ref'])\hspace{6pt}\ForestasRiferimento{{!! $sheet['ref'] !!}}@endif
-@if ($sheet['area'])\hspace{6pt}\ForestasOcchiello{{!! $sheet['area'] !!}}@endif
-@if ($sheet['kind'] !== 'itinerario')\hfill\ForestasBadgeStato{{!! $validation['color'] !!}}{{!! $validation['badge'] !!}}@endif
-
-\vspace{2pt}
-\TitoloScheda{{!! $name !!}}
-@if ($sheet['location'])
-\begingroup\color{ink-2}\ForestasStileSottotitolo {!! $sheet['location'] !!}\par\endgroup
-@endif
-\FilettoOro
+@include('wm-package::print.partials.header', [
+    'sheetLabel' => $sheet['sheetLabel'],
+    'typeText' => $sheet['type']['text'],
+    'ref' => $sheet['ref'],
+    'area' => $sheet['area'],
+    'badge' => $sheet['kind'] !== 'itinerario' ? ['color' => $validation['color'], 'text' => $validation['badge']] : null,
+    'title' => $name,
+    'location' => $sheet['location'],
+])
 @if ($sheet['notice'])
 {{-- 2. Avviso di percorribilità: è un dato di stato, nel colore dello stato, e apre il blocco di stato. --}}
 \ForestasRiquadro{{!! $sheet['noticeColor'] !!}}{\begingroup\color{ink}\bfseries {!! $l['Notice'] !!}\endgroup{}@if ($sheet['notice']['date'])\hspace{6pt}\begingroup\color{ink-3}\ForestasStileDidascalia {!! $sheet['notice']['date'] !!}\endgroup{}@endif\par
@@ -90,12 +78,7 @@
 \ForestasRiquadro{sar-blu}{\ForestasOcchiello{{!! $l['Trail for everyone'] !!}}\par
 \begingroup\color{ink}\bfseries {!! $sheet['inclusivity']['class'] !!}\endgroup\hspace{6pt}\begingroup\color{ink-2}{!! $l['Inclusivity score'] !!}: {!! $sheet['inclusivity']['score'] !!}\endgroup\par
 {{-- I cinque dati in una griglia di tre colonne, come i dati catastali: la tabella non starebbe nella pagina 1. --}}
-\vspace{2pt}\begin{ForestasGriglia}{3}
-@foreach ($sheet['inclusivity']['rows'] as $row)
-\ForestasDato{{!! $row['label'] !!}}{{!! $row['value'] !!}}@if ($loop->last) \\ @elseif ($loop->iteration % 3 === 0) \\[4pt]
-@else & @endif
-@endforeach
-\end{ForestasGriglia}}
+\vspace{2pt}@include('wm-package::print.partials.grid', ['rows' => $sheet['inclusivity']['rows']])}
 @endif
 @endif
 {{-- 4. In breve. --}}
@@ -112,20 +95,14 @@
      sotto i dati l'indirizzo della pagina del sito, a destra il suo QR code. --}}
 
 \par\vspace{2pt}\ForestasOcchiello{{!! $sheet['dataTitle'] !!}}
-\par\nointerlineskip\vspace{4pt}\noindent\begin{minipage}[t]{\dimexpr\linewidth-@if ($sheet['link'])28mm @else 0mm @endif\relax}\vspace{0pt}
+\begin{ForestasConRimando}{{!! $sheet['link']['qr'] ?? '' !!}}
 @if ($sheet['keyData'] !== [])
-\begin{ForestasGriglia}{3}
-@foreach ($sheet['keyData'] as $row)
-\ForestasDato{{!! $row['label'] !!}}{{!! $row['value'] !!}}@if ($loop->last) \\ @elseif ($loop->iteration % 3 === 0) \\[6pt]
-@else & @endif
-@endforeach
-\end{ForestasGriglia}
+@include('wm-package::print.partials.grid', ['rows' => $sheet['keyData']])
 @endif
 @if ($sheet['link'])
 \ForestasIndirizzo{{!! $l['See the page on the website'] !!}}{{!! $sheet['link']['text'] !!}}
 @endif
-\end{minipage}@if ($sheet['link'])\hfill\begin{minipage}[t]{22mm}\vspace{0pt}\ForestasQr{{!! $sheet['link']['qr'] !!}}\end{minipage}@endif
-\par
+\end{ForestasConRimando}
 @endif
 \end{ForestasPaginaUnica}
 @if ($mapFile)

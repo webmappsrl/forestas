@@ -52,7 +52,9 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   system SARDEGNA Sentieri (artifact K7Z7K9PsveXuD7TNBspac7: `tokens.json`, README §3-§5, componenti). I colori
   hanno i valori esatti di `tokens.json`; se il design system cambia, si aggiorna il preambolo a mano. Il package
   allega solo `wm-print.sty` (macro di base), che il preambolo ridefinisce.
-- `resources/views/vendor/wm-package/print/`: `ec-track`, `ec-poi` e i partial `preamble` e `logotype`. I dati
+- `resources/views/vendor/wm-package/print/`: `ec-track`, `ec-poi` e i partial `head` (classe, stili, preambolo),
+  `header` (testata), `grid` (dati brevi in tre colonne), `preamble` e `logotype`. I dati e il QR code a destra
+  stanno nell'ambiente `ForestasConRimando` del preambolo (URL vuoto: niente QR, tutta la larghezza). I dati
   li prepara `App\Support\ForestasPrintSheet` (già escaped), costruiti da `ForestasTrackDetail` /
   `ForestasPoiDetail`: la logica sta fuori da Blade. Una direttiva Blade attaccata a un comando LaTeX
   (`\noindent@foreach`) non si compila: i pezzi ripetuti dentro una cella si compongono nel `@php`.
