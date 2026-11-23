@@ -10,9 +10,10 @@ WordPress non è toccato da questo ticket.
 
 ## Cosa cambia
 
-- Lo shard installa il **motore di rendering** del package (LaTeX e renderer delle mappe) e
-  configura il package per usarlo. Dove gira, se nell'immagine PHP dello shard o in un container
-  separato, è una domanda aperta: vedi «Domanda aperta» nell'overview del package.
+- Lo shard installa **TeX Live** (`xelatex`) nella propria immagine PHP, con lo script del
+  package, e ricostruisce l'immagine nel deploy quando il package ne cambia le dipendenze. La
+  **mappa** non la disegna lo shard: la chiede via HTTP al servizio di rendering unico di oc:9011,
+  di cui configura indirizzo e token. Niente container nuovi nel compose.
 - Le schede PDF di Forestas hanno la **grafica del design system di SARDEGNA Sentieri** invece
   della scheda neutra del package:
   - lo stile si genera dal `tokens.json` del design system (artifact «SARDEGNA Sentieri Design
@@ -50,11 +51,18 @@ Ne discendono i requisiti qui sotto, che sostituiscono la scelta fra soluzione A
 
 - <a id="r1"></a>**R1** — Installazione di `texlive-xetex` e `texlive-fonts-recommended` in
       `docker/configs/phpfpm/Dockerfile`, richiamando lo script del package
-      (`COPY wm-package/docker/render/install-deps.sh` più `RUN`), così le dipendenze restano
+      (`COPY --from=wmpackage install-deps.sh` più `RUN`, vedi R2), così le dipendenze restano
       versionate con il codice che le usa.
-- <a id="r2"></a>**R2** — Build context alla root: `context: .` e `dockerfile: docker/configs/phpfpm/Dockerfile` in
-      `compose.yml`, `develop.compose.yml` e `local.compose.yml`. Oggi è `build: ./docker/configs/phpfpm`,
-      e da lì la `COPY` dal submodule non è possibile.
+- <a id="r2"></a>**R2** — Secondo contesto di build (challenge del 18/11): il contesto resta
+      `./docker/configs/phpfpm` e lo script del package arriva con `additional_contexts`
+      (`wmpackage: ./wm-package/docker/render`) e `COPY --from=wmpackage install-deps.sh`. Vale per
+      tutti i servizi che costruiscono `wm-phpfpm:8.4`: `php` e `horizon` in `compose.yml`,
+      `horizon` in `develop.compose.yml`, `php`, `scout-init` e `laravel` in `local.compose.yml`.
+      Richiede Docker Compose 2.17 o successivo con BuildKit, da verificare sugli host di dev e UAT.
+  - ~~Build context alla root: `context: .` e `dockerfile: docker/configs/phpfpm/Dockerfile`.~~
+    Superato: gli `ADD` del Dockerfile (`.bashrc`, `www.conf`, `zz-docker.conf`, `php.ini`) sono
+    relativi alla cartella attuale e si sarebbero rotti, e senza `.dockerignore` ogni build avrebbe
+    mandato al daemon anche `storage` (4,5 GB in locale), `vendor` e `.git`.
 - <a id="r3"></a>**R3** — Rebuild esplicito dell'immagine quando il package cambia le dipendenze: il deploy fa
       `git submodule update --init wm-package` e poi `docker exec` nel container esistente, senza
       ricostruire nulla.
@@ -83,6 +91,11 @@ Ne discendono i requisiti qui sotto, che sostituiscono la scelta fra soluzione A
     un'applicazione aggiornata con dipendenze di sistema vecchie è il disallineamento che questo
     requisito esiste per evitare. Il marcatore di versione nell'immagine resta come rete di
     sicurezza per le ricostruzioni fatte a mano.
+  - **Precisato nella challenge (18/11):** `stop_grace_period: 6m` sul servizio `horizon` di
+    `compose.yml`. Quando `up -d` ricrea il container, Docker manda SIGKILL dopo 10 secondi, e le
+    code in `config/horizon.php` hanno `timeout` fino a 360 secondi: senza questa riga un Job
+    dell'import o del DEM morirebbe a metà, mentre `horizon:terminate` di `scripts/deploy.sh`
+    aspetta che finisca.
 - <a id="r4"></a>**R4** — Coda Horizon dedicata alla stampa, con pochi worker, e `maxProcesses` delle code esistenti
       rivisto: oggi 47 worker fermi occupano 2,4 GB di PSS.
 - <a id="r5"></a>**R5** — Configurazione dell'indirizzo e del token del servizio di rendering delle mappe (oc:9011) in
@@ -102,6 +115,71 @@ Ne discendono i requisiti qui sotto, che sostituiscono la scelta fra soluzione A
       sentieri correlati) entrano nella scheda di Forestas dove servono.
 - <a id="r12"></a>**R12** — Colori di stato e di tipo usati solo per il loro ruolo, come prescrive il design system (le
       tinte del marchio non indicano stati).
+- <a id="r15"></a>**R15** — Test che fa il render dell'override (Blade → `.tex`) con un `EcTrack`
+      di prova, senza compilare (challenge del 18/11): una variabile cambiata nel package fa
+      fallire la CI al primo aggiornamento del puntatore, invece che il Job di stampa davanti
+      all'utente. Non richiede `xelatex` in CI.
+
+### Revisione del 20/11: view generate dal design system, niente token
+
+Decisa dal dev: le view della scheda si generano con un'IA a partire dal design system, senza il
+passaggio dai token allo `.sty` (R46-R50 del package). **Supera R6, la parte di R9 «si parte dalla
+struttura della view di default», e l'ampliamento con pagina e anteprima (R16-R17 di prima, mai
+implementati).**
+
+- <a id="r16"></a>**R16** — Via `resources/print/design-system/tokens.json`,
+      `resources/print/forestas.sty`, il test di allineamento, la procedura
+      `docs/howto/riallineare-lo-stile-di-stampa.md` e la riga `style_path` in `AppServiceProvider`.
+      Colori, font e stili di testo della scheda stanno nel preambolo delle view di Forestas,
+      generato dal design system ([SARDEGNA Sentieri Design System](https://claude.ai/artifact/K7Z7K9PsveXuD7TNBspac7)).
+- <a id="r17"></a>**R17** — La scheda di `EcTrack` prende a modello la pagina di dettaglio del
+      sentiero del sito (tema `wp-forestas/themes/forestas-child`, `wp-package/track.php` e
+      `inc/dettaglio.php`; esempio: `https://wp.forestas.uat.maphub.it/sentiero/untanas-de-su-tassu-su-tassu-g-111b/`),
+      nell'ordine:
+  1. testata: logotipo «SARDEGNA Sentieri», nome, località, badge di stato;
+  2. **mappa in apertura, grande, quasi una pagina intera** (dimensioni chieste al servizio delle
+     mappe con R49 del package);
+  3. subito sotto, **il blocco di stato** come sul sito: fascia «Percorribilità» con il testo
+     (es. «Dato non ancora disponibile»); poi tre colonne con scala a segmenti:
+     «Validazione catastale» (livello su scala, es. «3 su 6 · In pre-accatastamento o
+     manutenzione»), «Percorribilità» (scala, es. «Dato non ancora disponibile»), «Accessibilità»
+     (AT, AE, AEE, es. «Non classificato», con le tre icone Motoria, sensoriale, psichica
+     cognitiva);
+  4. **«Il sentiero in breve»**: Lunghezza, Dislivello totale, Tempo di percorrenza, Quota min —
+     max (con «—» se il dato manca);
+  5. poi come il sito: descrizione, descrizione delle tappe (roadbook), attività e avvertenze,
+     dati catastali e altimetrici (Percorso, Misure, Catasto), immagini se ci sono, punti di
+     interesse correlati.
+
+  Le scale, le etichette e la logica dei livelli si prendono dal tema WordPress, che legge gli
+  stessi dati di `properties.forestas`: la scheda e la pagina web devono dire la stessa cosa.
+- <a id="r18"></a>**R18** — Le icone dell'accessibilità e gli altri segni grafici vengono dal tema
+      WordPress o dal design system, convertiti una volta in PDF o PNG in `resources/print/`
+      (XeLaTeX non legge SVG). Il logotipo resta composto in testo (R7).
+- <a id="r19"></a>**R19** — La scheda di `EcPoi` segue lo stesso linguaggio grafico, con la mappa in
+      apertura.
+
+### Revisione del 23/11: foglio fronte e retro (call del team)
+
+Decisa nella call del 23/11 (Alessio, Peppe) e precisata dal dev. **Supera R17 nei punti 2 e 5 e
+la mappa in apertura di R19.** Il caso d'uso è il volantino dell'infopoint: un foglio A4 stampato
+fronte e retro, che il turista si mette in tasca e da cui torna al sito con il QR code. La versione
+lunga, con la descrizione, si rimanda a quando la chiederà il cliente.
+
+- <a id="r20"></a>**R20** — La scheda di `EcTrack` è di **due pagine esatte**:
+  1. pagina 1: la testata come prima; l'avviso di percorribilità se pubblicato; il blocco di stato e
+     «Sentiero per tutti» come in R17, al più più compatti; «Il sentiero in breve»; pochi dati
+     catastali e altimetrici, solo quelli che non sono già sopra e che ci stanno (Partenza, Arrivo,
+     Andata e ritorno, Difficoltà; per i sentieri Codice catastale e Data del rilievo; le righe
+     senza dato non escono); il **rimando alla pagina del sito**, QR code e indirizzo. Se il
+     contenuto non ci sta, si riduce in scala quanto basta invece di traboccare;
+  2. pagina 2: **la sola mappa, A4 al vivo** (210 x 297 mm, senza margini, testata né piè di
+     pagina), nella misura che restituisce il servizio delle mappe, con il credito di
+     OpenStreetMap piccolo nell'angolo (lo chiede la licenza).
+
+  Escono descrizione, informazioni utili, roadbook, attività e avvertenze, le tabelle complete dei
+  dati catastali e la galleria. La scheda di `EcPoi` tiene i suoi contenuti, con il rimando al sito
+  in fondo e la mappa nell'ultima pagina, da sola, come quella del percorso.
 
 ### Requisiti superati dalla risposta del 18/11
 
@@ -131,16 +209,21 @@ cinque requisiti qui sopra.
 
 - Tutto il lato WordPress (`wp-forestas` e plugin `wp-package`): il pulsante «Stampa» del
   dettaglio e i pulsanti della ricerca li fa un altro ticket.
-- La produzione di Forestas: oggi non esiste; il motore va solo negli ambienti del repo (locale,
+- La produzione di Forestas: oggi non esiste; TeX Live va solo negli ambienti del repo (locale,
   dev, UAT).
+- Il servizio di rendering delle mappe: è il ticket oc:9011.
 
 ## Moduli toccati
 
 Repo `forestas`:
 
-- `docker/configs/phpfpm/Dockerfile` (soluzione A) oppure `compose.yml`, `develop.compose.yml`,
-  `local.compose.yml` (soluzione B).
-- `.env-example`, `.env-deploy` : configurazione del motore.
+- `docker/configs/phpfpm/Dockerfile` : richiamo di `wm-package/docker/render/install-deps.sh`.
+- `compose.yml`, `develop.compose.yml`, `local.compose.yml` : `additional_contexts` nei servizi
+  che costruiscono `wm-phpfpm:8.4`.
+- `.github/workflows/deploy.yml` : rebuild di `php` e `horizon` quando cambia il puntatore di
+  `wm-package`.
+- `config/horizon.php` : coda dedicata alla stampa e `maxProcesses` delle code esistenti.
+- `.env-example`, `.env-deploy` : indirizzo e token del servizio di rendering di oc:9011.
 - `resources/design-system/tokens.json` (nuovo, percorso da confermare nel piano) e lo stile
   generato.
 - `resources/views/vendor/wm-package/…` : override delle view della scheda di `EcTrack` e `EcPoi`.

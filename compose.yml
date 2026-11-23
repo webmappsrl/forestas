@@ -11,7 +11,10 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     # user: root
-    build: ./docker/configs/phpfpm
+    build:
+      context: ./docker/configs/phpfpm
+      additional_contexts:
+        wmpackage: ./wm-package/docker/render
     restart: always
     container_name: "php-${APP_NAME}"
     image: wm-phpfpm:8.4
@@ -112,9 +115,15 @@ services:
   horizon:
     extra_hosts:
       - host.docker.internal:host-gateway
-    build: ./docker/configs/phpfpm
+    build:
+      context: ./docker/configs/phpfpm
+      additional_contexts:
+        wmpackage: ./wm-package/docker/render
     restart: always
     container_name: "horizon-${APP_NAME}"
+    # Lascia a Horizon il tempo di finire i job di compilazione PDF in corso: il supervisor print
+    # ha timeout 420 s, 8m ne da' il margine (oc:8982)
+    stop_grace_period: 8m
     image: wm-phpfpm:8.4
     command: php artisan horizon
     volumes:

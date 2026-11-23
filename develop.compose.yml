@@ -51,9 +51,16 @@ services:
   horizon:
     extra_hosts:
       - host.docker.internal:host-gateway
-    build: ./docker/configs/phpfpm
+    build:
+      context: ./docker/configs/phpfpm
+      additional_contexts:
+        wmpackage: ./wm-package/docker/render
     restart: always
     container_name: "horizon-${APP_NAME}"
+    # Horizon in chiusura aspetta il timeout piu' lungo fra i supervisor: in production
+    # (APP_ENV di UAT) geohub-import-supervisor ha 600 s, il supervisor print 420 s (oc:8982).
+    # 11m (660 s) copre anche il primo, con margine.
+    stop_grace_period: 11m
     image: wm-phpfpm:8.4
     command: php artisan horizon
     volumes:

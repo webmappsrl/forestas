@@ -33,6 +33,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Indirizzo del sito WordPress (oc:8982)
+    |--------------------------------------------------------------------------
+    |
+    | URL base del sito pubblico (senza la barra finale), per il QR code e il
+    | link alla pagina di dettaglio nelle schede PDF. Vuoto: le schede escono
+    | senza rimando. Come WP_API_TOKEN, va impostato nel `.env` prima del deploy.
+    |
+    */
+
+    'wp_site_url' => env('WP_SITE_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Dizionario delle traduzioni per i TaxonomyPoiType
     |--------------------------------------------------------------------------
     |

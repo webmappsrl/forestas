@@ -1,5 +1,9 @@
 <?php
 
+// Il supervisor `print` esiste solo a dominio acceso (stessa variabile del package): a dominio
+// spento non restano worker accesi a vuoto su una coda che nessuno riempie (oc:8982).
+$print = env('WM_PRINT_ENABLED', false) ? ['supervisor-print' => []] : [];
+
 return [
     'defaults' => [
         'supervisor-aws' => [
@@ -105,13 +109,38 @@ return [
             'timeout' => 120,
             'nice' => 0,
         ],
+        /*
+         * Stampa PDF delle schede (oc:8982). Coda dedicata e pochi worker: xelatex
+         * e' pesante (il limite di memoria del processo lo da' `prlimit`, non
+         * `memory`).
+         *
+         * Il `timeout` di 420 s sta sopra i 390 s del Job (2 x compile 120 + mappa
+         * 60 + foto 60 + 30) e sotto il `retry_after` di 660 s della connessione
+         * redis: se fosse minore, Horizon ucciderebbe il Job prima del suo
+         * timeout; se fosse maggiore, la coda lo riconsegnerebbe mentre gira.
+         *
+         * `tries` non e' impostato: il Job dichiara i propri (`$tries`,
+         * `$maxExceptions`) e quelli hanno la precedenza sul valore del worker.
+         */
+        'supervisor-print' => [
+            'connection' => 'redis',
+            'queue' => ['print'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'maxTime' => 3600,
+            'maxJobs' => 100,
+            'memory' => 256,
+            'timeout' => 420,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
         'local' => [
+            ...$print,
             'supervisor-default' => [
                 'balance' => 'simple',
-                'maxProcesses' => 30,
+                'maxProcesses' => 10,
             ],
             'supervisor-sardegnasentieri-import' => [
                 'balance' => 'simple',
@@ -119,8 +148,9 @@ return [
             ],
         ],
         'develop' => [
+            ...$print,
             'supervisor-default' => [
-                'maxProcesses' => 30,
+                'maxProcesses' => 10,
                 'minProcesses' => 1,
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
@@ -160,6 +190,7 @@ return [
          * altri (oc:8607).
          */
         'production' => [
+            ...$print,
             'supervisor-sardegnasentieri-import' => [
                 'maxProcesses' => 5,
                 'minProcesses' => 1,
@@ -170,8 +201,9 @@ return [
             ],
         ],
         'staging' => [
+            ...$print,
             'supervisor-default' => [
-                'maxProcesses' => 30,
+                'maxProcesses' => 10,
                 'minProcesses' => 1,
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
