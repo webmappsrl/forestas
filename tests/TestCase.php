@@ -4,6 +4,7 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Wm\WmPackage\Jobs\BuildAppPoisGeojsonJob;
 use Wm\WmPackage\Jobs\TaxonomyWhere\RegenerateTaxonomyWhereOutputsJob;
@@ -41,5 +42,11 @@ abstract class TestCase extends BaseTestCase
         foreach (['wmfe', 'pois', 'conf', 'mapping', 'importer', 'backups', 'wmdumps', 'well_known_registry'] as $disk) {
             Storage::fake($disk);
         }
+
+        // Nemmeno via HTTP: una richiesta che il test non ha finto con Http::fake() fallisce
+        // invece di uscire. Da oc:9001 l'import chiama Geohub per le aree geografiche, e i test
+        // che lanciano l'import intero lo avrebbero chiamato davvero; il passo delle aree
+        // registra l'errore e l'import prosegue.
+        Http::preventStrayRequests();
     }
 }
