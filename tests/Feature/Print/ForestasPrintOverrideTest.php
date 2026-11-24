@@ -547,8 +547,8 @@ describe('scheda del sentiero', function () {
         expect($trackTex)
             // Nel QR i caratteri speciali di LaTeX escaped come vuole il pacchetto qrcode.
             ->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
-            // Nell'indirizzo leggibile senza schema.
-            ->toContain('{www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
+            // L'indirizzo leggibile è completo, con lo schema.
+            ->toContain('}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
             ->not->toContain('sardegnasentieri.it/sentieri')
             // Anche un POI creato in Nova, senza indirizzo di Drupal, ha il suo rimando.
             ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=poi\&wmwp\_id='.$poi->id.'}');

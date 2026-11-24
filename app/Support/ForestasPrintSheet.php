@@ -421,7 +421,8 @@ final class ForestasPrintSheet
 
     /**
      * Il rimando alla pagina di dettaglio del sito pubblico: l'URL per il QR code (caratteri speciali
-     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, senza schema (escaped per LaTeX).
+     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, con lo schema (escaped per LaTeX): chi lo ricopia a mano deve avere
+     * l'indirizzo completo.
      *
      * L'URL è `<forestas.website_url>/?wmwp_detail=track|poi&wmwp_id=<id>`: il plugin del sito lo
      * risolve nella pagina di dettaglio, che non cambia se l'elemento viene rinominato e c'è anche per
@@ -440,7 +441,7 @@ final class ForestasPrintSheet
 
         return [
             'qr' => strtr($url, ['\\' => '\\\\', '#' => '\\#', '%' => '\\%', '&' => '\\&', '_' => '\\_', '~' => '\\~', '$' => '\\$', '^' => '\\^', '{' => '\\{', '}' => '\\}']),
-            'text' => LatexText::escape(preg_replace('#^https?://#i', '', $url) ?? $url),
+            'text' => LatexText::escape($url),
         ];
     }
 
