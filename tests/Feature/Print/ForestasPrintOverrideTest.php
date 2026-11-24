@@ -237,8 +237,8 @@ describe('la mappa: una pagina a sé, A4 al vivo', function () {
         foreach ([printOverrideTrack(), printOverridePoi()] as $model) {
             $tex = printOverrideBody(printOverrideRender($model));
             // Niente credito accanto alla mappa: lo disegna il servizio sull'immagine (oc:9011).
-            expect($tex)->toContain("\\ForestasMappaPagina{map.png}\n")
-                ->not->toContain('\ForestasMappaPagina{map.png}{');
+            expect($tex)->toContain("\\ForestasMappaPagina{map.png}\n");
+            expect($tex)->not->toContain('\ForestasMappaPagina{map.png}{');
             expect($tex)->not->toContain('\ForestasMappa{');
         }
     });
@@ -548,10 +548,10 @@ describe('scheda del sentiero', function () {
             // Nel QR i caratteri speciali di LaTeX escaped come vuole il pacchetto qrcode.
             ->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
             // L'indirizzo leggibile è completo, con lo schema.
-            ->toContain('}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
-            ->not->toContain('sardegnasentieri.it/sentieri')
-            // Anche un POI creato in Nova, senza indirizzo di Drupal, ha il suo rimando.
-            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=poi\&wmwp\_id='.$poi->id.'}');
+            ->toContain('}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}');
+        expect($trackTex)->not->toContain('sardegnasentieri.it/sentieri');
+        // Anche un POI creato in Nova, senza indirizzo di Drupal, ha il suo rimando.
+        expect(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=poi\&wmwp\_id='.$poi->id.'}');
 
         // Lo slash finale del dominio non raddoppia.
         config(['forestas.website_url' => 'https://www.example.test/']);
