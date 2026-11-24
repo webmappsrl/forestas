@@ -11,6 +11,8 @@
 
   Riceve: $sectionColor  token `tipo-*` del filetto di sezione e dell'etichetta di tipo;
           $copyright     riga del copyright RAS per il piè di pagina, già escaped.
+  Usa anche $generatedOn del contratto della view (data di generazione già escaped, a destra del
+  copyright): la scheda è un'istantanea e deve dire a che giorno risalgono i dati.
 
   Regole del design system applicate:
   - fondo pagina bianco (surf); surf-2 solo per riquadri e fasce, mai per la pagina;
@@ -165,13 +167,13 @@
 \end{tikzpicture}}
 
 % Mappa: una pagina a sé, A4 al vivo, senza testata, margini né piè di pagina (oc:8982). L'immagine
-% arriva già nella misura della pagina (features.print.map.*, 210 x 297 mm) e si stende sulla pagina
+% arriva già nella misura della pagina (print.map.*, 210 x 297 mm) e si stende sulla pagina
 % intera, centrata (keepaspectratio: un'immagine di proporzioni diverse non si deforma). Si disegna
-% sotto la pagina con eso-pic, che non chiede una seconda compilazione. #2 è il credito, d'obbligo per
-% la licenza di OpenStreetMap: piccolo, nell'angolo in basso a destra, su fondo bianco.
-\newcommand{\ForestasMappaPagina}[2]{\clearpage\thispagestyle{empty}%
-\AddToShipoutPictureBG*{\AtPageCenter{\makebox[0pt][c]{\raisebox{-0.5\height}{\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{#1}}}}%
-\AtPageLowerLeft{\put(\LenToUnit{\dimexpr\paperwidth-3mm\relax},\LenToUnit{3mm}){\makebox[0pt][r]{\setlength{\fboxsep}{1.5pt}\colorbox{white}{\begingroup\color{ink-2}\fontsize{7pt}{8pt}\selectfont #2\endgroup}}}}}%
+% sotto la pagina con eso-pic, che non chiede una seconda compilazione. Il credito di OpenStreetMap,
+% d'obbligo per la licenza, è sull'immagine: lo disegna il servizio mappe con scala e nord (oc:9011,
+% `map_service.map_info`), e qui non si ripete.
+\newcommand{\ForestasMappaPagina}[1]{\clearpage\thispagestyle{empty}%
+\AddToShipoutPictureBG*{\AtPageCenter{\makebox[0pt][c]{\raisebox{-0.5\height}{\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{#1}}}}}%
 \null\clearpage}
 
 % Pagina unica (fronte del foglio della traccia): il contenuto si compone in un box largo quanto lo
@@ -223,11 +225,11 @@
 \renewcommand{\RigaTabella}[2]{#1 & #2\\\hline}
 
 % Piè di pagina (PieDiPagina): filetto oro in testa, logotipo e numero di pagina, poi il
-% copyright RAS in didascalia ink-3. Il credito della mappa sta sotto la mappa.
+% copyright RAS in didascalia ink-3 e, a destra, la data di generazione. Il credito della mappa è sull'immagine.
 \setlength{\footskip}{28pt}
 \pagestyle{fancy}\fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
 \fancyfoot[C]{\parbox[t]{\textwidth}{\begingroup\color{sar-oro}\rule{\textwidth}{2.25pt}\endgroup\par\vspace{3pt}%
 \ForestasLogotipoSolo{9pt}\hfill\begingroup\color{ink-3}\ForestasStileDidascalia\thepage\endgroup\par\vspace{-1pt}%
-\begingroup\color{ink-3}\ForestasStileDidascalia {!! $copyright !!}\endgroup}}
+\begingroup\color{ink-3}\ForestasStileDidascalia {!! $copyright !!}@if (! empty($generatedOn))\hfill {!! $generatedOn !!}@endif\endgroup}}

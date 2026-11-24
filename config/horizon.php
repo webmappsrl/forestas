@@ -1,8 +1,8 @@
 <?php
 
-// Il supervisor `print` esiste solo a dominio acceso (stessa variabile del package): a dominio
-// spento non restano worker accesi a vuoto su una coda che nessuno riempie (oc:8982).
-$print = env('WM_PRINT_ENABLED', false) ? ['supervisor-print' => []] : [];
+// Il supervisor della coda `print` (oc:8982), in ogni ambiente: la stampa non ha più un interruttore
+// nello shard, la decide l'opzione dell'App (`properties.ec_pdf_enabled`).
+$print = ['supervisor-print' => []];
 
 return [
     'defaults' => [

@@ -2,7 +2,7 @@
 
 > Ticket: oc:8982
 
-Come Forestas genera la scheda PDF di sentieri e POI. Il dominio `print` (flusso, rotte, contratto delle
+Come Forestas genera la scheda PDF di sentieri e POI. La stampa del package (flusso, rotte, contratto delle
 view, sicurezza) è del package: [wm-package/docs/resources/Print.md](../../wm-package/docs/resources/Print.md).
 Qui solo ciò che è specifico di questo shard.
 
@@ -32,8 +32,8 @@ Qui solo ciò che è specifico di questo shard.
 ## Coda `print` in Horizon
 
 `config/horizon.php`, `supervisor-print`: coda `print`, 2 worker, `timeout` 420 (sotto `retry_after` 660).
-Il supervisor esiste solo a dominio acceso (`WM_PRINT_ENABLED`): `config/horizon.php` lo aggiunge agli
-ambienti con `...$print`.
+Il supervisor c'è in ogni ambiente: dal 24/11 la stampa non ha più un interruttore nello shard
+(`WM_PRINT_ENABLED` è stato tolto) e la decide solo l'opzione dell'App.
 `stop_grace_period` di `horizon` è 8m in `compose.yml` e 11m in `develop.compose.yml` (UAT, `APP_ENV=production`):
 Horizon in chiusura aspetta il timeout più lungo fra i supervisor, che è 420 s per `print` e 600 s per
 `geohub-import-supervisor` (local e production, dal package). Le altre code di `config/horizon.php` hanno
@@ -63,7 +63,7 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   nome, località, filetto oro); l'avviso di percorribilità se pubblicato (nel colore dello stato); il blocco di
   stato nell'opzione A (fascia «Percorribilità», Validazione catastale e Percorribilità affiancate, Accessibilità a
   tutta larghezza con la scala AT / AE / AEE e le tre icone); «Sentiero per tutti» se c'è la classe, con i punteggi
-  in griglia; «Il sentiero in breve»; i dati catastali e altimetrici che non sono già sopra (Partenza, Arrivo,
+  in griglia; «Il sentiero in breve»; i dati catastali e altimetrici che non sono già sopra (Partenza, Via, Arrivo,
   Andata e ritorno, Difficoltà; per i sentieri Codice catastale e Data del rilievo; senza righe vuote), in griglia,
   con a destra il QR code e sotto l'indirizzo della pagina del sito. **Pagina 2**: la sola mappa. Niente
   descrizione, informazioni utili, roadbook, attività e avvertenze né galleria. Itinerario e cammino cambiano
@@ -77,10 +77,13 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   altrimenti LaTeX lo manda alla pagina dopo e la pagina 1 resta bianca. Nelle griglie (`ForestasGriglia`,
   `\ForestasDato`) serve `\leavevmode` in testa alla cella: un `\color` in modo verticale fa scendere la cella di
   una riga.
-- **Rimando al sito**: l'URL è `properties.forestas.url` (`ForestasTrackDetail` / `ForestasPoiDetail`), lo stesso
-  del dettaglio: oggi la pagina di sardegnasentieri.it, quando il sito passerà a WordPress il nuovo indirizzo. Lo
-  shard non lo costruisce (lo slug del sito lo calcola il plugin wp-package). Senza `url`, o se non è http(s),
-  niente QR né indirizzo. Il QR code è del pacchetto `qrcode`, che vuole escaped `# % & _ ~ $ ^ { } \`.
+- **Rimando al sito**: l'URL è `<forestas.website_url>/?wmwp_detail=track|poi&wmwp_id=<id>` (variabile
+  `FORESTAS_WEBSITE_URL`, solo schema e dominio: in produzione `https://www.sardegnasentieri.it`, su dev
+  `https://wp.forestas.dev.maphub.it`). Il plugin wp-package lo risolve nella pagina di dettaglio, che porta lo slug:
+  l'indirizzo non cambia se l'elemento viene rinominato e c'è anche per gli elementi creati in Nova. Non si usa
+  `properties.forestas.url`: è l'indirizzo di Drupal, che porta alle pagine vecchie e serve ai redirect dal vecchio
+  sito (oc:9018), quindi non va sovrascritto. Il QR contiene l'id dello shard: un PDF stampato resta valido finché
+  l'id non cambia (su UAT cambia a ogni reset notturno). Senza dominio, o se non è http(s), niente QR né indirizzo. Il QR code è del pacchetto `qrcode`, che vuole escaped `# % & _ ~ $ ^ { } \`.
 - **Scale come il sito** (registro degli stati del tema, `inc/statuses.php`, branch di oc:9000; lo stato di
   assenza vale 0): validazione 0-5 (non verificato 0, in revisione 2, pre-accatastamento 3, validato 4,
   certificato 5); percorribilità 0-4 (sconosciuta o assente 0, non percorribile 2, parzialmente 3,
@@ -96,11 +99,13 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
   `ForestasPrintSheet::icon()` li traduce in TikZ (libreria `svg.path`, in `texlive-pictures`). Non PNG/PDF
   allegati: il compilatore apre solo i file che gli allega il package (`openin_any=p`), e il contratto delle
   view non ha un modo per allegarne altri.
-- **Mappa: una pagina A4 al vivo**: `AppServiceProvider` imposta `features.print.map.width_mm` 210 e `height_mm`
+- **Mappa: una pagina A4 al vivo**: `AppServiceProvider` imposta `print.map.width_mm` 210 e `height_mm`
   297; il servizio delle mappe la disegna in quella misura. `\ForestasMappaPagina` (preambolo) la stende sulla
   pagina intera con `eso-pic` (non chiede una seconda compilazione: il compilatore lancia xelatex una volta sola),
   con `keepaspectratio` e centrata, su una pagina senza testata né piè di pagina; il credito di OpenStreetMap,
-  d'obbligo per la licenza, sta piccolo nell'angolo in basso a destra. `eso-pic` e `qrcode` arrivano con
+  d'obbligo per la licenza, lo disegna il servizio mappe sull'immagine insieme a scala e nord
+  (`map_service.map_info`, acceso di serie), e la view non lo ripete. Con `map_info` spento o con il driver
+  `fake` la pagina della mappa resta senza credito. `eso-pic` e `qrcode` arrivano con
   `texlive-xetex` (dipendenze di `texlive-latex-recommended` e `texlive-pictures`), già installato dallo script
   del package. La cella dell'accessibilità ha larghezza esplicita (`\multicolumn` con `p{}`): una colonna `X` in
   un `\multicolumn` non prende la larghezza delle due colonne.
@@ -110,22 +115,49 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
 - Il **logotipo è testo**, non immagine: lettere colorate per ruolo (S terra, A verde, R blu, D terra,
   E oro, G blu, N terra, A oro, peso 700) e coda «Sentieri» in Light, omessa nel piè di pagina (corpo piccolo).
 - Per il POI la rotta del package carica `Wm\WmPackage\Models\EcPoi`, che non ha le relazioni di Forestas:
-  l'override ricarica `App\Models\EcPoi`. `EcPoiDetailController` aggiunge `properties.print_url` solo a
-  dominio acceso.
+  l'override ricarica `App\Models\EcPoi`. Né il dettaglio della traccia né `EcPoiDetailController` hanno
+  `properties.print_url`: il plugin del sito costruisce il link da `OPTIONS.ec_pdf_enabled` del
+  `config.json` e dalla rotta `/print/{ec-track|ec-poi}/{id}` (scrum del 24/11).
+- **Data di generazione** nel piè di pagina, a destra del copyright («Scheda generata il 24 novembre 2026»,
+  `$generatedOn` del package): la scheda è un'istantanea. Le schede si rigenerano solo quando qualcuno le chiede
+  e non sono più aggiornate rispetto a `updated_at`, mai al salvataggio.
 - `tests/Feature/Print/ForestasPrintOverrideTest.php` passa da `PrintService::generate()` con compilatore
   finto, così le variabili sono quelle vere del package e un contratto cambiato lì rompe il test.
 
+## La stampa è accesa sull'App
+
+Nel package la scheda vale solo per gli elementi di un'App con `properties.ec_pdf_enabled` acceso (campo «Print
+PDF» nel tab `frontend` della Resource `App`, vedi la sezione «L'opzione dell'App» di
+[Print.md](../../wm-package/docs/resources/Print.md)). Manca finché qualcuno non la accende, e nessuna
+migration lo fa: in ogni ambiente l'opzione va accesa a mano da Nova sull'App di Forestas, altrimenti il
+pulsante sparisce, `/print/...` risponde 404 e l'action non si esegue.
+
+«Via» fra Partenza e Arrivo è `properties.via`, la meta intermedia scritta dal registro catastale
+([registro-catastale.md](registro-catastale.md)): la riga esce solo se c'è.
+
 ## Mappa e foto
 
-- La mappa è il mock del package: Forestas non cambia il driver finché non c'è il servizio di oc:9011.
+- La mappa la disegna il servizio di stampa di wm-tiles (oc:9011): nel `.env` `WM_PRINT_MAP_DRIVER=http`,
+  `WM_PRINT_MAP_SERVICE_URL` e il token di Forestas in `WM_PRINT_MAP_SERVICE_TOKEN`. La pagina 2 è un A4
+  verticale a 300 dpi (circa 6 s per la traccia 119, provata il 24/11), con scala, nord e attribuzioni disegnati
+  dal servizio. `AppServiceProvider` alza `map_service.max_zoom` a 18: con il 16 di serie un sentiero breve
+  restava piccolo in mezzo alla pagina (traccia 119: 1:21.500 con 16, 1:5.400 con 18). Con il driver `fake`
+  la mappa è il segnaposto del package.
+- Il colore della traccia sulla mappa è quello del suo layer (il primo per rank), altrimenti il rosso di default
+  di `EcTrack`; `WM_PRINT_MAP_STROKE_COLOR` nel `.env` lo fissa per tutte le tracce e vince sul layer. In locale
+  (24/11) solo 4 layer su 11 hanno un colore, e la traccia 119 esce rossa.
 - In locale le foto non si scaricano: gli URL puntano a `localhost:9000` e dal container non è raggiungibile
   (warning «Foto saltata» nel log `print-*`). Il layout delle foto non è mai stato visto in un PDF.
 
 ## Provare in locale
 
+- Prima: «Print PDF» acceso sull'App 1 (Nova, tab `frontend`), nel `.env` le tre variabili del servizio mappe
+  e `FORESTAS_WEBSITE_URL` (per il QR code), poi `php artisan config:clear` e riavvio di `horizon-forestas`: i
+  worker tengono in memoria il codice e la configurazione con cui sono partiti. Poi
+  `http://localhost:8000/print/ec-track/<id>?lang=it`: pagina d'attesa e redirect al PDF su MinIO
+  (`localhost:9000`).
 - Senza scrivere sul DB: da tinker, `PrintService::generate($model, 'it')` con il modello caricato
-  (`App\Models\EcTrack::find(...)`); è sincrono e scrive solo il PDF sullo storage `wmfe`. Serve
-  `WM_PRINT_ENABLED=true`. La rotta `/print/...` invece accoda il Job: serve un worker sulla coda `print`.
+  (`App\Models\EcTrack::find(...)`); è sincrono e scrive solo il PDF sullo storage `wmfe`. La rotta `/print/...` invece accoda il Job: serve un worker sulla coda `print`.
 - Per vedere la scheda **senza la personalizzazione**:
   `View::replaceNamespace('wm-package', base_path('wm-package/resources/views'))` prima di `generate()`, così
   non si usano gli override di Forestas.

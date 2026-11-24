@@ -8,6 +8,7 @@ use App\Models\EcTrack;
 use App\Services\Import\SardegnaSentieriImportService;
 use App\Support\ForestasPrintSheet;
 use App\Support\ForestasTrackDetail;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,8 +45,11 @@ beforeEach(function () {
     Storage::fake('wmfe');
     Storage::fake('s3');
     // Mappa dal renderer finto del package: un .env.testing con il driver http farebbe chiamate di rete.
-    config(['wm-package.features.print.map_service.driver' => 'fake']);
-    App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID]);
+    config(['wm-package.print.map_service.driver' => 'fake']);
+    // Il sito a cui rimanda il QR code delle schede.
+    config(['forestas.website_url' => 'https://www.example.test']);
+    // La stampa vale solo per un'App con `properties.ec_pdf_enabled` acceso: su Forestas lo si accende da Nova.
+    App::factory()->createQuietly(['id' => SardegnaSentieriImportService::IMPORT_APP_ID, 'properties' => ['ec_pdf_enabled' => true]]);
 
     // Compilatore finto: cattura il sorgente e restituisce un PDF finto; con `$real` compila davvero.
     $this->compiler = new class extends XelatexCompiler
@@ -167,7 +171,7 @@ describe('design system nel preambolo', function () {
 
         expect($tex)->not->toContain('\usepackage{forestas}')
             ->and($tex)->toContain('\usepackage{wm-print}')
-            ->and(config('wm-package.features.print.style_path'))->toBeNull()
+            ->and(config('wm-package.print.style_path'))->toBeNull()
             ->and(is_file(resource_path('print/forestas.sty')))->toBeFalse()
             ->and(is_file(resource_path('print/design-system/tokens.json')))->toBeFalse();
     });
@@ -228,12 +232,14 @@ describe('design system nel preambolo', function () {
 describe('la mappa: una pagina a sé, A4 al vivo', function () {
     it('chiede al servizio mappe la misura della pagina A4 e la stende sulla pagina intera', function () {
         // Il servizio mappe disegna già a misura di A4 (call del 23/11): niente margini né testata.
-        expect(config('wm-package.features.print.map.width_mm'))->toBe(210)
-            ->and(config('wm-package.features.print.map.height_mm'))->toBe(297);
+        expect(config('wm-package.print.map.width_mm'))->toBe(210)
+            ->and(config('wm-package.print.map.height_mm'))->toBe(297);
 
         foreach ([printOverrideTrack(), printOverridePoi()] as $model) {
             $tex = printOverrideBody(printOverrideRender($model));
-            expect($tex)->toContain('\ForestasMappaPagina{map.png}{');
+            // Niente credito accanto alla mappa: lo disegna il servizio sull'immagine (oc:9011).
+            expect($tex)->toContain("\\ForestasMappaPagina{map.png}\n")
+                ->not->toContain('\ForestasMappaPagina{map.png}{');
             expect($tex)->not->toContain('\ForestasMappa{');
         }
     });
@@ -250,7 +256,7 @@ describe('la mappa: una pagina a sé, A4 al vivo', function () {
             $tex = printOverrideBody(printOverrideRender($model));
 
             expect(substr($tex, printOverridePos($tex, '\ForestasMappaPagina{')))
-                ->toMatch('/^\\\\ForestasMappaPagina\{map\.png\}\{[^\n]*\}\n\\\\end\{document\}\s*$/');
+                ->toMatch('/^\\\\ForestasMappaPagina\{map\.png\}\n\\\\end\{document\}\s*$/');
         }
     });
 
@@ -521,23 +527,59 @@ describe('scheda del sentiero', function () {
         expect($itineraryTex)->not->toContain('\ForestasDato{Codice catastale}');
     });
 
-    it('rimanda alla pagina del sito dei dati (properties.forestas.url) con il QR code e l\'indirizzo', function () {
-        $track = printOverrideTrack([], ['forestas' => ['url' => 'https://www.example.test/sentieri/salita-sul-monte-corrasi-b_401?x=1&y=100%']]);
-        $poi = printOverridePoi(['forestas' => ['url' => 'https://www.example.test/da-vedere/san-mauro']]);
+    it('mette la meta intermedia (properties.via) fra partenza e arrivo', function () {
+        $track = printOverrideTrack([], ['from' => ['it' => 'Oliena'], 'via' => 'Su Gologone', 'to' => ['it' => 'Monte Corrasi']]);
+        $tex = printOverrideBody(printOverrideRender($track));
 
-        expect(printOverrideBody(printOverrideRender($track)))
+        $start = strpos($tex, '\ForestasDato{Partenza}{Oliena}');
+        $via = strpos($tex, '\ForestasDato{Via}{Su Gologone}');
+        $end = strpos($tex, '\ForestasDato{Arrivo}{Monte Corrasi}');
+        expect($start)->not->toBeFalse()
+            ->and($via)->toBeGreaterThan($start)
+            ->and($end)->toBeGreaterThan($via);
+    });
+
+    it('rimanda alla pagina del sito per numero dell\'elemento, non all\'indirizzo di Drupal, con il QR code e l\'indirizzo', function () {
+        // L'indirizzo di Drupal resta nei dati (redirect di oc:9018) ma la scheda non lo usa.
+        $track = printOverrideTrack([], ['forestas' => ['url' => 'https://www.sardegnasentieri.it/sentieri/monte-corrasi']]);
+        $poi = printOverridePoi();
+
+        $trackTex = printOverrideBody(printOverrideRender($track));
+        expect($trackTex)
             // Nel QR i caratteri speciali di LaTeX escaped come vuole il pacchetto qrcode.
-            ->toContain('\begin{ForestasConRimando}{https://www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
+            ->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
             // Nell'indirizzo leggibile senza schema.
-            ->toContain('{www.example.test/sentieri/salita-sul-monte-corrasi-b\_401?x=1\&y=100\%}')
-            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/da-vedere/san-mauro}');
+            ->toContain('{www.example.test/?wmwp\_detail=track\&wmwp\_id='.$track->id.'}')
+            ->not->toContain('sardegnasentieri.it/sentieri')
+            // Anche un POI creato in Nova, senza indirizzo di Drupal, ha il suo rimando.
+            ->and(printOverrideBody(printOverrideRender($poi)))->toContain('\begin{ForestasConRimando}{https://www.example.test/?wmwp\_detail=poi\&wmwp\_id='.$poi->id.'}');
 
-        // Senza indirizzo (creato in Nova) o con un indirizzo che non è http(s): niente rimando.
-        foreach ([printOverrideTrack(), printOverridePoi(), printOverrideTrack([], ['forestas' => ['url' => 'javascript:alert(1)']])] as $model) {
+        // Lo slash finale del dominio non raddoppia.
+        config(['forestas.website_url' => 'https://www.example.test/']);
+        expect(printOverrideBody(printOverrideRender($poi)))->toContain('{https://www.example.test/?wmwp\_detail=poi');
+    });
+
+    it('non mette il rimando al sito se il dominio non è configurato o non è http(s)', function (?string $base) {
+        config(['forestas.website_url' => $base]);
+
+        foreach ([printOverrideTrack([], ['forestas' => ['url' => 'https://www.sardegnasentieri.it/sentieri/monte-corrasi']]), printOverridePoi()] as $model) {
             $tex = printOverrideBody(printOverrideRender($model));
             // Nessun QR code: l'ambiente del rimando, se c'è, ha l'URL vuoto.
             expect($tex)->not->toMatch('/ForestasConRimando\}\{[^}]/');
             expect($tex)->not->toContain('\ForestasIndirizzo');
+        }
+    })->with([
+        'vuoto' => [null],
+        'stringa vuota' => [''],
+        'non http(s)' => ['javascript:alert(1)'],
+        'con un percorso' => ['https://www.example.test/sentieri'],
+    ]);
+
+    it('mette la data di generazione nel piè di pagina, accanto al copyright', function () {
+        $this->travelTo(Carbon::parse('2026-11-24 10:00', config('app.timezone')));
+
+        foreach ([printOverrideTrack(), printOverridePoi()] as $model) {
+            expect(printOverrideRender($model))->toMatch('/\\\\hfill Scheda generata il 24 novembre 2026\\\\endgroup/');
         }
     });
 
@@ -765,15 +807,15 @@ it('compila un foglio di due facciate: i dati in pagina 1, anche quando sono tan
     @unlink($pdf);
 
     // Pagina 1: testata, stato, in breve, dati catastali e indirizzo del sito. Pagina 2: solo la
-    // mappa, con il credito; né testata né piè di pagina.
+    // mappa (il credito è nell'immagine del servizio, non nel segnaposto); né testata né piè di pagina.
     expect($pages)->toBe(2);
     expect($one)->toContain('scamartini')->toContain('validazionecatastale')->toContain('ilsentieroinbreve')
-        ->toContain('codicecatastale')->toContain('www.example.test/sentieri')
+        ->toContain('codicecatastale')->toContain('www.example.test/?wmwp_detail=track')
         ->and(strpos($one, 'sentierochiusoperfrana'))->toBeLessThan(strpos($one, 'validazionecatastale'))
         ->and(strpos($one, 'validazionecatastale'))->toBeLessThan(strpos($one, 'ilsentieroinbreve'));
     expect($one)->not->toContain('openstreetmap');
     expect($one)->not->toContain('ilsentierosale');
-    expect($two)->toContain('openstreetmap');
+    expect($two)->not->toContain('openstreetmap');
     expect($two)->not->toContain('scamartini');
     expect($two)->not->toContain('regioneautonoma');
 })->skip(! is_executable('/usr/bin/xelatex') || trim((string) shell_exec('command -v gs')) === '', 'xelatex o ghostscript non installati');
@@ -796,9 +838,9 @@ it('compila la scheda del POI in due facciate, con la sola mappa in pagina 2', f
     @unlink($pdf);
 
     expect($pages)->toBe(2);
-    expect($one)->toContain('nuragheserbissi')->toContain('ilpuntoinbreve')->toContain('www.example.test/da-vedere');
+    expect($one)->toContain('nuragheserbissi')->toContain('ilpuntoinbreve')->toContain('www.example.test/?wmwp_detail=poi');
     expect($one)->not->toContain('santuariocampestre');
-    expect($two)->toContain('openstreetmap');
+    expect($two)->not->toContain('openstreetmap');
     expect($two)->not->toContain('nuragheserbissi');
 })->skip(! is_executable('/usr/bin/xelatex') || trim((string) shell_exec('command -v gs')) === '', 'xelatex o ghostscript non installati');
 
@@ -815,26 +857,11 @@ it('compila la mappa d\'insieme del package', function () {
         ->and(str_starts_with((string) $this->compiler->pdf, '%PDF'))->toBeTrue();
 })->skip(! is_executable('/usr/bin/xelatex'), 'xelatex non installato');
 
-describe('print_url nel dettaglio del POI', function () {
-    it('c\'è a dominio acceso', function () {
-        config(['wm-package.features.print.enabled' => true]);
-        $provider = app()->getProvider(WmPackageServiceProvider::class);
-        // Le rotte dei domini si caricano al boot: si rilancia lo stesso metodo del provider.
-        (new ReflectionMethod($provider, 'registerEnabledDomains'))->invoke($provider);
-        app('router')->getRoutes()->refreshNameLookups();
-        $poi = printOverridePoi();
+it('non mette print_url nel dettaglio del POI, nemmeno a stampa accesa', function () {
+    // Il link alla scheda lo costruiscono frontend e plugin dalla rotta (scrum del 24/11).
+    $poi = printOverridePoi();
 
-        $data = (new EcPoiDetailController)->show($poi->id)->getData(true);
+    $data = (new EcPoiDetailController)->show($poi->id)->getData(true);
 
-        expect($data['properties']['print_url'] ?? null)->toBe(route('print.show', ['type' => 'ec-poi', 'id' => $poi->id]));
-    });
-
-    it('non c\'è a dominio spento', function () {
-        config(['wm-package.features.print.enabled' => false]);
-        $poi = printOverridePoi();
-
-        $data = (new EcPoiDetailController)->show($poi->id)->getData(true);
-
-        expect($data['properties'])->not->toHaveKey('print_url');
-    });
+    expect($data['properties'])->not->toHaveKey('print_url');
 });

@@ -173,7 +173,7 @@ final class ForestasPrintSheet
             'facts' => self::facts($track, $locale),
             'dataTitle' => self::label(['itinerario' => 'Itinerary data', 'cammino' => 'Walk data'][$kind] ?? 'Register and elevation data', $locale),
             'keyData' => self::keyData($track, $kind, $forestas, $locale),
-            'link' => self::link($forestas['url'] ?? null, $locale),
+            'link' => self::link('track', $track->getKey()),
             'labels' => self::labels($locale),
         ];
     }
@@ -206,7 +206,7 @@ final class ForestasPrintSheet
             'area' => self::areaText($places['areas'], $locale),
             'location' => self::locationText($places, $locale),
             'rows' => $rows,
-            'link' => self::link($forestas['url'] ?? null, $locale),
+            'link' => self::link('poi', $poi->getKey()),
             'labels' => $labels,
         ];
     }
@@ -405,6 +405,8 @@ final class ForestasPrintSheet
 
         $rows = [
             ['label' => self::label('Start', $locale), 'value' => self::text(self::localized($properties['from'] ?? null, $locale))],
+            // La meta intermedia del registro catastale, fra partenza e arrivo come nell'ordine del percorso.
+            ['label' => self::label('Via', $locale), 'value' => self::text(self::localized($properties['via'] ?? null, $locale))],
             ['label' => self::label('End', $locale), 'value' => self::text(self::localized($properties['to'] ?? null, $locale))],
             ['label' => self::label('Round trip', $locale), 'value' => $roundtrip === null ? null : self::label($roundtrip ? 'Yes' : 'No', $locale)],
             ['label' => self::label('Difficulty level', $locale), 'value' => $difficulty === '' ? null : $difficulty],
@@ -421,20 +423,20 @@ final class ForestasPrintSheet
      * Il rimando alla pagina di dettaglio del sito pubblico: l'URL per il QR code (caratteri speciali
      * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, senza schema (escaped per LaTeX).
      *
-     * L'URL è quello dei dati, `properties.forestas.url` (`ForestasTrackDetail` / `ForestasPoiDetail`):
-     * oggi l'import ci scrive la pagina di sardegnasentieri.it, e quando il sito passerà a WordPress ci
-     * sarà il nuovo indirizzo (decisione del dev, 23/11). Lo shard non lo costruisce. Null se manca o
-     * se non è un indirizzo http(s): un dato importato finisce stampato in un QR code.
+     * L'URL è `<forestas.website_url>/?wmwp_detail=track|poi&wmwp_id=<id>`: il plugin del sito lo
+     * risolve nella pagina di dettaglio, che non cambia se l'elemento viene rinominato e c'è anche per
+     * quelli creati in Nova. Non si usa `properties.forestas.url`: è l'indirizzo di Drupal, che resta
+     * per i redirect dal vecchio sito (oc:9018). Null se il dominio non è configurato o non è http(s).
      *
      * @return array{qr: string, text: string}|null
      */
-    private static function link(mixed $url, string $locale): ?array
+    private static function link(string $detail, mixed $id): ?array
     {
-        $url = self::localized($url, $locale);
-        $url = $url === null ? '' : trim($url);
-        if (! preg_match('#^https?://[^\s/$.?\#].\S*$#i', $url)) {
+        $base = rtrim(trim((string) config('forestas.website_url')), '/');
+        if ($id === null || ! preg_match('#^https?://[^\s/$.?\#][^\s/?\#]*$#i', $base)) {
             return null;
         }
+        $url = $base.'/?'.http_build_query(['wmwp_detail' => $detail, 'wmwp_id' => $id]);
 
         return [
             'qr' => strtr($url, ['\\' => '\\\\', '#' => '\\#', '%' => '\\%', '&' => '\\&', '_' => '\\_', '~' => '\\~', '$' => '\\$', '^' => '\\^', '{' => '\\{', '}' => '\\}']),
