@@ -21,7 +21,6 @@ use Wm\WmPackage\Models\TaxonomyTerm;
 use Wm\WmPackage\Services\Print\Contracts\PrintableModel;
 use Wm\WmPackage\Services\Print\PrintService;
 use Wm\WmPackage\Services\Print\XelatexCompiler;
-use Wm\WmPackage\WmPackageServiceProvider;
 
 /**
  * Le schede PDF di Forestas (oc:8982, R16-R20): view generate dal design system SARDEGNA Sentieri
