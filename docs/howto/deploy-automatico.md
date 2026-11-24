@@ -67,10 +67,10 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
 
 ## Il primo deploy della stampa PDF (oc:8982)
 
-- **Prima del deploy**, nel `.env` del server: `WM_PRINT_ENABLED=true` e `WM_PRINT_QUEUE=print`: il
-  supervisor `print` di Horizon esiste solo a dominio acceso. Dove la configurazione è congelata
-  (`php artisan optimize` di `deploy_prod.sh`), un cambio di queste variabili vale solo dal deploy
-  successivo.
+- **Prima del deploy**, nel `.env` del server: `WM_PRINT_QUEUE=print` (è anche il default). Il supervisor
+  `print` di Horizon c'è sempre; `WM_PRINT_ENABLED` non esiste più e, se è rimasta nel `.env`, si può togliere.
+  Dove la configurazione è congelata (`php artisan optimize` di `deploy_prod.sh`), un cambio di queste
+  variabili vale solo dal deploy successivo.
 - **Il primo deploy ricostruisce l'immagine** (TeX Live): qualche minuto, entro il `command_timeout`
   di 30m del workflow. Dai deploy successivi la build usa la cache.
 - Sull'host servono Docker Compose >= 2.17 (`additional_contexts`) e `bash` (lo script remoto usa
@@ -78,7 +78,16 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
 - Se la build fallisce il deploy si ferma, e rilanciarlo ricostruisce di nuovo. A mano, sull'host:
   `source scripts/compose-args.sh` (con `SHARD=php-<APP_NAME>`), poi
   `docker compose "${ARGS[@]}" build php horizon`, `up -d php` e `up -d horizon`.
-- Su AWS il `print_url` compare nei JSON delle tracce solo dopo la loro rigenerazione.
+- **Prima del deploy**, nel `.env` del server, la mappa delle schede (oc:9011): `WM_PRINT_MAP_DRIVER=http`,
+  `WM_PRINT_MAP_SERVICE_URL=https://origine.tiles.maphub.it/v1/print/map` e il token di Forestas in
+  `WM_PRINT_MAP_SERVICE_TOKEN` (sta nel ticket oc:9011 e in `/etc/wm-tiles/print-tokens.json` sull'host di
+  wm-tiles). Senza, la mappa è il segnaposto.
+- **Prima del deploy**, nel `.env` del server: `FORESTAS_WEBSITE_URL` con il dominio del sito WordPress
+  (`https://wp.forestas.dev.maphub.it` su dev, `https://www.sardegnasentieri.it` in produzione). Vuoto: le schede
+  escono senza QR code.
+- **Dopo il deploy**, in Nova: accendere «Print PDF» nel tab `frontend` dell'App (`properties.ec_pdf_enabled`). Nasce
+  spenta e nessuna migration la accende: finché resta spenta il pulsante non compare, `/print/...` risponde 404 e l'action non si
+  esegue.
 
 ## Configurazione una tantum
 
