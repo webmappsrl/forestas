@@ -255,11 +255,98 @@ final class ForestasPrintSheet
         preg_match_all('/<path\s+d="([^"]+)"\s*\/>/', $svg, $paths);
         foreach ($paths[1] as $d) {
             if (preg_match('/^[MmLlHhVvCcSsQqTtAaZz\d\s.,-]+$/', $d) === 1) {
-                $commands[] = '\draw svg {'.$d.'};';
+                $commands[] = '\draw svg {'.self::svgPathForTikz($d).'};';
             }
         }
 
         return implode('', $commands);
+    }
+
+    /**
+     * Il tracciato SVG riscritto per `svg.path` di TikZ: ogni comando con la sua lettera, e i raggi degli
+     * archi ingranditi quando non bastano a unire i due estremi. Il browser li ingrandisce da sé, come
+     * vuole la specifica SVG (F.6.6); TikZ no, e disegna un arco sbagliato: l'icona del cervello
+     * (`disability-cognitive`) perdeva il lobo in basso, con `A3 3 0 0 0 12 18.5` a 6,5 unità di distanza.
+     */
+    public static function svgPathForTikz(string $d): string
+    {
+        $arity = ['M' => 2, 'L' => 2, 'H' => 1, 'V' => 1, 'C' => 6, 'S' => 4, 'Q' => 4, 'T' => 2, 'A' => 7, 'Z' => 0];
+        preg_match_all('/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/', $d, $tokens);
+        $out = [];
+        $x = $y = $startX = $startY = 0.0;
+        $command = null;
+        $tokens = $tokens[0];
+        $i = 0;
+        while ($i < count($tokens)) {
+            if (ctype_alpha($tokens[$i])) {
+                $command = $tokens[$i++];
+            }
+            if ($command === null) {
+                return $d;
+            }
+            $upper = strtoupper($command);
+            $relative = $command !== $upper;
+            $n = $arity[$upper] ?? null;
+            if ($n === null) {
+                return $d;
+            }
+            if ($n === 0) {
+                $out[] = $command;
+                [$x, $y] = [$startX, $startY];
+                $command = null;
+
+                continue;
+            }
+            $args = array_map('floatval', array_slice($tokens, $i, $n));
+            if (count($args) < $n) {
+                return $d;
+            }
+            $i += $n;
+            [$nx, $ny] = match ($upper) {
+                'H' => [$relative ? $x + $args[0] : $args[0], $y],
+                'V' => [$x, $relative ? $y + $args[0] : $args[0]],
+                default => [($relative ? $x : 0) + $args[$n - 2], ($relative ? $y : 0) + $args[$n - 1]],
+            };
+            if ($upper === 'A') {
+                [$args[0], $args[1]] = self::arcRadii($args[0], $args[1], $args[2], $nx - $x, $ny - $y);
+            }
+            $out[] = $command.implode(' ', array_map(fn (float $v) => rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.'), $args));
+            [$x, $y] = [$nx, $ny];
+            if ($upper === 'M') {
+                [$startX, $startY] = [$x, $y];
+                // Coppie in più dopo un moveto sono lineto (specifica SVG).
+                $command = $relative ? 'l' : 'L';
+            }
+        }
+
+        return implode('', $out);
+    }
+
+    /**
+     * Raggi di un arco SVG ingranditi se non bastano a coprire la distanza fra gli estremi (specifica
+     * SVG, F.6.6.2): lambda è la distanza nel sistema dell'ellisse, oltre 1 i raggi si moltiplicano per
+     * la sua radice.
+     *
+     * @return array{0: float, 1: float}
+     */
+    private static function arcRadii(float $rx, float $ry, float $rotation, float $dx, float $dy): array
+    {
+        $rx = abs($rx);
+        $ry = abs($ry);
+        if ($rx == 0.0 || $ry == 0.0) {
+            return [$rx, $ry];
+        }
+        $phi = deg2rad($rotation);
+        $x1 = cos($phi) * (-$dx / 2) + sin($phi) * (-$dy / 2);
+        $y1 = -sin($phi) * (-$dx / 2) + cos($phi) * (-$dy / 2);
+        $lambda = ($x1 * $x1) / ($rx * $rx) + ($y1 * $y1) / ($ry * $ry);
+        if ($lambda <= 1) {
+            return [$rx, $ry];
+        }
+        // Un filo sopra il minimo: con il raggio esatto l'arco degenera e gli arrotondamenti lo spezzano.
+        $scale = sqrt($lambda) * 1.0001;
+
+        return [$rx * $scale, $ry * $scale];
     }
 
     /**

@@ -98,7 +98,10 @@ si scaricano, quindi 2 worker e questi limiti sono quelli del piano, non misurat
 - **Icone delle disabilità**: i disegni a tratto del tema (viewBox 24) sono in `resources/print/icons/*.svg` e
   `ForestasPrintSheet::icon()` li traduce in TikZ (libreria `svg.path`, in `texlive-pictures`). Non PNG/PDF
   allegati: il compilatore apre solo i file che gli allega il package (`openin_any=p`), e il contratto delle
-  view non ha un modo per allegarne altri.
+  view non ha un modo per allegarne altri. Prima di passarli a TikZ i tracciati si riscrivono
+  (`svgPathForTikz()`): un arco con il raggio troppo piccolo per unire i due estremi il browser lo ingrandisce
+  (specifica SVG), `svg.path` no e disegna un arco sbagliato. Era il lobo in basso mancante del cervello
+  («Psichica cognitiva»), con `A3 3 … 12 18.5` a 6,5 unità di distanza.
 - **Mappa: una pagina A4 al vivo**: `AppServiceProvider` imposta `print.map.width_mm` 210 e `height_mm`
   297; il servizio delle mappe la disegna in quella misura. `\ForestasMappaPagina` (preambolo) la stende sulla
   pagina intera con `eso-pic` (non chiede una seconda compilazione: il compilatore lancia xelatex una volta sola),

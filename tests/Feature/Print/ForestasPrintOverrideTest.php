@@ -864,3 +864,14 @@ it('non mette print_url nel dettaglio del POI, nemmeno a stampa accesa', functio
 
     expect($data['properties'])->not->toHaveKey('print_url');
 });
+
+it('ingrandisce i raggi degli archi che non bastano a unire gli estremi, come il browser', function () {
+    // L'ultimo arco di ogni metà del cervello unisce due punti a 6,5 unità con raggio 3: il browser
+    // ingrandisce il raggio (specifica SVG), TikZ no e perdeva il lobo in basso.
+    $tikz = ForestasPrintSheet::svgPathForTikz('M12 5.5a3 3 0 0 0-5.6 1.2 3 3 0 0 0-1.9 5.1 3 3 0 0 0 1.4 4.5A3 3 0 0 0 12 18.5');
+
+    expect($tikz)->toBe('M12 5.5a3 3 0 0 0 -5.6 1.2a3 3 0 0 0 -1.9 5.1a3 3 0 0 0 1.4 4.5A3.2426 3.2426 0 0 0 12 18.5')
+        ->and(ForestasPrintSheet::icon('disability-cognitive'))->toContain('A3.2426 3.2426 0 0 1 12 18.5')
+        // Un tracciato senza archi resta com'è, con ogni comando esplicito.
+        ->and(ForestasPrintSheet::svgPathForTikz('M11 7v6h5l2.5 5.5M11 10h4.5'))->toBe('M11 7v6h5l2.5 5.5M11 10h4.5');
+});
