@@ -85,6 +85,9 @@ class AppServiceProvider extends ServiceProvider
             // al territorio: la traccia 119 (circa 1 km) esce a 1:21.500 con 16 e a 1:5.400 con 18. I
             // sentieri lunghi non cambiano, perché l'inquadratura li ferma prima (oc:9011, prova del 24/11).
             'wm-package.print.map_service.max_zoom' => 18,
+            // Il margine di 42 mm del package serve alla copertina del template di default (riquadro
+            // del titolo sopra la mappa): la pagina della mappa di Forestas non ha il riquadro.
+            'wm-package.print.map.padding_mm' => null,
         ]);
 
         // Tipi di anomalia del registro catastale (oc:8539): il package li

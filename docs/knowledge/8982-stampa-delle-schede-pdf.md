@@ -141,7 +141,9 @@ pulsante sparisce, `/print/...` risponde 404 e l'action non si esegue.
   `WM_PRINT_MAP_SERVICE_URL` e il token di Forestas in `WM_PRINT_MAP_SERVICE_TOKEN`. La pagina 2 è un A4
   verticale a 300 dpi (circa 6 s per la traccia 119, provata il 24/11), con scala, nord e attribuzioni disegnati
   dal servizio. `AppServiceProvider` alza `map_service.max_zoom` a 18: con il 16 di serie un sentiero breve
-  restava piccolo in mezzo alla pagina (traccia 119: 1:21.500 con 16, 1:5.400 con 18). Con il driver `fake`
+  restava piccolo in mezzo alla pagina (traccia 119: 1:21.500 con 16, 1:5.400 con 18). Azzera anche `print.map.padding_mm`
+  (42 mm nel package, per la copertina con il riquadro del titolo del template di default): la pagina della
+  mappa di Forestas non ha riquadro e tiene il margine del servizio. Con il driver `fake`
   la mappa è il segnaposto del package.
 - Il colore della traccia sulla mappa è quello del suo layer (il primo per rank), altrimenti il rosso di default
   di `EcTrack`; `WM_PRINT_MAP_STROKE_COLOR` nel `.env` lo fissa per tutte le tracce e vince sul layer. In locale
