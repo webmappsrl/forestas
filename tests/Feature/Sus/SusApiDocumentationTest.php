@@ -1,5 +1,7 @@
 <?php
 
+use Dedoc\Scramble\Generator;
+use Dedoc\Scramble\Scramble;
 use Illuminate\Support\Facades\Validator;
 use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
 
@@ -10,12 +12,11 @@ use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
  */
 function corpoDellaCreazione(): array
 {
-    $generator = app(\Dedoc\Scramble\Generator::class);
-    $documento = $generator->generate(\Dedoc\Scramble\Scramble::getGeneratorConfig('default'))->spec();
+    $generator = app(Generator::class);
+    $documento = $generator->generate(Scramble::getGeneratorConfig('default'))->spec();
 
     return $documento['paths']['/api/v1/sus/trail-applications']['post']['requestBody']['content']['multipart/form-data']['schema'];
 }
-
 
 // Rete di sicurezza: se lo schema esige un campo obbligatorio che nessuno ha nominato nella
 // pagina delle API, chi costruisce la maschera lo scopre da un 422. Il controllo e' una
