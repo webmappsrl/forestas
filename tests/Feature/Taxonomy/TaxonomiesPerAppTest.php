@@ -58,7 +58,7 @@ it('una tassonomia di sistema si accende da sé in un\'app creata dopo', functio
     $new = App::factory()->createQuietly();
     (new AppObserver)->created($new);
 
-    expect($new->taxonomies()->where('identifier', '!=', 'walkability-status')->pluck('identifier')->all())->toBe(['dal-package']);
+    expect($new->taxonomies()->whereNotIn('identifier', ['walkability-status', 'primary-activity'])->pluck('identifier')->all())->toBe(['dal-package']);
 });
 
 it('la scheda del sentiero mostra solo le tassonomie accese nella sua app', function () {

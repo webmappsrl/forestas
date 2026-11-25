@@ -140,8 +140,9 @@ it('il reset cancella le relazioni dei termini di tracce e POI e ricrea la tasso
     Artisan::call('sardegnasentieri:import', ['--reset' => true]);
 
     expect(DB::table('taxonomy_termables')->where('termable_type', EcTrack::class)->count())->toBe(0)
-        ->and(TaxonomyTerm::taxonomies()->where('identifier', '!=', 'walkability-status')->count())->toBe(12)
-        ->and(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')->count())->toBe(55);
+        ->and(TaxonomyTerm::taxonomies()->whereNotIn('identifier', ['walkability-status', 'primary-activity'])->count())->toBe(12)
+        ->and(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')
+            ->where('identifier', 'not like', 'primary-activity%')->count())->toBe(55);
 });
 
 it('il reset non cancella le relazioni dei termini di altri modelli', function () {
@@ -166,7 +167,8 @@ it('il reset non cancella le relazioni dei termini di altri modelli', function (
     $method->invoke($command);
 
     expect(DB::table('taxonomy_termables')->where('termable_type', Layer::class)->count())->toBe(1)
-        ->and(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')->count())->toBe(55);
+        ->and(TaxonomyTerm::where('identifier', 'not like', 'walkability-status%')
+            ->where('identifier', 'not like', 'primary-activity%')->count())->toBe(55);
 });
 
 it('l import orario allinea i termini senza azzerarli', function () {
@@ -195,9 +197,9 @@ it('l import orario crea la tassonomia se manca', function () {
 
     Artisan::call('sardegnasentieri:import');
 
-    // Dodici dal comando dello shard, più la famiglia della percorribilità, che il dominio
-    // Catasto installa da sé con la sua migration (oc:8989).
-    expect(TaxonomyTerm::taxonomies()->count())->toBe(13);
+    // Dodici dal comando dello shard, più le due che il dominio Catasto installa da sé con le
+    // sue migration: la percorribilità (oc:8989) e l'attività primaria (oc:9038).
+    expect(TaxonomyTerm::taxonomies()->count())->toBe(14);
 });
 
 it('il reset non porta via le relazioni dei layer: niente da rifare a mano dopo l import notturno', function () {
