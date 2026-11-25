@@ -129,6 +129,8 @@ Anche il rilascio dei filtri e dei redirect dai dati dello shard (oc:9018) ha i 
 con un passo in più, una volta sola: sullo storico del dev restano 170 righe con chiave per id (`i:174` … `i:597`),
 da togliere con una copia della tabella prima (`wp db export --tables=wp_wmwp_detail_paths`), poi
 `wp eval 'echo wmwp_detail_history_forget_ids( "track" );'`, come su UAT il 23/11.
+Anche il rilascio delle pagine d'elenco (oc:9003) ha i passi di UAT
+([«Pagine d'elenco»](messa-in-opera-wordpress-uat.md#pagine-delenco-oc9003)).
 
 Per azzerare: `scripts/wordpress-reset.sh --conferma`, poi il passo 5 (o si aspetta il giro del
 cron) e la verifica. Su dev si può fare quando serve.

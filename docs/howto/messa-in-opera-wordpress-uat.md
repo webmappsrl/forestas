@@ -187,6 +187,14 @@ Drupal nello storico), dopo `scripts/wordpress-up.sh`:
   modello di forestas la chiave degli elementi è l'id dello shard, che cambia, e lo storico si sporca: oc:8959), e gli
   indirizzi vecchi devono essere già tutti nello storico (punto sopra).
 
+### Pagine d'elenco (oc:9003)
+
+Al rilascio che porta `wp-package` 0.7.0 (griglie di `/sentieri/`, `/itinerari/`, `/cammini/` e
+`/punti-di-interesse/`, slider di distanza e tempo anche nella ricerca unica), dopo `scripts/wordpress-up.sh` e i passi
+di oc:9018 qui sopra se arrivano insieme: copia delle tracce, `applica --conferma` (template della griglia),
+`pagine --conferma` (template, titoli di Punti di interesse e Itinerari, sottotitolo di Cammini) e verifica, in
+[`wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md`](../../wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md).
+
 ## Azzerare WordPress
 
 ```bash
