@@ -125,7 +125,7 @@
 
             // --- prova del caso completo -----------------------------------
             //
-            // La creazione ha 17 campi obbligatori: compilarli a mano nel Try
+            // La creazione ha quindici campi obbligatori: compilarli a mano nel Try
             // It ad ogni giro, solo per vedere se il canale risponde, non e'
             // ragionevole. Questo bottone manda un modulo gia' pieno — gli
             // stessi valori del `curl` nella descrizione dell'endpoint — con un
@@ -145,12 +145,9 @@
                 difficulty: '{"hiking":"EE"}',
                 primary_activity: 'hiking',
                 existing_signage: 'good_condition',
-                proposed_managing_municipalities: '["Domusnovas"]',
-                municipality_email: 'protocollo@comune.example.it',
-                soggetto_gestore: 'forestas',
-                soggetto_rilevatore: 'applicant',
-                soggetto_manutentore: 'forestas',
-                soggetto_custode_presente: 'false',
+                managing_subjects: '[{"name":"Comune di Domusnovas","email":"protocollo@comune.example.it","subject":"organization"}]',
+                surveying_subjects: '[{"name":"Mario Rossi","subject":"person"}]',
+                maintaining_subjects: '[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]',
                 last_survey_date: '2026-10-20',
                 maintenance_frequency_months: '12',
             };

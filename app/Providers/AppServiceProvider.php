@@ -27,6 +27,7 @@ use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\Combined\AllOf;
 use Dedoc\Scramble\Support\Generator\Header;
 use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\Response;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\SecurityRequirement;
@@ -227,15 +228,25 @@ class AppServiceProvider extends ServiceProvider
             // campi appena compilati.
             //
             // Scramble produce quell'`allOf` quando un endpoint ha sia una Form
-            // Request (da cui ricava `$ref`) sia gli attributi `#[BodyParameter]`
-            // che descrivono i campi uno per uno (da cui ricava un secondo
-            // oggetto). I due blocchi hanno le stesse proprieta' e gli stessi
-            // campi obbligatori: il secondo in piu' porta descrizioni ed esempi,
-            // quindi tenere solo quello non toglie niente al documento e
-            // restituisce uno schema che il renderer sa compilare.
+            // Request (da cui ricava un `$ref` allo schema delle regole) sia gli
+            // attributi `#[BodyParameter]` che descrivono i campi uno per uno (da
+            // cui ricava un oggetto inline). I due blocchi portano cose diverse e
+            // nessuno dei due basta:
             //
-            // Si tocca solo il caso previsto — un unico oggetto con proprieta'
-            // dentro l'`allOf` — e si lascia stare tutto il resto.
+            // - dalle **regole** vengono il tipo di ogni campo, l'`enum` dei
+            //   valori ammessi e, per una lista, la forma dei suoi elementi
+            //   (`items`): e' l'unico posto dove un soggetto risulta un oggetto
+            //   con `name`, `email` e `subject` invece che una stringa;
+            // - dagli **attributi** vengono descrizione ed esempio, che le regole
+            //   non sanno.
+            //
+            // Tenere solo l'oggetto degli attributi — come si faceva prima di
+            // oc:9039 — pubblicava `managing_subjects` come lista di stringhe, e
+            // chi genera un client dal documento otteneva il tipo sbagliato. Si
+            // fondono: le proprieta' delle regole fanno da base, quelle degli
+            // attributi aggiungono descrizione ed esempio.
+            //
+            // Si tocca solo il caso previsto e si lascia stare tutto il resto.
             foreach ($openApi->paths as $path) {
                 foreach ($path->operations as $operation) {
                     foreach ($operation->requestBodyObject->content ?? [] as $schema) {
@@ -243,14 +254,58 @@ class AppServiceProvider extends ServiceProvider
                             continue;
                         }
 
-                        $objects = array_values(array_filter(
-                            $schema->type->items,
-                            fn ($item) => $item instanceof ObjectType && $item->properties !== [],
-                        ));
+                        $daRegole = null;
+                        $daAttributi = null;
 
-                        if (count($objects) === 1) {
-                            $schema->type = $objects[0];
+                        foreach ($schema->type->items as $item) {
+                            $oggetto = $item instanceof Reference
+                                ? $this->oggettoDelRiferimento($item)
+                                : $item;
+
+                            if (! $oggetto instanceof ObjectType || $oggetto->properties === []) {
+                                continue;
+                            }
+
+                            // L'oggetto risolto da un `$ref` viene dalla Form
+                            // Request, quello inline dagli attributi.
+                            if ($item instanceof Reference) {
+                                $daRegole ??= $oggetto;
+                            } else {
+                                $daAttributi ??= $oggetto;
+                            }
                         }
+
+                        if ($daRegole === null && $daAttributi === null) {
+                            continue;
+                        }
+
+                        if ($daRegole === null) {
+                            $schema->type = $daAttributi;
+
+                            continue;
+                        }
+
+                        if ($daAttributi !== null) {
+                            foreach ($daAttributi->properties as $nome => $property) {
+                                $base = $daRegole->properties[$nome] ?? null;
+
+                                if ($base === null) {
+                                    $daRegole->properties[$nome] = $property;
+
+                                    continue;
+                                }
+
+                                if ($property->description !== '') {
+                                    $base->setDescription($property->description);
+                                }
+
+                                if ($property->examples !== []) {
+                                    $base->examples = $property->examples;
+                                }
+                            }
+                        }
+
+                        $schema->type = $daRegole;
                     }
                 }
             }
@@ -396,5 +451,21 @@ class AppServiceProvider extends ServiceProvider
                 }
             }
         });
+    }
+
+    /**
+     * L'oggetto dietro un `$ref` del documento OpenAPI, se e' un oggetto.
+     *
+     * `Reference::resolve()` restituisce lo `Schema` registrato nei
+     * `components`, che a sua volta avvolge il tipo: qui interessa solo il
+     * tipo, e solo quando e' un oggetto con proprieta'.
+     */
+    protected function oggettoDelRiferimento(Reference $reference): ?ObjectType
+    {
+        $risolto = $reference->resolve();
+
+        $tipo = $risolto instanceof Schema ? $risolto->type : $risolto;
+
+        return $tipo instanceof ObjectType ? $tipo : null;
     }
 }
