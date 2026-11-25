@@ -144,7 +144,7 @@ return [
             Note over SUS,API: Fase 5 - lettura dello stato, ripetibile
             loop finché serve seguire la domanda
                 SUS->>API: GET /trail-applications/id
-                API-->>SUS: 200 submitted_data, attachments, status, dem_data, code solo se approvata, rejection_reason solo se respinta
+                API-->>SUS: 200 submitted_data, approved_data solo se approvata, attachments, status, dem_data, code solo se approvata, rejection_reason solo se respinta
             end
         ```
 
@@ -155,7 +155,55 @@ return [
         | 2. Allegati | `POST /trail-applications/{id}/attachments`, un file per chiamata | `201` con la `collection` e quanti file contiene. Un documento caricato di nuovo sostituisce il precedente. Dopo la trasmissione, `409` |
         | 3. Trasmissione | `POST /trail-applications/{id}/confirm` | `200` con `status` `under_review`. Se manca qualcosa, `422` con `missing`, e la domanda resta in compilazione. Ripetuta su una domanda gia' trasmessa risponde di nuovo `200`, con `already_confirmed` a `true` |
         | 4. Istruttoria | — | L'istruttore Forestas approva o respinge la domanda nel Catasto: non passa da queste API |
-        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con i dati dichiarati come il Catasto li ha registrati (`submitted_data`), quanti allegati ci sono per `collection` (`attachments`), lo `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con i dati dichiarati come il Catasto li ha registrati (`submitted_data`), le scelte di Forestas in istruttoria (`approved_data`, `null` finche' la domanda non e' approvata), quanti allegati ci sono per `collection` (`attachments`), lo `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+
+        ### Cosa propone il SUS e cosa decide Forestas: `submitted_data` e `approved_data`
+
+        La lettura (chiamata 4) porta due blocchi di dati che non vanno confusi:
+
+        | Chiave | Cos'e' | Quando c'e' |
+        |---|---|---|
+        | `submitted_data` | **Cio' che il SUS ha proposto**: i campi inviati alla creazione, come il Catasto li ha registrati. Non cambia piu', perche' una domanda creata non si corregge. | Sempre |
+        | `approved_data` | **Cio' che Forestas ha deciso in istruttoria**: le scelte dell'istruttore all'approvazione. | Solo a domanda approvata: in ogni altro stato e' `null` |
+
+        Le due cose **possono differire**. L'istruttore puo' confermare quanto proposto oppure
+        cambiarlo: per esempio il SUS propone `activities` = `["hiking","mtb"]` con `primary_activity`
+        = `hiking`, e Forestas approva solo `hiking`, oppure sceglie un'altra attivita' primaria.
+        Per mostrare all'utente l'esito di una domanda approvata la fonte e' `approved_data`, non
+        `submitted_data`.
+
+        Quando `approved_data` c'e' e' un oggetto con quattro chiavi:
+
+        | Chiave | Contenuto |
+        |---|---|
+        | `activities` | gli identificativi delle attivita' confermate |
+        | `difficulty` | oggetto che porta, per ogni scala di difficolta', il livello scelto; la chiave e' l'identificativo della scala (per esempio `hiking-difficulty`), **non** l'identificativo dell'attivita' (`hiking`) che si usa invece nella proposta |
+        | `primary_activity` | l'identificativo dell'attivita' primaria |
+        | `approved_at` | il momento dell'approvazione, in ISO 8601 con scarto orario |
+
+        Le chiavi di `difficulty` sono gli identificativi delle sei scale, che **non coincidono** con
+        quelli delle attivita'. Il livello e' uno dei valori gia' elencati per quella scala nella
+        sezione «I livelli di difficolta' ammessi»:
+
+        | Scala (chiave di `difficulty`) | Attivita' che la usano | Livelli |
+        |---|---|---|
+        | `hiking-difficulty` | `hiking`, `trekking` | `T` · `E` · `EE` · `EEA` |
+        | `mtb-difficulty` | `mtb` | `TC` · `MC` · `BC` · `OC` · `EC` |
+        | `horse-difficulty` | `horse` | `easy` · `medium` · `hard` |
+        | `inclusivity-difficulty` | `accessible-trails` | `AT` · `AE` · `AEE` |
+        | `nordic-walking-difficulty` | `nordic-walking` | `easy` · `medium` · `hard` |
+        | `educational-trails-difficulty` | `educational-trails` | `easy` · `medium` · `hard` |
+
+        Attenzione a `accessible-trails`: la sua scala si chiama `inclusivity-difficulty`, non
+        `accessible-trails-difficulty`, e il nome non si ricava dall'attivita'. `hiking` e `trekking`
+        condividono `hiking-difficulty`: in `approved_data` ne esce una sola chiave.
+
+        `null` **non e' un errore**: significa che nessuna decisione e' ancora definitiva (domanda in
+        compilazione, in istruttoria o respinta). Una domanda approvata puo' avere `activities` vuoto,
+        `difficulty` vuoto (`{}`) e `primary_activity` a `null`: e' una decisione presa, non un dato
+        mancante. `approved_data` e' `null` anche per una domanda approvata prima che le decisioni
+        venissero registrate: in quel caso il dato non esiste e `submitted_data` e' l'unico
+        riferimento.
 
         ## Gli strumenti di prova
 
@@ -271,6 +319,24 @@ return [
         Il campo 37 (`difficulty`) ha una sezione propria piu' avanti, perche' i suoi valori
         dipendono dall'attivita'.
 
+        ### L'attivita' primaria — `primary_activity`
+
+        **Obbligatorio.** Fra le attivita' proposte in `activities`, dice qual e' quella principale del
+        sentiero: una sola. Il format non lo numera: e' un campo aggiunto dal Catasto.
+
+        - Il valore e' l'identificativo di una delle sette attivita' della tabella qui sopra:
+          `trekking`, `hiking`, `mtb`, `horse`, `accessible-trails`, `nordic-walking`,
+          `educational-trails`.
+        - **Deve essere una delle attivita' dichiarate in `activities`.** Con
+          `activities` = `["hiking","mtb"]` vale `hiking` oppure `mtb`; `horse` e' rifiutato anche
+          se e' un'attivita' valida, perche' non e' fra quelle proposte.
+        - Se manca, se non e' uno dei sette valori o se non e' fra le attivita' dichiarate, la
+          creazione risponde `422` indicando `primary_activity`.
+        - E' una proposta: Forestas puo' confermarla o cambiarla in istruttoria. Il valore deciso si
+          legge in `approved_data`, quello inviato resta in `submitted_data` (vedi la sezione sopra).
+
+        Con `curl`: `-F primary_activity=hiking`.
+
         ## I campi che diventano obbligatori
 
         Alcuni campi sono obbligatori solo in base al valore di un altro. Se mancano, la creazione
@@ -282,6 +348,10 @@ return [
         | `soggetto_rilevatore` (campo 49) e' `other_surveyor` | `soggetto_rilevatore_other` (50) e `soggetto_rilevatore_email` (51) |
         | `soggetto_manutentore` (campo 53) e' `other_legal_entity` | `soggetto_manutentore_other` (54) e `soggetto_manutentore_cf` (55) |
         | `soggetto_custode_presente` (campo 57) e' `true` | `soggetto_custode` (58) |
+
+        C'e' poi un vincolo fra i valori di due campi sempre obbligatori: `primary_activity` deve essere
+        una delle attivita' dichiarate in `activities` (campo 36), altrimenti la creazione risponde
+        `422` indicando `primary_activity`. Il dettaglio e' nella sezione del campo 36.
 
         ## Un esempio completo
 
@@ -307,6 +377,7 @@ return [
           -F duration_forward=240 -F duration_backward=200 \
           -F activities='["hiking","mtb"]' \
           -F difficulty='{"hiking":"EE"}' \
+          -F primary_activity=hiking \
           -F existing_signage=good_condition \
           -F proposed_managing_municipalities='["Domusnovas"]' \
           -F municipality_email=protocollo@comune.example.it \
