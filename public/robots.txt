@@ -1,2 +1,4 @@
 User-agent: *
-Disallow:
+# Schede PDF (oc:8982): la rotta accoda una compilazione per ogni scheda chiesta, un crawler le accoderebbe tutte.
+# Il link «Stampa» del sito WordPress è anche rel="nofollow" (oc:9018).
+Disallow: /print/

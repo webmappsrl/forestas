@@ -159,6 +159,42 @@ degli enti»):
   indice degli enti sullo shard, `applica --conferma` (mette nel cestino i contenuti di default), rewrite, WP-Cron,
   `EMPTY_TRASH_DAYS`, verifica.
 
+### Filtri e redirect dai dati dello shard (oc:9018)
+
+Al rilascio che porta `wp-package` 0.6.0 (filtri dal `config.json` dell'app, aree degli overlay, indirizzi vecchi di
+Drupal nello storico), dopo `scripts/wordpress-up.sh`:
+
+- il `config.json` e i geojson degli overlay li scarica WP-Cron ogni ora; per averli subito, dal container WordPress:
+  `wp cron event run wmwp_app_config_refresh`. Fino al primo giro la ricerca non ha i filtri che vengono dal
+  `config.json` (tipo, attività, scale di difficoltà, aree) e la mappa usa OpenStreetMap;
+- gli indirizzi vecchi di Drupal entrano nello storico alla ricostruzione dell'indice dei dettagli, solo nel cron o da
+  WP-CLI: i POI tutti al primo giro (stanno in `pois.geojson`), i percorsi al più 100 (e 60 secondi) per giro, perché
+  si legge il dettaglio di ognuno. Fra due ricostruzioni passano almeno 5 minuti: si lancia
+  `wp cron event run wmwp_detail_refresh_index` ogni 5 minuti, o si aspettano i giri orari. Si controlla con
+  `wp eval 'echo count( (array) get_option( "wmwp_detail_legacy_done", [] ) );'`, che deve arrivare al numero dei
+  percorsi con il nid di Drupal; i percorsi che non si sono letti o non hanno un indirizzo Drupal stanno in
+  `wp option get wmwp_detail_legacy_failed --format=json` e si riprovano dopo 6 ore;
+- la pagina di ricerca inglese cambia slug, da `/en/cerca-nel-sito/` a `/en/search-in-our-website/`
+  (`config/pagine.json`): lo applica `bin/wordpress-config.sh pagine --conferma`, o il giro del cron delle pagine. Il
+  vecchio indirizzo porta al nuovo con un 301, che tiene i parametri. Provato solo in locale: dopo il rilascio si
+  controlla anche su UAT che `curl -sI 'https://<sito UAT>/en/cerca-nel-sito/?q=monte'` risponda `301` con
+  `location: …/en/search-in-our-website/?q=monte` (il redirect legge il percorso senza il prefisso della lingua,
+  `$wp->request`; se WPML su UAT lo lasciasse con `en/`, la risposta sarebbe un 404);
+- il pulsante «Stampa» dei dettagli compare solo con «Print PDF» acceso sull'App di Forestas in Nova (tab `frontend`
+  della Resource `App`, `OPTIONS.ec_pdf_enabled` del `config.json`; knowledge 8982), e dopo il giro del cron del
+  `config.json` (`wp cron event run wmwp_app_config_refresh`). Su UAT il 24/11 l'opzione non c'è;
+- **produzione, prima del passaggio di dominio:** il `.env` dello shard non deve avere `EC_TRACK_MODEL` (senza il
+  modello di forestas la chiave degli elementi è l'id dello shard, che cambia, e lo storico si sporca: oc:8959), e gli
+  indirizzi vecchi devono essere già tutti nello storico (punto sopra).
+
+### Pagine d'elenco (oc:9003)
+
+Al rilascio che porta `wp-package` 0.7.0 (griglie di `/sentieri/`, `/itinerari/`, `/cammini/` e
+`/punti-di-interesse/`, slider di distanza e tempo anche nella ricerca unica), dopo `scripts/wordpress-up.sh` e i passi
+di oc:9018 qui sopra se arrivano insieme: copia delle tracce, `applica --conferma` (template della griglia),
+`pagine --conferma` (template, titoli di Punti di interesse e Itinerari, sottotitolo di Cammini) e verifica, in
+[`wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md`](../../wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md).
+
 ## Azzerare WordPress
 
 ```bash
