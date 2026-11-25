@@ -276,31 +276,6 @@ return [
         | `dilapidated` | c'e' ed e' fatiscente |
         | `absent` | non c'e' |
 
-        ### Campo 47 — `soggetto_gestore`
-
-        | Identificativo | Etichetta |
-        |---|---|
-        | `applicant` | Il richiedente |
-        | `municipalities` | Comuni territorialmente competenti selezionati |
-        | `third_party` | Altro soggetto terzo |
-        | `forestas` | Forestas |
-
-        ### Campo 49 — `soggetto_rilevatore`
-
-        | Identificativo | Etichetta |
-        |---|---|
-        | `applicant` | Il richiedente |
-        | `other_surveyor` | Altro soggetto rilevatore |
-
-        ### Campo 53 — `soggetto_manutentore`
-
-        | Identificativo | Etichetta |
-        |---|---|
-        | `applicant` | Il richiedente (se soggetto giuridico) |
-        | `municipalities` | Comuni territorialmente competenti selezionati |
-        | `other_legal_entity` | Altro soggetto giuridico |
-        | `forestas` | Forestas |
-
         ### Campo 36 — `activities`, le attivita' proposte
 
         Lista, almeno una voce. Le tre del format sono `trekking`, `mtb` e `horse`; le altre
@@ -337,6 +312,118 @@ return [
 
         Con `curl`: `-F primary_activity=hiking`.
 
+        ### Campo 45 — `themes`, i tematismi
+
+        Lista di identifier, facoltativa: zero, uno o piu'. Si manda l'identifier, mai l'etichetta —
+        l'etichetta e' il testo che l'utente legge mentre compila, e la colonna qui sotto serve solo
+        a far capire cosa significhi ciascun identifier. Un valore fuori da questo elenco fa
+        rispondere `422`.
+
+        | Identificativo | Etichetta |
+        |---|---|
+        | `history-archaeology` | Storia e archeologia |
+        | `mining-geology` | Miniere e geologia |
+        | `transhumance` | Transumanza e pastorizia |
+        | `spirituality` | Fede e spiritualita' |
+        | `woods-forests` | Boschi e foreste |
+        | `flora-fauna` | Flora e fauna |
+        | `waters` | Acque: fiumi, sorgenti e cascate |
+        | `sea-coast` | Mare e coste |
+        | `villages` | Borghi e centri storici |
+        | `rural-landscape` | Paesaggio agrario e tradizioni rurali |
+
+        Con `curl`: `-F themes='["spirituality","waters"]'`.
+
+        ## I soggetti del sentiero
+
+        Il format chiede chi gestisce, chi rileva, chi manutiene e chi fa da custode del sentiero.
+        Fino alla versione precedente di queste API ciascun ruolo era una scelta fra categorie —
+        il richiedente, i comuni selezionati, un altro soggetto giuridico, Forestas, a seconda del
+        ruolo — che non diceva *chi* fossero quei soggetti ne' quanti. Forestas ha chiesto i soggetti veri,
+        perche' per ciascun ruolo possono essercene piu' d'uno: il gestore, per esempio, e' sempre
+        almeno un comune, ma se il sentiero ne attraversa diversi i gestori sono i comuni toccati,
+        ed eventualmente Forestas o il CAI.
+
+        Ogni ruolo e' quindi una **lista di soggetti**, e ogni soggetto e' un oggetto con tre
+        chiavi:
+
+        | Chiave | Cosa contiene |
+        |---|---|
+        | `name` | la denominazione del soggetto: il nome dell'ente, o il nominativo della persona |
+        | `email` | il recapito del soggetto |
+        | `subject` | `organization` se e' un ente, `person` se e' una persona fisica |
+
+        I quattro campi, con il numero del campo del format da cui ciascuno proviene:
+
+        | Campo | Numero nel format | Quanti soggetti |
+        |---|---|---|
+        | `managing_subjects` | 47 — *Soggetto gestore* | almeno uno |
+        | `surveying_subjects` | 49 — *Soggetto rilevatore* | almeno uno |
+        | `maintaining_subjects` | 53 — *Soggetto manutentore* | almeno uno |
+        | `keeping_subjects` | 58 — *Soggetto custode* | **facoltativo**: zero o piu' |
+
+        Il custode e' l'unico ruolo che puo' non esserci: la sua lista puo' essere vuota, oppure il
+        campo puo' non essere passato affatto. Gli altri tre, se mancano o arrivano con la lista
+        vuota, fanno rispondere `422`.
+
+        **La `email` dipende da `subject`.** Per un `organization` e' obbligatoria e deve essere un
+        indirizzo valido; per una `person` puo' mancare o valere `null`. Il controllo si applica a
+        ogni soggetto per conto suo: in una lista con un ente e una persona, la e-mail e' chiesta
+        solo all'ente.
+
+        **Il codice fiscale non viene piu' richiesto.** Il campo 55 del format (*CF altro soggetto
+        manutentore*) esce dallo scambio: per distinguere un ente da un privato basta `subject`, e
+        un dato personale in meno e' un dato personale in meno da custodire.
+
+        **Il richiedente non va passato.** Il Catasto ha gia' il suo campo e non lo conserva fra i
+        soggetti.
+
+        **Almeno uno dei gestori deve essere un comune**: e' un vincolo che vale per la domanda, ma
+        non lo controlla il Catasto, che riceve denominazioni e non sa quali di esse siano comuni.
+        Che quei comuni siano davvero fra quelli attraversati dal tracciato lo verifica Forestas in
+        istruttoria, sulla geometria.
+
+        **Gli errori dicono quale soggetto.** Se un soggetto e' rifiutato, la chiave dell'errore
+        porta il ruolo e la posizione nella lista, **contata da zero**: con tre gestori, un errore
+        sul terzo arriva come `managing_subjects.2.email`.
+
+        Esempio:
+
+        ```json
+        "managing_subjects": [
+          { "name": "Comune di Oliena",     "email": "protocollo@comune.oliena.example.it", "subject": "organization" },
+          { "name": "CAI Sezione di Nuoro", "email": "nuoro@cai.example.it",                "subject": "organization" }
+        ],
+        "surveying_subjects":   [ { "name": "Mario Rossi", "subject": "person" } ],
+        "maintaining_subjects": [ { "name": "Forestas", "email": "protocollo@forestas.example.it", "subject": "organization" } ],
+        "keeping_subjects":     []
+        ```
+
+        ## Campi e valori concordati
+
+        Il canale accetta **solo i campi elencati in questa pagina**, con i valori che ciascuno
+        ammette. Un campo che non riconosce non viene ignorato ne' conservato in silenzio: la
+        creazione risponde `422` e l'errore porta il nome del campo.
+
+        | Cosa arriva | Cosa risponde |
+        |---|---|
+        | un campo non previsto, o un refuso in un nome | `422` — «Il campo … non è previsto da questa API.» |
+        | una chiave non prevista dentro un soggetto | `422` — «La chiave … non è prevista. Le chiavi concordate sono: name, email, subject.» |
+        | un valore fuori dall'elenco di un campo a scelta chiusa | `422` — «Il valore di … non è fra quelli concordati: …» |
+        | un testo piu' lungo del consentito | `422` — i toponimi e le denominazioni dei soggetti arrivano a 255 caratteri, gli itinerari sovrapposti a 600 |
+
+        E' una scelta deliberata, e cambia rispetto alla versione precedente di queste API, che un
+        campo sconosciuto lo accettava e lo conservava. Un campo sbagliato — per esempio un nome
+        scritto male — finiva cosi' nel verbale senza che nessuno se ne accorgesse, e il campo vero
+        risultava mancante alla conferma. Meglio una risposta che lo dice subito.
+
+        **Ne segue che un campo nuovo va concordato prima di essere inviato**: il Catasto lo
+        dichiara e lo documenta qui, e solo dopo il sistema di origine puo' mandarlo. Finche' non e'
+        in questa pagina, inviarlo fa fallire la creazione.
+
+        I parametri nella query string e i file sotto una chiave non prevista non fanno fallire la
+        chiamata — non fanno parte del modulo — ma non vengono conservati.
+
         ## I campi che diventano obbligatori
 
         Alcuni campi sono obbligatori solo in base al valore di un altro. Se mancano, la creazione
@@ -344,10 +431,7 @@ return [
 
         | Se... | ...allora sono obbligatori |
         |---|---|
-        | `soggetto_gestore` (campo 47) e' `third_party` | `soggetto_gestore_other` (48) |
-        | `soggetto_rilevatore` (campo 49) e' `other_surveyor` | `soggetto_rilevatore_other` (50) e `soggetto_rilevatore_email` (51) |
-        | `soggetto_manutentore` (campo 53) e' `other_legal_entity` | `soggetto_manutentore_other` (54) e `soggetto_manutentore_cf` (55) |
-        | `soggetto_custode_presente` (campo 57) e' `true` | `soggetto_custode` (58) |
+        | un soggetto ha `subject` uguale a `organization` | la sua `email`, che deve essere un indirizzo valido |
 
         C'e' poi un vincolo fra i valori di due campi sempre obbligatori: `primary_activity` deve essere
         una delle attivita' dichiarate in `activities` (campo 36), altrimenti la creazione risponde
@@ -379,10 +463,9 @@ return [
           -F difficulty='{"hiking":"EE"}' \
           -F primary_activity=hiking \
           -F existing_signage=good_condition \
-          -F proposed_managing_municipalities='["Domusnovas"]' \
-          -F municipality_email=protocollo@comune.example.it \
-          -F soggetto_gestore=forestas -F soggetto_rilevatore=applicant \
-          -F soggetto_manutentore=forestas -F soggetto_custode_presente=false \
+          -F managing_subjects='[{"name":"Comune di Domusnovas","email":"protocollo@comune.example.it","subject":"organization"}]' \
+          -F surveying_subjects='[{"name":"Mario Rossi","subject":"person"}]' \
+          -F maintaining_subjects='[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]' \
           -F last_survey_date=2026-10-20 -F maintenance_frequency_months=12 \
           -F geometry=@tracciato-di-prova.gpx
 

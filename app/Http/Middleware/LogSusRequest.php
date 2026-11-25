@@ -17,7 +17,7 @@ use Throwable;
  * messaggi, oppure, alla conferma, i campi e gli allegati che mancano.
  *
  * Il token e l'header Authorization non vengono mai scritti, nemmeno troncati.
- * Nemmeno i valori inviati: una domanda porta nomi, e-mail e codici fiscali, e
+ * Nemmeno i valori inviati: una domanda porta nomi ed e-mail di persone, e
  * questo log li terrebbe per 90 giorni. Si scrive solo cio' che e' nella
  * risposta, che nomina i campi ma non ne ripete il contenuto.
  */

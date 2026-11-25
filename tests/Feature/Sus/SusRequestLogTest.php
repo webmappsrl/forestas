@@ -59,17 +59,17 @@ function susLogClientHeaders(): array
 
 it('registra i campi che non passano la validazione, ma non i valori inviati', function () {
     // Quando chi integra segnala un 422, il log deve dire su quale campo. Il
-    // valore no: una domanda porta nomi, e-mail e codici fiscali.
+    // valore no: una domanda porta nomi ed e-mail di persone.
     $headers = susLogClientHeaders();
     $log = captureSusLog();
 
     $this->withHeaders($headers)
-        ->postJson(route('sus.applications.store'), ['municipality_email' => 'valore-riservato-123'])
+        ->postJson(route('sus.applications.store'), ['managing_subjects' => 'valore-riservato-123'])
         ->assertUnprocessable();
 
     expect($log['status'])->toBe(422)
-        ->and($log['validation_errors'])->toHaveKeys(['municipality_email', 'geometry'])
-        ->and($log['validation_errors']['municipality_email'][0])->toContain('municipality_email');
+        ->and($log['validation_errors'])->toHaveKeys(['managing_subjects', 'geometry'])
+        ->and($log['validation_errors']['managing_subjects'][0])->toContain('managing_subjects');
 
     expect(json_encode($log->getArrayCopy()))->not->toContain('valore-riservato-123');
 });
