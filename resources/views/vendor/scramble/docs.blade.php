@@ -143,6 +143,7 @@
                 duration_backward: '200',
                 activities: '["hiking","mtb"]',
                 difficulty: '{"hiking":"EE"}',
+                primary_activity: 'hiking',
                 existing_signage: 'good_condition',
                 proposed_managing_municipalities: '["Domusnovas"]',
                 municipality_email: 'protocollo@comune.example.it',
