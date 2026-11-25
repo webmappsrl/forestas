@@ -24,8 +24,6 @@
     $forestas = \App\Support\ForestasPoiDetail::build($poi);
     $sheet = \App\Support\ForestasPrintSheet::poi($poi, $forestas, $locale);
     $l = $sheet['labels'];
-    // Variabili del contratto lette senza `??`: se il package le rinomina la view si rompe subito.
-    $credit = $labels['© OpenStreetMap contributors, Webmapp'];
     // Due righe da tre: con la testata e «Il punto in breve» la pagina 1 basta (oc:8982, R21).
     $photos = array_slice($photos, 0, \App\Support\ForestasPrintSheet::POI_PHOTOS);
 @endphp
@@ -74,6 +72,6 @@
 \end{ForestasPaginaUnica}
 @if ($mapFile)
 {{-- Pagina 2: la mappa da sola, A4 al vivo, come nella scheda del percorso. --}}
-\ForestasMappaPagina{{!! $mapFile !!}}{{!! $credit !!}}
+\ForestasMappaPagina{{!! $mapFile !!}}
 @endif
 \end{document}

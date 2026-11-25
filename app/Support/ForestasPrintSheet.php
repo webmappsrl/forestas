@@ -173,7 +173,7 @@ final class ForestasPrintSheet
             'facts' => self::facts($track, $locale),
             'dataTitle' => self::label(['itinerario' => 'Itinerary data', 'cammino' => 'Walk data'][$kind] ?? 'Register and elevation data', $locale),
             'keyData' => self::keyData($track, $kind, $forestas, $locale),
-            'link' => self::link($forestas['url'] ?? null, $locale),
+            'link' => self::link('track', $track->getKey()),
             'labels' => self::labels($locale),
         ];
     }
@@ -206,7 +206,7 @@ final class ForestasPrintSheet
             'area' => self::areaText($places['areas'], $locale),
             'location' => self::locationText($places, $locale),
             'rows' => $rows,
-            'link' => self::link($forestas['url'] ?? null, $locale),
+            'link' => self::link('poi', $poi->getKey()),
             'labels' => $labels,
         ];
     }
@@ -255,11 +255,98 @@ final class ForestasPrintSheet
         preg_match_all('/<path\s+d="([^"]+)"\s*\/>/', $svg, $paths);
         foreach ($paths[1] as $d) {
             if (preg_match('/^[MmLlHhVvCcSsQqTtAaZz\d\s.,-]+$/', $d) === 1) {
-                $commands[] = '\draw svg {'.$d.'};';
+                $commands[] = '\draw svg {'.self::svgPathForTikz($d).'};';
             }
         }
 
         return implode('', $commands);
+    }
+
+    /**
+     * Il tracciato SVG riscritto per `svg.path` di TikZ: ogni comando con la sua lettera, e i raggi degli
+     * archi ingranditi quando non bastano a unire i due estremi. Il browser li ingrandisce da sé, come
+     * vuole la specifica SVG (F.6.6); TikZ no, e disegna un arco sbagliato: l'icona del cervello
+     * (`disability-cognitive`) perdeva il lobo in basso, con `A3 3 0 0 0 12 18.5` a 6,5 unità di distanza.
+     */
+    public static function svgPathForTikz(string $d): string
+    {
+        $arity = ['M' => 2, 'L' => 2, 'H' => 1, 'V' => 1, 'C' => 6, 'S' => 4, 'Q' => 4, 'T' => 2, 'A' => 7, 'Z' => 0];
+        preg_match_all('/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/', $d, $tokens);
+        $out = [];
+        $x = $y = $startX = $startY = 0.0;
+        $command = null;
+        $tokens = $tokens[0];
+        $i = 0;
+        while ($i < count($tokens)) {
+            if (ctype_alpha($tokens[$i])) {
+                $command = $tokens[$i++];
+            }
+            if ($command === null) {
+                return $d;
+            }
+            $upper = strtoupper($command);
+            $relative = $command !== $upper;
+            $n = $arity[$upper] ?? null;
+            if ($n === null) {
+                return $d;
+            }
+            if ($n === 0) {
+                $out[] = $command;
+                [$x, $y] = [$startX, $startY];
+                $command = null;
+
+                continue;
+            }
+            $args = array_map('floatval', array_slice($tokens, $i, $n));
+            if (count($args) < $n) {
+                return $d;
+            }
+            $i += $n;
+            [$nx, $ny] = match ($upper) {
+                'H' => [$relative ? $x + $args[0] : $args[0], $y],
+                'V' => [$x, $relative ? $y + $args[0] : $args[0]],
+                default => [($relative ? $x : 0) + $args[$n - 2], ($relative ? $y : 0) + $args[$n - 1]],
+            };
+            if ($upper === 'A') {
+                [$args[0], $args[1]] = self::arcRadii($args[0], $args[1], $args[2], $nx - $x, $ny - $y);
+            }
+            $out[] = $command.implode(' ', array_map(fn (float $v) => rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.'), $args));
+            [$x, $y] = [$nx, $ny];
+            if ($upper === 'M') {
+                [$startX, $startY] = [$x, $y];
+                // Coppie in più dopo un moveto sono lineto (specifica SVG).
+                $command = $relative ? 'l' : 'L';
+            }
+        }
+
+        return implode('', $out);
+    }
+
+    /**
+     * Raggi di un arco SVG ingranditi se non bastano a coprire la distanza fra gli estremi (specifica
+     * SVG, F.6.6.2): lambda è la distanza nel sistema dell'ellisse, oltre 1 i raggi si moltiplicano per
+     * la sua radice.
+     *
+     * @return array{0: float, 1: float}
+     */
+    private static function arcRadii(float $rx, float $ry, float $rotation, float $dx, float $dy): array
+    {
+        $rx = abs($rx);
+        $ry = abs($ry);
+        if ($rx == 0.0 || $ry == 0.0) {
+            return [$rx, $ry];
+        }
+        $phi = deg2rad($rotation);
+        $x1 = cos($phi) * (-$dx / 2) + sin($phi) * (-$dy / 2);
+        $y1 = -sin($phi) * (-$dx / 2) + cos($phi) * (-$dy / 2);
+        $lambda = ($x1 * $x1) / ($rx * $rx) + ($y1 * $y1) / ($ry * $ry);
+        if ($lambda <= 1) {
+            return [$rx, $ry];
+        }
+        // Un filo sopra il minimo: con il raggio esatto l'arco degenera e gli arrotondamenti lo spezzano.
+        $scale = sqrt($lambda) * 1.0001;
+
+        return [$rx * $scale, $ry * $scale];
     }
 
     /**
@@ -405,6 +492,8 @@ final class ForestasPrintSheet
 
         $rows = [
             ['label' => self::label('Start', $locale), 'value' => self::text(self::localized($properties['from'] ?? null, $locale))],
+            // La meta intermedia del registro catastale, fra partenza e arrivo come nell'ordine del percorso.
+            ['label' => self::label('Via', $locale), 'value' => self::text(self::localized($properties['via'] ?? null, $locale))],
             ['label' => self::label('End', $locale), 'value' => self::text(self::localized($properties['to'] ?? null, $locale))],
             ['label' => self::label('Round trip', $locale), 'value' => $roundtrip === null ? null : self::label($roundtrip ? 'Yes' : 'No', $locale)],
             ['label' => self::label('Difficulty level', $locale), 'value' => $difficulty === '' ? null : $difficulty],
@@ -419,26 +508,27 @@ final class ForestasPrintSheet
 
     /**
      * Il rimando alla pagina di dettaglio del sito pubblico: l'URL per il QR code (caratteri speciali
-     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, senza schema (escaped per LaTeX).
+     * escaped per il pacchetto `qrcode`) e lo stesso URL leggibile, con lo schema (escaped per LaTeX): chi lo ricopia a mano deve avere
+     * l'indirizzo completo.
      *
-     * L'URL è quello dei dati, `properties.forestas.url` (`ForestasTrackDetail` / `ForestasPoiDetail`):
-     * oggi l'import ci scrive la pagina di sardegnasentieri.it, e quando il sito passerà a WordPress ci
-     * sarà il nuovo indirizzo (decisione del dev, 23/11). Lo shard non lo costruisce. Null se manca o
-     * se non è un indirizzo http(s): un dato importato finisce stampato in un QR code.
+     * L'URL è `<forestas.website_url>/?wmwp_detail=track|poi&wmwp_id=<id>`: il plugin del sito lo
+     * risolve nella pagina di dettaglio, che non cambia se l'elemento viene rinominato e c'è anche per
+     * quelli creati in Nova. Non si usa `properties.forestas.url`: è l'indirizzo di Drupal, che resta
+     * per i redirect dal vecchio sito (oc:9018). Null se il dominio non è configurato o non è http(s).
      *
      * @return array{qr: string, text: string}|null
      */
-    private static function link(mixed $url, string $locale): ?array
+    private static function link(string $detail, mixed $id): ?array
     {
-        $url = self::localized($url, $locale);
-        $url = $url === null ? '' : trim($url);
-        if (! preg_match('#^https?://[^\s/$.?\#].\S*$#i', $url)) {
+        $base = rtrim(trim((string) config('forestas.website_url')), '/');
+        if ($id === null || ! preg_match('#^https?://[^\s/$.?\#][^\s/?\#]*$#i', $base)) {
             return null;
         }
+        $url = $base.'/?'.http_build_query(['wmwp_detail' => $detail, 'wmwp_id' => $id]);
 
         return [
             'qr' => strtr($url, ['\\' => '\\\\', '#' => '\\#', '%' => '\\%', '&' => '\\&', '_' => '\\_', '~' => '\\~', '$' => '\\$', '^' => '\\^', '{' => '\\{', '}' => '\\}']),
-            'text' => LatexText::escape(preg_replace('#^https?://#i', '', $url) ?? $url),
+            'text' => LatexText::escape($url),
         ];
     }
 

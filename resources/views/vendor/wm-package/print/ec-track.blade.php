@@ -14,8 +14,9 @@
     a destra; «Sentiero per tutti» se c'è; «Il sentiero in breve» (Lunghezza, Dislivello totale,
     Tempo di percorrenza, Quota min — max, «—» se mancano); pochi dati catastali e altimetrici, solo
     quelli che non sono già sopra; il rimando alla pagina del sito (QR code e indirizzo);
-  - pagina 2: la mappa da sola, A4 al vivo, senza testata né piè di pagina, con il credito
-    nell'angolo ($mapWidthMm x $mapHeightMm, features.print.map.*, 210 x 297 mm).
+  - pagina 2: la mappa da sola, A4 al vivo, senza testata né piè di pagina ($mapWidthMm x
+    $mapHeightMm, print.map.*, 210 x 297 mm). Scala, nord e attribuzioni li disegna il
+    servizio mappe sull'immagine (oc:9011, `map_service.map_info`).
   Niente descrizione, roadbook, attività e avvertenze né galleria: è la versione breve, da volantino.
   Le parti senza dati non compaiono.
 
@@ -26,9 +27,6 @@
     $forestas = \App\Support\ForestasTrackDetail::build($track);
     $sheet = \App\Support\ForestasPrintSheet::track($track, $forestas, $locale);
     $l = $sheet['labels'];
-    // Variabili del contratto lette senza `??`: se il package le rinomina la view si rompe subito
-    // (e il test che passa da PrintService::generate() con lei).
-    $credit = $labels['© OpenStreetMap contributors, Webmapp'];
     $validation = $sheet['validation'];
     $walkability = $sheet['walkability'];
     $accessibility = $sheet['accessibility'];
@@ -107,6 +105,6 @@
 \end{ForestasPaginaUnica}
 @if ($mapFile)
 {{-- 7. Pagina 2: la mappa da sola, A4 al vivo. --}}
-\ForestasMappaPagina{{!! $mapFile !!}}{{!! $credit !!}}
+\ForestasMappaPagina{{!! $mapFile !!}}
 @endif
 \end{document}
