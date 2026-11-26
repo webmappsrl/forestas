@@ -437,10 +437,12 @@ return [
 
         **`name` ed `email` dipendono da `subject`.** Per un `organization` sono obbligatori
         entrambi, e la e-mail deve essere un indirizzo valido. Per una `person` **non si mandano**:
-        i dati identificativi di una persona fisica non entrano nel Catasto, e un soggetto che li
-        porta valorizzati fa rispondere `422`. Il controllo si applica a ogni soggetto per conto
-        suo: in una lista con un ente e un privato, i due campi sono chiesti all'ente e rifiutati al
-        privato. Un privato si manda cosi', e basta:
+        un soggetto che li porta valorizzati fa rispondere `422`. Il vincolo viene dalla CR, che
+        *«esclude la trasmissione di dati di persone fisiche al Catasto»*, e finche' non c'e' una
+        decisione formale del titolare del trattamento quei dati non vanno trasmessi in nessuna
+        forma. Il controllo si applica a ogni soggetto per conto suo: in una lista con un ente e un
+        privato, i due campi sono chiesti all'ente e rifiutati al privato. Un privato si manda
+        cosi', e basta:
 
         ```json
         "surveying_subjects": [ { "subject": "person" } ]

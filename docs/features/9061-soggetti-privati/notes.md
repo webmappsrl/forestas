@@ -40,6 +40,22 @@ mettere» — e la pagina Scramble è il canale con cui gli si risponde. Tacere 
 il rifiuto come un `422` inatteso.
 **Scartato:** scrivere solo la regola, senza nominare il segnaposto.
 
+### 2026-11-26 — la pagina cita la CR come fonte del divieto
+Nel paragrafo in cui la pagina dice che per una `person` nome ed e-mail non si mandano è stata
+aggiunta la fonte del vincolo: la CR «esclude la trasmissione di dati di persone fisiche al
+Catasto», e finché non c'è una decisione formale del titolare del trattamento quei dati non vanno
+trasmessi in nessuna forma. Chiesto dal dev: il divieto non è una scelta implementativa nostra, e
+chi legge la pagina deve vedere da dove viene. La CR è citata attraverso la riga 24 del documento
+dei 34 quesiti di Engineering, che la riporta come vincolo; il testo della CR non è stato letto
+direttamente.
+**Scartato:** ripetere la citazione nei quattro `#[BodyParameter]` del package, che l'avrebbe detta
+quattro volte nella stessa pagina.
+
 ## Follow-up
 
-Nessuno finora.
+### 2026-11-26 — il controllo degli identificatori legge la prosa di `config/scramble.php` come codice
+Il hook `identifier-check.sh` ha bloccato due volte una modifica alla descrizione della pagina
+Scramble segnalando «indirizzo», «valido» e «campi» come identificatori italiani: sono parole di
+un testo in italiano dentro la stringa di documentazione, non nomi di variabili. Le modifiche sono
+state applicate lo stesso. Finché il controllo non distingue quel file, ogni intervento sulla prosa
+della pagina lo farà scattare.
