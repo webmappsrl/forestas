@@ -1,5 +1,5 @@
 > Ticket: oc:9061
-> Stato: approvato il 2026-11-26
+> Stato: seguito senza divergenze
 
 # Soggetti privati: la pagina delle API — piano (shard)
 

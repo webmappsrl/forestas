@@ -1,5 +1,5 @@
 > Ticket: oc:9061
-> Stato: approvata il 2026-11-26
+> Stato: chiusa il 2026-11-26 · approvata il 2026-11-26
 
 # Soggetti privati: la pagina delle API dice cosa non si manda e dove si recupera
 
@@ -70,7 +70,7 @@ La pagina dice che per un soggetto `person` nome ed e-mail non si mandano, che p
 ruolo e posizione del soggetto. La riga della tabella che descrive `name` non lo presenta più
 come un dato sempre dovuto.
 
-**Verifica:** _da compilare alla chiusura._
+**Verifica:** [config/scramble.php](../../../config/scramble.php) › la tabella delle chiavi del soggetto e il paragrafo «`name` ed `email` dipendono da `subject`»
 
 ### <a id="r2"></a>**R2** — La pagina dice che il segnaposto testuale è rifiutato
 
@@ -79,7 +79,7 @@ che riceve lo stesso `422`, senza numeri di ticket nel testo.
 
 *Fonte:* decisione del dev del 26/11/2026, contro la richiesta di Alessio Piccioli in call il
 23/11/2026.
-**Verifica:** _da compilare alla chiusura._
+**Verifica:** [config/scramble.php](../../../config/scramble.php) › il paragrafo «Un segnaposto non e' una via d'uscita» e la riga del dato personale nella tabella «Cosa arriva / Cosa risponde»
 
 ### <a id="r3"></a>**R3** — La pagina dice dove si recupera il dato del privato
 
@@ -92,14 +92,14 @@ sostituisce la lista intera.
 
 *Fonte:* documento dei 34 quesiti, riga 24, stato del quesito — «devono essere recuperate dal SUS
 usando il codice identificativo SUS presente».
-**Verifica:** _da compilare alla chiusura._
+**Verifica:** [config/scramble.php](../../../config/scramble.php) › il paragrafo «Dove si recupera il dato del privato» e la nota che segue sui privati indistinguibili
 
 ### <a id="r4"></a>**R4** — Il modulo di prova manda un privato senza dati personali
 
 Il bottone «Prova la chiamata» precompila il rilevatore privato come `[{"subject":"person"}]`, e
 la chiamata che ne esce è accettata.
 
-**Verifica:** _da compilare alla chiusura._
+**Verifica:** [SusApiDocumentationTest.php](../../../tests/Feature/Sus/SusApiDocumentationTest.php) › `pubblica due esempi identici, e che il canale accetterebbe`, che confronta il modulo di prova con l'esempio `curl` e valida il payload con le regole vere dello schema
 
 ## Rischi
 
@@ -130,18 +130,13 @@ mano con il riferimento della pratica.
 
 ## Moduli toccati
 
-Previsti:
+Toccati davvero, da `git diff --name-only`:
 
-- `config/scramble.php`, sei punti:
-  - `:421` — la riga della tabella che descrive `name`
-  - `:438-441` — il paragrafo «La `email` dipende da `subject`», che diventa su due campi e porta
-    la nota su segnaposto e recupero dal SUS
-  - `:466` — l'esempio JSON della sezione dei soggetti, dove il rilevatore privato perde il nome
-  - `:478-481` — la tabella «Cosa arriva / Cosa risponde», che guadagna la riga del dato personale
-  - `:509-512` — la tabella «Se… allora sono obbligatori» e la frase «mandarla con dentro un
-    soggetto senza `name` no», che oggi direbbe il contrario della regola nuova
-  - `:568` — l'esempio `curl` completo, stessa correzione dell'esempio JSON
-- `resources/views/vendor/scramble/docs.blade.php:158` — il rilevatore privato del modulo di prova
+- `config/scramble.php` — la tabella delle chiavi del soggetto, il paragrafo sulla regola
+  condizionata riscritto su entrambi i campi, i due blocchi nuovi sul segnaposto e sul recupero
+  dal SUS, la riga nuova nella tabella dei `422`, la tabella «Se… allora sono obbligatori» e la
+  frase sulla lista mandata a metà, l'esempio JSON e l'esempio `curl`
+- `resources/views/vendor/scramble/docs.blade.php` — il rilevatore privato del modulo di prova
 
 La validazione e la documentazione dei campi del canale stanno nel package:
 `wm-package/docs/features/9061-soggetti-privati/overview.md`.
