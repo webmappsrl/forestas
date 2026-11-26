@@ -171,9 +171,23 @@ UAT, che aggiorna il team.
 
 ```sql
 ALTER TABLE trail_applications ADD COLUMN IF NOT EXISTS reference VARCHAR(255) NULL;
-ALTER TABLE trail_applications ADD COLUMN IF NOT EXISTS original_geometry_hash VARCHAR(255) NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS trail_applications_reference_unique ON trail_applications (reference);
 ```
+
+### La chiave di configurazione: fatta su dev e UAT il 26/11/2026
+
+`WM_TRAIL_REGISTRY_REQUIRE_REFERENCE=true` è stata aggiunta al `.env` dei due ambienti, subito
+sotto `WM_TRAIL_REGISTRY_ENABLED`, prima del deploy. Di ciascun file resta una copia
+`.env.backup-oc9056-<data>` accanto all'originale.
+
+Metterla prima del deploy è la cosa giusta e non è rischiosa: finché il codice nuovo non è in
+linea, quella chiave non la legge nessuno e viene ignorata. Al contrario, aggiungerla dopo
+costringerebbe a ricordarsene, e su UAT `deploy_prod.sh` esegue `php artisan optimize`, che congela
+la configurazione: una chiave che arriva dopo quel passo non ha effetto finché la cache non viene
+rifatta. Su nessuno dei due ambienti la configurazione risultava cachata al momento della modifica.
+
+Senza quella chiave il canale resta com'era: `reference` facoltativo e nessun controllo sulla
+domanda già aperta.
 
 ## Bug trovati
 
