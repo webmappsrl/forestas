@@ -195,6 +195,57 @@ di oc:9018 qui sopra se arrivano insieme: copia delle tracce, `applica --conferm
 `pagine --conferma` (template, titoli di Punti di interesse e Itinerari, sottotitolo di Cammini) e verifica, in
 [`wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md`](../../wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md).
 
+### Bozze fuori dall'import (oc:8999)
+
+Dal rilascio di oc:8999 l'import da Sardegna Sentieri salta i nodi e le traduzioni in bozza di
+Drupal, e a fine import toglie dall'indice delle tracce le voci il cui id non è più una traccia. Lo
+shard si allinea da solo al primo import. Il sito no: tre elementi pubblicati che avevano un
+doppione in bozza restano su `-2` finché non si liberano a mano gli indirizzi puliti delle bozze.
+Si fa una volta sola, dopo il deploy, che riavvia già Horizon (`scripts/deploy.sh`). Dall'host:
+
+1. **Import.** Si aspetta quello delle 06:00, o lo si lancia subito:
+   `docker exec php-forestasuat php artisan sardegnasentieri:import --reset`. Fa il backup del DB,
+   svuota e reimporta; il comando accoda e ritorna. L'import è finito quando
+   `storage/logs/import-AAAA-MM-GG.log` ha la riga
+   `[sardegnasentieri] Indice delle tracce: tolte N voci senza traccia.`, con N uguale al calo delle
+   tracce (4 il 26/11).
+2. **Shard senza bozze.**
+
+   ```bash
+   docker exec php-forestasuat php artisan tinker --execute='$nids = DB::connection("sardegnasentieri")->table("node_field_data")->where("default_langcode", 1)->where("status", 0)->whereIn("type", ["sentiero", "itinerario", "poi", "ente_istituzione_societa"])->pluck("nid")->map(fn ($n) => (string) $n)->all(); echo "tracce in bozza: ".App\Models\EcTrack::whereIn("properties->sardegnasentieri_id", $nids)->count()." · POI in bozza: ".Wm\WmPackage\Models\EcPoi::where(fn ($q) => $q->whereIn("properties->sardegnasentieri_id", $nids)->orWhereIn("properties->out_source_feature_id", $nids))->count()." · tracce: ".App\Models\EcTrack::count()." · voci nell indice: ".count(app(App\Search\TrackSearchIndex::class)->documentIds()).PHP_EOL;'
+   ```
+
+   Deve dare 0 tracce e 0 POI in bozza, e tante voci nell'indice quante tracce (774 il 26/11; prima
+   del rilascio dava 4 tracce, 23 POI e 778 tracce).
+3. **Indirizzi del sito**, dal container WordPress
+   (`docker exec -u www-data wordpress-forestasuat wp …`):
+   - si ricostruisce l'indice dei dettagli: `wp eval 'wmwp_detail_index( true );'`;
+   - gli indirizzi puliti delle bozze devono rispondere 404:
+     `curl -s -o /dev/null -w '%{http_code}\n' https://wp.forestas.uat.maphub.it/sentiero/nolau-t-513/`
+     e `…/punti-di-interesse/bivacco-fisso-lungo-il-sentiero-d-105c/`. Se rispondono ancora 200 il sito
+     vede ancora la bozza: per il POI succede finché `pois.geojson` non è rigenerato, sulla coda
+     `default` dietro le conversioni delle immagini. Si aspetta e si ricostruisce di nuovo;
+   - solo allora, e solo sugli indirizzi puliti delle bozze:
+     `wp wmwp detail-paths forget sentiero/nolau-t-513`,
+     `wp wmwp detail-paths forget trail/nolau-t-513`,
+     `wp wmwp detail-paths forget punti-di-interesse/bivacco-fisso-lungo-il-sentiero-d-105c`;
+     poi di nuovo `wp eval 'wmwp_detail_index( true );'`. **Mai `forget` sui `-2`:** cancellerebbe
+     la riga del pubblicato, e il suo vecchio link darebbe 404. Con l'ordine giusto il pubblicato prende
+     l'indirizzo pulito e il `-2` resta come 301. Prima che la bozza sparisca dall'indice, invece, la
+     bozza riprenderebbe l'indirizzo pulito (`wmwp_detail_history_forget()` del plugin).
+   - Monte Cresia su UAT ha già l'indirizzo pulito sul pubblicato (nid 699): niente da fare.
+4. **Verifica.** `wp wmwp detail-paths list sentiero/nolau-t-513` dà la chiave `s:694` come
+   attuale; `/sentiero/nolau-t-513/`, `/en/trail/nolau-t-513/` e l'indirizzo pulito del Bivacco
+   rispondono 200 con il pubblicato (nid 694 e 3111); `/sentiero/nolau-t-513-2/` e
+   `…/bivacco-fisso-lungo-il-sentiero-d-105c-2/` rispondono 301 verso l'indirizzo pulito.
+5. **Catasto.** Spariscono le 2 anomalie `codice_gia_assegnato` (ZORT513, ZORT513A, fra i
+   pubblicati e le bozze). Può comparire un `registro_link_orfano` per ZNUT511, il codice della bozza
+   Sa Crabarissa (nid 545), se il foglio del registro la cita: è un dato vero, non un errore.
+
+L'esito va nel ticket oc:8999. Su dev gli stessi passi, con `php-forestasdev` e
+`wordpress-forestasdev`, e con due `forget` in più per Monte Cresia, che lì ha il pubblicato su `-2`:
+`sentiero/monte-cresia-t-513a` e `trail/monte-cresia-t-513a`.
+
 ## Azzerare WordPress
 
 ```bash

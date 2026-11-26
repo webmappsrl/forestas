@@ -30,6 +30,11 @@ Artisan::command('inspire', function () {
  *
  * Spento (produzione, e le macchine di sviluppo): importazione oraria
  * incrementale, che aggiorna senza distruggere.
+ *
+ * Nota (oc:8999): in produzione non è previsto nessun import. L'import serve
+ * a tenere dev e collaudo allineati a Drupal durante il lavoro, e in
+ * produzione resterà l'ultima copia importata: al passaggio in produzione lo
+ * schedule orario va spento.
  */
 if (env('SARDEGNASENTIERI_DAILY_RESET', false)) {
     // Il ricalcolo delle anomalie non sta più qui. Stava in un `->then()`

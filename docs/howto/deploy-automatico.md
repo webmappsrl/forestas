@@ -36,6 +36,9 @@ test, deploy, commit, autore e link alla run. Si spegne con la variabile di repo
   del merge su `main`, perche' il deploy parte da solo.
 - **I rilasci di WordPress con passi propri**, come `applica --conferma` e `pagine --conferma` di
   `wp-forestas/bin/wordpress-config.sh`: vedi [messa-in-opera-wordpress-uat.md](messa-in-opera-wordpress-uat.md).
+- **Il primo deploy che esclude le bozze di Drupal (oc:8999)**, su dev e su UAT: import subito o
+  alle 06:00, controllo dello shard e `forget` degli indirizzi puliti delle bozze sul sito, in
+  [messa-in-opera-wordpress-uat.md](messa-in-opera-wordpress-uat.md#bozze-fuori-dallimport-oc8999).
 - **Le variabili nuove nei `.env`** dei server.
 - **Il primo deploy delle versioni del JSON della traccia (oc:8997)**, su ogni server:
   **prima del deploy**, scrivere nel `.env` del server `WMFE_TRACK_VERSIONS=legacy,v1`. Il deploy

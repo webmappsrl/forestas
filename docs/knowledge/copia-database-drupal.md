@@ -26,7 +26,8 @@ copia abbia sentieri e POI: con liste vuote marcherebbe ogni record come sparito
 
 ### Dove sta
 
-Su UAT e in produzione la accende il `compose.yml` dello shard, e l'import ne dipende. In locale
+Su UAT la accende il `compose.yml` dello shard, e l'import ne dipende; lo stesso file la accenderebbe in
+produzione, dove però non è previsto nessun import (oc:8999). In locale
 **non c'è per forza**: esiste solo dove qualcuno ha acceso il container
 `mysql-sardegnasentieri-dump` e ci ha caricato un dump. Come accenderla, caricarla, scaricare il
 dump da produzione, come si aggiorna da sola su UAT, come raggiungere quella di UAT e scaricare il
@@ -91,8 +92,8 @@ Colonne del valore secondo il tipo di campo:
 **Come si ricava il valore corrente di un campo**
 
 1. Si parte da `node_field_data` filtrando `type`, `status = 1` e la lingua. `status = 1` vale per
-   chi mostra solo il pubblicato, come WordPress: **l'import non filtra**, perché replica le API,
-   che esponevano anche le bozze.
+   chi mostra solo il pubblicato, come WordPress, e anche per l'import: salta i nodi in bozza nella
+   lingua originale e, dei nodi pubblicati, le traduzioni in bozza (oc:8999).
 2. Join su `node__<campo>` con `entity_id = nid AND deleted = 0`, e in più:
    - campo **traducibile** → `AND langcode = node_field_data.langcode`;
    - campo **non traducibile** → nessun filtro sulla lingua: c'è una sola riga, nella lingua
@@ -263,11 +264,12 @@ Gli endpoint `/ss/*` sono nel modulo Drupal `api_webmapp`.
 
 | Campo | Copia | Note |
 |---|---|---|
-| chiave | nodo `.nid` con `type IN ('sentiero','itinerario')` / `type = 'poi'` | **include anche i nodi non pubblicati** (bozze in `draft`, `status = 0`): verificato il 05/10/2026, l'elenco ha tutti i sentieri e itinerari della copia, compresi quelli non pubblicati, mentre la pagina pubblica del nodo risponde 403 |
+| chiave | nodo `.nid` con `type IN ('sentiero','itinerario')` / `type = 'poi'` | l'elenco delle API **includeva anche i nodi non pubblicati** (bozze in `draft`, `status = 0`): verificato il 05/10/2026, aveva tutti i sentieri e itinerari della copia, compresi quelli non pubblicati, mentre la pagina pubblica del nodo risponde 403. L'import dalla copia invece li esclude con `status = 1` (oc:8999) |
 | valore | nodo `.changed` | l'API lo restituisce già formattato come data |
 
 **Lista degli enti** (`getEnteList()`, oc:8513) — le API non l'avevano: la copia dà `{nid: changed}`
-dei nodi `type = 'ente_istituzione_societa'`, bozze comprese, nella stessa forma delle liste sopra.
+dei nodi `type = 'ente_istituzione_societa'` pubblicati nella lingua originale (`status = 1`, oc:8999),
+nella stessa forma delle liste sopra.
 L'import confronta il `changed` con `properties.forestas.updated_at` dell'ente.
 
 **`/ss/track/{id}`** — `ApiTrackResponse` (serve sia sentieri sia itinerari)
@@ -374,6 +376,10 @@ fields        campo => langcode => delta => {colonne senza il prefisso del campo
 Regole non documentate del modulo `api_webmapp`, ricavate confrontando le risposte vere con la copia
 (oc:8900) e replicate da `SardegnaSentieriDatabaseSource`:
 
+- **Le bozze no** (oc:8999): le API esponevano anche i nodi e le traduzioni non pubblicati,
+  l'import li salta. Un nodo entra solo se è pubblicato nella lingua originale (`changedList()`), e
+  del suo record restano solo le traduzioni pubblicate (`withoutDraftTranslations()`): una
+  traduzione in bozza non dà testi, né immagini e allegati col ripiego sull'inglese.
 - **La chiave `it` è la traduzione originale**, anche quando è `en` o `und`; le altre traduzioni
   compaiono con la propria lingua, tranne l'italiana di un nodo nato in inglese, che le API
   ignoravano (sentiero 3636: `name.it` è il titolo inglese).
@@ -549,8 +555,9 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
   perde i nodi nati in inglese; per la lingua originale usare `default_langcode = 1`.
 - **Mai join su `revision_id`**: il valore corrente si prende su `entity_id` e `deleted = 0`.
 - **`status` è per traduzione** e le API non lo espongono: sia gli elenchi `/ss/list-tracks/` e
-  `/ss/listpoi/` sia i dettagli restituiscono anche i nodi non pubblicati. Dalla copia si possono
-  escludere con `status = 1`, ma l'import oggi non lo fa (oc:8900).
+  `/ss/listpoi/` sia i dettagli restituiscono anche i nodi non pubblicati. Dalla copia si escludono con
+  `status = 1` sulla riga della lingua originale, e le traduzioni in bozza togliendole dal record:
+  l'import fa tutte e due le cose (oc:8999).
 - **Riferimenti verso nodi cancellati** in `sentieri_collegati`, `itinerari_correlati`,
   `field_sentiero` e `poi_correlati`: il join va fatto sul nodo di destinazione.
 - **Liste di riferimenti diverse fra `it` ed `en`**: `field_sentieri_collegati` e l'immagine
@@ -599,7 +606,8 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
   copia a metà.
 - **Copia nel `compose.yml` e non negli altri compose** (oc:8900): su UAT e nella futura
   produzione serve sempre; in locale è un'opzione, e un container sempre acceso occuperebbe la
-  porta 3307 del tunnel verso UAT.
+  porta 3307 del tunnel verso UAT. In produzione però non è previsto nessun import (oc:8999):
+  lì la copia non serve all'import.
 - **Ritardo di un giorno accettato** (oc:8900): finché Drupal è vivo una modifica fatta lì arriva
   dopo il dump giornaliero e non entro un'ora; su UAT l'import gira già una volta al giorno.
 - **Caricamento solo dallo script** (oc:8705): una strada sola, che crea anche `readonly` con il
@@ -632,8 +640,23 @@ WHERE t.vid = 'tipologia_poi' AND t.langcode = 'it';
   UAT dal locale si spegne il container locale e si apre il tunnel sulla 3307.
 - **Log dedicato** (oc:8706): l'esito del giro giornaliero sta in un file solo suo, letto dal dev e
   dalle sessioni di lavoro, invece di perdersi fra i log di Laravel.
+- **Le bozze non entrano nello shard** (oc:8999): sul sito e nell'app comparivano contenuti non
+  pubblicati in Drupal, e alcuni toglievano l'indirizzo pulito al pubblicato con lo stesso nome
+  (`/sentiero/monte-cresia-t-513a-2/`). Deciso allo scrum del 17/11: restano nella copia e, se il
+  cliente le chiederà, si riaggiungono. Un nodo con la lingua originale in bozza resta fuori anche
+  se ha una traduzione pubblicata: nello shard ogni nodo è costruito attorno alla lingua originale.
+- **Nessun import in produzione** (oc:8999): l'import serve a tenere dev e UAT allineati a Drupal
+  durante il lavoro; in produzione resterà l'ultima copia importata. Lo schedule orario di
+  `routes/console.php` (oc:8489) resta nel codice, con la nota che al passaggio va spento.
 
 ## Come ci siamo arrivati
+
+- **Import senza filtro su `status`** (oc:8900, superata in oc:8999): replicava le API alla
+  lettera, bozze comprese, perché il confronto potesse dimostrare che il risultato non cambiava.
+  Portava sul sito contenuti non pubblicati e slug doppi.
+- **Traduzione pubblicata di un nodo con l'originale in bozza** (scartata in oc:8999): importarla da
+  sola avrebbe chiesto un nodo costruito in modo diverso da tutti gli altri, per un caso che non
+  esiste (0 sulla copia di UAT il 26/11).
 
 - **Import sulle API e copia accanto** (oc:8705, superata in oc:8900): le API erano più fresche
   della copia finché il sync non la aggiornava ogni giorno. Con il dump giornaliero su UAT il

@@ -24,8 +24,9 @@ Il 06/11/2026 `https://wp.forestas.dev.maphub.it` è in opera sull'host di dev:
 In `wp-forestas` il lavoro è su `develop`: commit `7b6fe2e` (8947), `60b65e6` (8760) e `d384dce`
 (8783) sul branch del ticket, PR #17 chiusa con squash and merge il 06/11 → `b84a917`. In `forestas`
 la documentazione è nel commit `428024c` e il puntatore di `wp-forestas` (da `b160727` a `b84a917`) nel
-commit `d5f587d`, sul branch del ticket, e vanno su `develop` con la PR del ticket. Resta
-l'aggiornamento dell'host di dev (Task 8, passi 2 e 3).
+commit `d5f587d`, sul branch del ticket, e vanno su `develop` con la PR del ticket. L'host di dev è aggiornato dal 06/11/2026 14:47 UTC
+(Task 8, passi 2 e 3: pull, submodule a `b84a917`, `scripts/wordpress-up.sh`, virtual host identici a
+quelli installati; annotato in oc:8999).
 
 ## Divergenze dal piano, task per task
 
@@ -134,8 +135,7 @@ Nessun bloccante, cinque correzioni fatte:
 
 ## Follow-up
 
-- Dopo il merge su `develop` di `forestas`, sull'host di dev: pull, `git submodule update --init
-  --recursive` (porta `wp-forestas` a `b84a917`), `scripts/wordpress-up.sh`, e verifica che
-  `wp-forestas/docker/dev/` coincida con `/etc/apache2/sites-available/` (Task 8, passi 2 e 3).
+- ~~Aggiornamento dell'host di dev dopo il merge (Task 8, passi 2 e 3)~~: fatto il 06/11/2026
+  (annotato in oc:8999).
 - Titolo e introduzione di `wp-forestas/docs/howto/cron-sincronizzazione-pagine.md` estesi a eventi
   e «da sapere» (punto rimasto della nota di oc:8760).
