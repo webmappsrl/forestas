@@ -155,7 +155,7 @@
                 primary_activity: 'hiking',
                 existing_signage: 'good_condition',
                 managing_subjects: '[{"name":"Comune di Domusnovas","email":"protocollo@comune.example.it","subject":"organization"}]',
-                surveying_subjects: '[{"name":"Mario Rossi","subject":"person"}]',
+                surveying_subjects: '[{"subject":"person"}]',
                 maintaining_subjects: '[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]',
                 last_survey_date: '2026-10-20',
                 maintenance_frequency_months: '12',

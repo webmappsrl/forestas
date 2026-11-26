@@ -418,9 +418,9 @@ return [
 
         | Chiave | Cosa contiene |
         |---|---|
-        | `name` | la denominazione del soggetto: il nome dell'ente, o il nominativo della persona |
-        | `email` | il recapito del soggetto |
         | `subject` | `organization` se e' un ente, `person` se e' una persona fisica |
+        | `name` | la denominazione dell'ente. Per una `person` non si manda |
+        | `email` | il recapito dell'ente. Per una `person` non si manda |
 
         I quattro campi, con il numero del campo del format da cui ciascuno proviene:
 
@@ -435,10 +435,32 @@ return [
         campo puo' non essere passato affatto. Gli altri tre, se mancano o arrivano con la lista
         vuota, fanno rispondere `422`.
 
-        **La `email` dipende da `subject`.** Per un `organization` e' obbligatoria e deve essere un
-        indirizzo valido; per una `person` puo' mancare o valere `null`. Il controllo si applica a
-        ogni soggetto per conto suo: in una lista con un ente e una persona, la e-mail e' chiesta
-        solo all'ente.
+        **`name` ed `email` dipendono da `subject`.** Per un `organization` sono obbligatori
+        entrambi, e la e-mail deve essere un indirizzo valido. Per una `person` **non si mandano**:
+        i dati identificativi di una persona fisica non entrano nel Catasto, e un soggetto che li
+        porta valorizzati fa rispondere `422`. Il controllo si applica a ogni soggetto per conto
+        suo: in una lista con un ente e un privato, i due campi sono chiesti all'ente e rifiutati al
+        privato. Un privato si manda cosi', e basta:
+
+        ```json
+        "surveying_subjects": [ { "subject": "person" } ]
+        ```
+
+        **Un segnaposto non e' una via d'uscita.** Un valore convenzionale al posto del dato vero —
+        una stringa come «campo oscurato per motivi di privacy» — e' un valore come un altro e
+        riceve lo stesso `422`. L'informazione che serve al Catasto e' che quel ruolo e' coperto da
+        un privato, e la dice gia' `subject`. Valgono come l'assenza del campo soltanto `null` e la
+        stringa vuota.
+
+        **Dove si recupera il dato del privato.** Resta sul SUS. La domanda porta il `reference`
+        passato alla creazione — il riferimento con cui la pratica e' identificata presso chi la
+        consegna, che l'operatore vede sulla domanda come «External reference» —, ed e' con quello
+        che si risale alla persona quando serve, in istruttoria o dopo l'approvazione.
+
+        Di conseguenza **i privati di uno stesso ruolo arrivano senza nulla che li distingua fra
+        loro**: due rilevatori privati sono due elementi identici della lista. Non e' un dato
+        perso per sbaglio, ed e' bene non contare sulla posizione nella lista come se fosse un
+        identificativo: una modifica che rimanda un ruolo ne sostituisce la lista intera.
 
         **Il codice fiscale non viene piu' richiesto.** Il campo 55 del format (*CF altro soggetto
         manutentore*) esce dallo scambio: per distinguere un ente da un privato basta `subject`, e
@@ -463,7 +485,7 @@ return [
           { "name": "Comune di Oliena",     "email": "protocollo@comune.oliena.example.it", "subject": "organization" },
           { "name": "CAI Sezione di Nuoro", "email": "nuoro@cai.example.it",                "subject": "organization" }
         ],
-        "surveying_subjects":   [ { "name": "Mario Rossi", "subject": "person" } ],
+        "surveying_subjects":   [ { "subject": "person" } ],
         "maintaining_subjects": [ { "name": "Forestas", "email": "protocollo@forestas.example.it", "subject": "organization" } ],
         "keeping_subjects":     []
         ```
@@ -479,6 +501,7 @@ return [
         | un campo non previsto, o un refuso in un nome | `422` — «Il campo … non è previsto da questa API.» |
         | una chiave non prevista dentro un soggetto | `422` — «La chiave … non è prevista. Le chiavi concordate sono: name, email, subject.» |
         | un valore fuori dall'elenco di un campo a scelta chiusa | `422` — «Il valore di … non è fra quelli concordati: …» |
+        | il `name` o la `email` di un soggetto `person` | `422` — «Il nome e la e-mail di un soggetto `person` non si trasmettono al Catasto: ometti il campo e recupera il dato dal SUS con il riferimento della pratica.» |
         | un testo piu' lungo del consentito | `422` — i toponimi e le denominazioni dei soggetti arrivano a 255 caratteri, gli itinerari sovrapposti a 600 |
 
         E' una scelta deliberata, e cambia rispetto alla versione precedente di queste API, che un
@@ -506,10 +529,12 @@ return [
 
         | Se... | ...allora sono obbligatori |
         |---|---|
-        | un soggetto ha `subject` uguale a `organization` | la sua `email`, che deve essere un indirizzo valido |
+        | un soggetto ha `subject` uguale a `organization` | il suo `name` e la sua `email`, che deve essere un indirizzo valido |
+        | un soggetto ha `subject` uguale a `person` | nessuno dei due: `name` ed `email` sono rifiutati |
 
         **Una lista mandata a meta' e' sempre un errore.** Non dire niente di `managing_subjects`
-        e' lecito — si consegnera' dopo —, mandarla con dentro un soggetto senza `name` no.
+        e' lecito — si consegnera' dopo —, mandarla con dentro un ente senza `name` o senza `email`
+        no. Un privato senza quei campi non e' un soggetto incompleto: e' la sua forma giusta.
 
         C'e' poi un vincolo fra i valori di due campi: `primary_activity` deve essere una delle
         attivita' dichiarate in `activities` (campo 36). Per questo i due campi, insieme a
@@ -565,7 +590,7 @@ return [
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
           -F _method=PATCH \
           -F managing_subjects='[{"name":"Comune di Domusnovas","email":"protocollo@comune.example.it","subject":"organization"}]' \
-          -F surveying_subjects='[{"name":"Mario Rossi","subject":"person"}]' \
+          -F surveying_subjects='[{"subject":"person"}]' \
           -F maintaining_subjects='[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]'
 
         # Una correzione: si rimanda solo il campo che cambia.
