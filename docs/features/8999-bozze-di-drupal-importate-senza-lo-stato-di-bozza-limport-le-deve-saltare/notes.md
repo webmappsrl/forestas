@@ -113,6 +113,14 @@ include `phpstan.neon.dist`): sul disco esterno il `rename` della cache fallisce
 - **Perché:** i cinque messaggi del piano descrivono un lavoro unico, e il branch entra in `develop`
   con uno squash.
 
+### 2026-11-26 — Procedura di messa in opera nella howto di UAT, import a mano dopo il deploy
+- **Decide:** Rubens
+- **Perché:** chi farà il passaggio su `main` deve trovare cosa fare senza conoscere oc:8999: la
+  howto di UAT è nell'indice «Procedure» del `CLAUDE.md`, e `deploy-automatico.md` la richiama fra
+  i passi a mano. Sul dev l'import si lancia subito dopo il deploy, senza aspettare le 06:00.
+- **Scartato:** lasciare i passi solo nei Task 6 e 7 del piano: chi lavora su `main` non apre le
+  cartelle delle feature.
+
 ## Follow-up
 
 Nessuno.

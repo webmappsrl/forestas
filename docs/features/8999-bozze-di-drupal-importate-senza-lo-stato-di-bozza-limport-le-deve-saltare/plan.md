@@ -197,6 +197,11 @@ Drupal finta, Elasticsearch 8 (`Elastic\Elasticsearch\Client`), WP-CLI di `wp-pa
 
 ### Task 6: messa in opera su dev — [R1](overview.md#r1), [R3](overview.md#r3), [R4](overview.md#r4)
 
+La procedura completa, con i comandi provati su UAT, è in
+[messa-in-opera-wordpress-uat.md](../../howto/messa-in-opera-wordpress-uat.md#bozze-fuori-dallimport-oc8999),
+anche per il dev. L'import si può lanciare a mano subito dopo il deploy, senza aspettare le 06:00
+(Rubens, 26/11).
+
 Dopo il merge in `develop` (deploy automatico) e l'import delle 06:00 del giorno dopo. Solo letture,
 tranne i `forget` e la ricostruzione dell'indice dei dettagli. L'esito va nel ticket, non nel repo:
 un secondo merge per oc:8999 non ci deve essere.
@@ -214,6 +219,9 @@ un secondo merge per oc:8999 non ci deve essere.
   699, 694, 3111); i `-2` rispondono 301 verso di loro; `wp wmwp detail-paths list` lo conferma.
 
 ### Task 7: messa in opera su UAT — [R1](overview.md#r1), [R3](overview.md#r3), [R4](overview.md#r4)
+
+Procedura in
+[messa-in-opera-wordpress-uat.md](../../howto/messa-in-opera-wordpress-uat.md#bozze-fuori-dallimport-oc8999).
 
 Dopo il merge di `develop` in `main`, quando Rubens lo segnala, e l'import delle 06:00 del giorno
 dopo. Passi del Task 6, con due differenze: Monte Cresia su UAT ha già l'indirizzo pulito, quindi i
