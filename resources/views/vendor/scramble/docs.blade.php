@@ -133,8 +133,17 @@
             //
             // I dati sono palesemente di prova e la domanda che nasce e' una
             // domanda vera: va usato solo su ambienti di prova.
-            const SAMPLE = {
+            // L'apertura chiede tre cose. Il riferimento deve essere diverso a
+            // ogni prova: con uno gia' usato la chiamata risponde 422 e
+            // restituisce l'id della domanda di prima, che e' proprio il
+            // comportamento da mostrare — ma impedirebbe di aprirne una nuova.
+            const SAMPLE_OPEN = () => ({
+                reference: 'PROVA/' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14),
                 name: 'Sentiero del Monte Arcosu',
+            });
+
+            // Il resto del modulo, che viaggia con le modifiche.
+            const SAMPLE = {
                 from: 'Case Marganai',
                 to: 'Punta Perda Liana',
                 distance: '12.5',
@@ -172,7 +181,7 @@
 
             const run = document.createElement('button');
             run.type = 'button';
-            run.textContent = 'Prova una domanda completa';
+            run.textContent = 'Apri una domanda e compilala';
             run.style.cssText = [
                 'padding:6px 12px', 'border:1px solid #1f6feb', 'border-radius:5px',
                 'background:#1f6feb', 'color:#fff', 'cursor:pointer',
@@ -197,7 +206,7 @@
                 outcome.textContent = 'Invio in corso…';
 
                 const form = new FormData();
-                Object.entries(SAMPLE).forEach(([key, value]) => form.append(key, value));
+                Object.entries(SAMPLE_OPEN()).forEach(([key, value]) => form.append(key, value));
                 try {
                     const gpx = await (await window.fetch(SAMPLE_GPX_URL)).blob();
                     form.append('geometry', new Blob([gpx], { type: 'application/gpx+xml' }), 'tracciato-di-prova.gpx');
@@ -215,8 +224,26 @@
                     });
                     const body = await response.json();
                     if (response.ok && body.id) { idInput.value = body.id; }
+
+                    // Aperta la domanda, il modulo si consegna con una
+                    // modifica: e' il ciclo che il SUS seguira'.
+                    let fill = '';
+                    if (response.ok && body.id) {
+                        const patch = new FormData();
+                        patch.append('_method', 'PATCH');
+                        Object.entries(SAMPLE).forEach(([key, value]) => patch.append(key, value));
+                        const patched = await window.fetch(SUS_PATH + 'trail-applications/' + body.id, {
+                            method: 'POST',
+                            headers: { Accept: 'application/json' },
+                            body: patch,
+                        });
+                        fill = '\n\nModifica con il resto del modulo: ' + patched.status + ' '
+                            + JSON.stringify(await patched.json());
+                    }
+
                     outcome.textContent = response.status + ' ' + response.statusText + '\n'
                         + JSON.stringify(body, null, 2)
+                        + fill
                         + (response.ok && body.id
                             ? '\n\nL\'id ' + body.id + ' e\' gia\' nel campo qui sotto: ora carica gli allegati obbligatori e trasmetti.'
                             : '');

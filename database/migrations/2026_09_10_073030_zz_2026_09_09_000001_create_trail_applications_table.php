@@ -26,6 +26,23 @@ return new class extends Migration
             // questo codice servira' anche Lombardia e Toscana.
             $table->string('source', 16);
 
+            // Il riferimento con cui il sistema esterno che ha consegnato la
+            // domanda la chiama a casa propria: completa `source`, che dice
+            // solo da dove arriva. Per lo sportello sardo e' il numero della
+            // pratica, altrove sara' un protocollo diverso.
+            //
+            // Nullable perche' una domanda nata d'ufficio non ha nessun
+            // sistema esterno dietro, e perche' uno shard puo' accendere il
+            // Catasto senza avere un canale API: l'obbligo vive nella
+            // richiesta del canale, non qui. L'indice unico lo ammette, e
+            // Postgres non confronta fra loro i NULL.
+            //
+            // L'unicita' non e' solo un'integrita': e' cio' che rende
+            // ritentabile una creazione andata in timeout. Chi richiama con
+            // un riferimento gia' presente riceve un errore che nomina la
+            // domanda esistente, e da li' riprende con le modifiche.
+            $table->string('reference')->nullable()->unique();
+
             $table->string('status', 32)->index();
 
             $table->text('name')->nullable();

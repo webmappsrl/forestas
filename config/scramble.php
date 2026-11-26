@@ -113,35 +113,44 @@ return [
             SUS->>API: POST /auth/login con le credenziali del client
             API-->>SUS: 200 access_token, valido 60 minuti
 
-            Note over SUS,API: Fase 1 - creazione della domanda
-            SUS->>API: POST /trail-applications con i dati del modulo e il file del tracciato
-            alt modulo valido e tracciato leggibile
+            Note over SUS,API: Fase 1 - apertura della domanda
+            SUS->>API: POST /trail-applications con reference, name e il file del tracciato
+            alt riferimento nuovo e tracciato leggibile
                 API-->>SUS: 201 id, dem_data, dem_status
                 Note right of API: la domanda nasce in compilazione (under_compilation)<br/>con il numero del sentiero già riservato, non mostrato
-            else modulo non valido o tracciato illeggibile
+            else riferimento già usato
+                API-->>SUS: 422 error e id della domanda che esiste già
+                Note right of API: nessuna seconda domanda:<br/>si riprende da quell'id
+            else tracciato illeggibile
                 API-->>SUS: 422 errori campo per campo, nessuna domanda creata
             end
 
-            Note over SUS,API: Fase 2 - allegati, uno per chiamata
+            Note over SUS,API: Fase 2 - compilazione, quante chiamate servono
+            loop finché il modulo non è completo
+                SUS->>API: POST /trail-applications/id con _method=PATCH e i campi che cambiano
+                API-->>SUS: 200 id, dem_status
+            end
+
+            Note over SUS,API: Fase 3 - allegati, uno per chiamata
             loop per ogni documento e fotografia
                 SUS->>API: POST /trail-applications/id/attachments
                 API-->>SUS: 201 collection e count
             end
 
-            Note over SUS,API: Fase 3 - trasmissione
+            Note over SUS,API: Fase 4 - trasmissione
             SUS->>API: POST /trail-applications/id/confirm
-            alt fascicolo completo
+            alt fascicolo completo e valido
                 API-->>SUS: 200 status under_review, already_confirmed false
-                Note right of API: da qui la domanda non accetta più allegati
-            else manca qualcosa
-                API-->>SUS: 422 error e missing (campi e allegati mancanti)
-                Note right of API: la domanda resta in compilazione:<br/>si completa e si richiama confirm
+                Note right of API: da qui la domanda non accetta più modifiche né allegati
+            else manca qualcosa o qualcosa non va
+                API-->>SUS: 422 error, missing (cosa manca) e invalid (cosa non va)
+                Note right of API: la domanda resta in compilazione:<br/>si corregge e si richiama confirm
             end
 
-            Note over API,FOR: Fase 4 - istruttoria, fuori da queste API
+            Note over API,FOR: Fase 5 - istruttoria, fuori da queste API
             FOR->>API: approva o respinge la domanda
 
-            Note over SUS,API: Fase 5 - lettura dello stato, ripetibile
+            Note over SUS,API: Fase 6 - lettura dello stato, ripetibile
             loop finché serve seguire la domanda
                 SUS->>API: GET /trail-applications/id
                 API-->>SUS: 200 submitted_data, approved_data solo se approvata, attachments, status, dem_data, code solo se approvata, rejection_reason solo se respinta
@@ -151,11 +160,71 @@ return [
         | Passo | Il SUS chiede | Il Catasto risponde |
         |---|---|---|
         | Accesso | `POST /auth/login` | `200` con il token; alla scadenza si rinnova con `POST /auth/refresh` |
-        | 1. Creazione | `POST /trail-applications` con i dati del modulo e il file del tracciato | `201` con `id`, `dem_data` e `dem_status`. Se il calcolo dei dati tecnici non e' ancora pronto, `dem_status` e' `processing` e i dati si leggono dopo con la chiamata 4. Con un modulo non valido, `422` con gli errori campo per campo, e la domanda non viene creata |
-        | 2. Allegati | `POST /trail-applications/{id}/attachments`, un file per chiamata | `201` con la `collection` e quanti file contiene. Un documento caricato di nuovo sostituisce il precedente. Dopo la trasmissione, `409` |
-        | 3. Trasmissione | `POST /trail-applications/{id}/confirm` | `200` con `status` `under_review`. Se manca qualcosa, `422` con `missing`, e la domanda resta in compilazione. Ripetuta su una domanda gia' trasmessa risponde di nuovo `200`, con `already_confirmed` a `true` |
-        | 4. Istruttoria | — | L'istruttore Forestas approva o respinge la domanda nel Catasto: non passa da queste API |
-        | 5. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con i dati dichiarati come il Catasto li ha registrati (`submitted_data`), le scelte di Forestas in istruttoria (`approved_data`, `null` finche' la domanda non e' approvata), quanti allegati ci sono per `collection` (`attachments`), lo `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+        | 1. Apertura | `POST /trail-applications` con `reference`, `name` e il file del tracciato | `201` con `id`, `dem_data` e `dem_status`. Se il calcolo dei dati tecnici non e' ancora pronto, `dem_status` e' `processing` e i dati si leggono dopo con la chiamata 6. Con un riferimento gia' usato, `422` con l'`id` della domanda che esiste gia': non ne nasce una seconda. Con un tracciato illeggibile, `422` e nessuna domanda creata |
+        | 2. Compilazione | `POST /trail-applications/{id}` con `_method=PATCH` e i campi che cambiano, quante volte serve | `200` con `id` e `dem_status`. Con un campo non valido, `422` con gli errori campo per campo e **nessuna scrittura**, nemmeno dei campi corretti della stessa chiamata. Dopo la trasmissione, `409` |
+        | 3. Allegati | `POST /trail-applications/{id}/attachments`, un file per chiamata | `201` con la `collection` e quanti file contiene. Un documento caricato di nuovo sostituisce il precedente. Dopo la trasmissione, `409` |
+        | 4. Trasmissione | `POST /trail-applications/{id}/confirm` | `200` con `status` `under_review`. Se il fascicolo non si puo' chiudere, `422` con `missing` (cosa manca) e `invalid` (cosa c'e' ma non va bene), e la domanda resta in compilazione. Ripetuta su una domanda gia' trasmessa risponde di nuovo `200`, con `already_confirmed` a `true` |
+        | 5. Istruttoria | — | L'istruttore Forestas approva o respinge la domanda nel Catasto: non passa da queste API |
+        | 6. Lettura | `GET /trail-applications/{id}`, quante volte serve | `200` con i dati dichiarati come il Catasto li ha registrati (`submitted_data`), le scelte di Forestas in istruttoria (`approved_data`, `null` finche' la domanda non e' approvata), quanti allegati ci sono per `collection` (`attachments`), lo `status`, i dati tecnici, il numero del sentiero (`code`) solo a domanda approvata e il motivo (`rejection_reason`) solo a domanda respinta |
+
+        ### La domanda si apre con poco e si completa in piu' riprese
+
+        L'apertura chiede tre cose soltanto: il **riferimento** della pratica presso il SUS
+        (`reference`), il **nome** e il **file del tracciato**. Nessun campo del modulo e'
+        obbligatorio li': si mandano quando si hanno, con una o piu' chiamate di compilazione.
+        A pretendere il modulo completo e' la trasmissione.
+
+        «Facoltativo» riguarda il *quando*, non il *come*: un campo mandato deve sempre valere
+        qualcosa di ammesso, altrimenti la chiamata viene rifiutata.
+
+        **Una domanda per `reference`.** Due domande non possono avere lo stesso riferimento, e
+        richiamare l'apertura con uno gia' usato non ne crea una seconda: la risposta e' `422` e
+        porta l'`id` di quella che esiste. E' cosi' che si riprende dopo un timeout di rete — se
+        non si sa se la prima chiamata sia arrivata, si richiama con lo stesso `reference` e si
+        ottiene l'identificatore della domanda nata.
+
+        E' il comportamento che la bozza IETF `Idempotency-Key` descrive per una risorsa che non
+        confronta il contenuto delle richieste:
+        <https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/>. Qui la
+        chiave non identifica la chiamata ma la pratica, e per questo viaggia come campo del
+        modulo e non come header.
+
+        ### La compilazione: cosa cambia e cosa resta
+
+        La chiamata 2 segue **RFC 7396 (JSON Merge Patch)**: un campo non mandato resta com'era,
+        un campo mandato sostituisce, un campo mandato **senza valore** cancella, e una lista si
+        sostituisce per intero — per cambiare un soggetto gestore si rimanda l'intera lista dei
+        gestori. Lo stesso vale per `difficulty`, che si rimanda tutta insieme.
+
+        Due scostamenti dalla lettera della RFC, e vengono entrambi dal formato della chiamata,
+        che e' `multipart/form-data` perche' puo' portare il file del tracciato:
+
+        - **si cancella con il campo vuoto, non con `null`**, che in multipart non esiste;
+        - **`difficulty` si sostituisce per intero** invece di fondersi chiave per chiave: una
+          difficolta' si dichiara tutta insieme, come le attivita' a cui si riferisce.
+
+        **Un campo obbligatorio gia' compilato non si puo' svuotare**: un valore sbagliato si
+        corregge mandandone uno nuovo. Lo stesso campo, se non e' mai stato compilato, puo'
+        essere mandato vuoto senza errore: serve a chi rimanda l'intero modulo con dentro anche i
+        campi ancora da riempire.
+
+        **Tre campi si mandano insieme:** `activities`, `primary_activity` e `difficulty`.
+        L'attivita' primaria deve essere una di quelle proposte e le difficolta' devono parlare
+        delle stesse attivita', quindi cambiarne uno solo lasciando gli altri com'erano darebbe
+        una combinazione incoerente. Mandandoli nella stessa chiamata non c'e' un ordine da
+        rispettare, e si possono correggere in qualunque momento.
+
+        **Il verbo.** La chiamata si fa con `POST` aggiungendo al modulo un campo `_method` con
+        valore `PATCH`. Non e' un vezzo: la chiamata puo' portare il file del tracciato, e un
+        `PATCH` con `multipart/form-data` non e' letto da tutte le versioni di PHP su cui gira
+        questo servizio. Il campo `_method` e' il meccanismo con cui il framework riconosce il
+        verbo vero.
+
+        **Il tracciato** si sostituisce mandando `geometry` come all'apertura. Quando si fa, i
+        dati tecnici vengono rifatti da capo — `dem_status` dice se sono gia' pronti — e il
+        numero del sentiero viene rivisto: se il tracciato nuovo cade in un altro settore, quello
+        riservato viene liberato e se ne riserva un altro. Quel numero non esce mai da queste API
+        prima dell'approvazione, quindi la sostituzione non ha conseguenze per chi integra.
 
         ### Cosa propone il SUS e cosa decide Forestas: `submitted_data` e `approved_data`
 
@@ -163,7 +232,7 @@ return [
 
         | Chiave | Cos'e' | Quando c'e' |
         |---|---|---|
-        | `submitted_data` | **Cio' che il SUS ha proposto**: i campi inviati alla creazione, come il Catasto li ha registrati. Non cambia piu', perche' una domanda creata non si corregge. | Sempre |
+        | `submitted_data` | **Cio' che il SUS ha proposto**: i campi dichiarati, come il Catasto li ha registrati. Cambia a ogni modifica finche' la domanda e' in compilazione, e dalla trasmissione in poi non cambia piu'. | Sempre |
         | `approved_data` | **Cio' che Forestas ha deciso in istruttoria**: le scelte dell'istruttore all'approvazione. | Solo a domanda approvata: in ogni altro stato e' `null` |
 
         Le due cose **possono differire**. L'istruttore puo' confermare quanto proposto oppure
@@ -424,18 +493,32 @@ return [
         I parametri nella query string e i file sotto una chiave non prevista non fanno fallire la
         chiamata — non fanno parte del modulo — ma non vengono conservati.
 
-        ## I campi che diventano obbligatori
+        ## Quando un campo diventa obbligatorio
 
-        Alcuni campi sono obbligatori solo in base al valore di un altro. Se mancano, la creazione
-        risponde `422` indicando il campo:
+        **Obbligatorio significa «prima della trasmissione», non «subito».** I campi del modulo si
+        consegnano quando si hanno: apertura e compilazione guardano la forma di cio' che
+        ricevono, e a pretendere che ci sia tutto e' la trasmissione. Un campo obbligatorio non
+        ancora compilato non fa fallire una chiamata; lo fa fallire se e' mandato con un valore
+        che il modulo non ammette.
+
+        Alcuni campi sono obbligatori solo in base al valore di un altro, e quelli valgono anche
+        dentro una singola consegna, perche' riguardano la forma di cio' che arriva:
 
         | Se... | ...allora sono obbligatori |
         |---|---|
         | un soggetto ha `subject` uguale a `organization` | la sua `email`, che deve essere un indirizzo valido |
 
-        C'e' poi un vincolo fra i valori di due campi sempre obbligatori: `primary_activity` deve essere
-        una delle attivita' dichiarate in `activities` (campo 36), altrimenti la creazione risponde
-        `422` indicando `primary_activity`. Il dettaglio e' nella sezione del campo 36.
+        **Una lista mandata a meta' e' sempre un errore.** Non dire niente di `managing_subjects`
+        e' lecito — si consegnera' dopo —, mandarla con dentro un soggetto senza `name` no.
+
+        C'e' poi un vincolo fra i valori di due campi: `primary_activity` deve essere una delle
+        attivita' dichiarate in `activities` (campo 36). Per questo i due campi, insieme a
+        `difficulty`, si mandano nella stessa chiamata: il dettaglio e' nella sezione del campo
+        36. Se la combinazione non torna, la risposta e' `422` indicando `primary_activity`.
+
+        Alla trasmissione il fascicolo viene guardato tutto insieme, ed e' li' che emergono i
+        vincoli fra campi consegnati in momenti diversi: la risposta `422` distingue `missing`,
+        cosa manca, da `invalid`, cosa c'e' ma non va bene.
 
         ## Un esempio completo
 
@@ -452,24 +535,48 @@ return [
         TOKEN=$(curl -s -X POST "$BASE_URL/auth/login" -H 'Accept: application/json' \
           -F email=<email del client> -F password=<password del client> | jq -r .access_token)
 
-        # 1. Creazione: risponde 201 con id, dem_data e dem_status
+        # 1. Apertura: tre campi, risponde 201 con id, dem_data e dem_status.
+        #    Con un reference gia' usato risponde 422 con l'id di quella esistente.
         curl -X POST "$BASE_URL/trail-applications" \
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F reference='FORES_02/2026/000123' \
           -F name='Sentiero del Monte Arcosu' \
+          -F geometry=@tracciato-di-prova.gpx
+
+        # 2. Compilazione: quante chiamate servono, anche un campo per volta.
+        #    I tre campi legati viaggiano insieme.
+        curl -X POST "$BASE_URL/trail-applications/42" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F _method=PATCH \
           -F from='Case Marganai' -F to='Punta Perda Liana' \
           -F distance=12.5 -F ascent=640 \
           -F duration_forward=240 -F duration_backward=200 \
-          -F activities='["hiking","mtb"]' \
-          -F difficulty='{"hiking":"EE"}' \
-          -F primary_activity=hiking \
           -F existing_signage=good_condition \
+          -F last_survey_date=2026-10-20 -F maintenance_frequency_months=12
+
+        curl -X POST "$BASE_URL/trail-applications/42" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F _method=PATCH \
+          -F activities='["hiking","mtb"]' \
+          -F primary_activity=hiking \
+          -F difficulty='{"hiking":"EE"}'
+
+        curl -X POST "$BASE_URL/trail-applications/42" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F _method=PATCH \
           -F managing_subjects='[{"name":"Comune di Domusnovas","email":"protocollo@comune.example.it","subject":"organization"}]' \
           -F surveying_subjects='[{"name":"Mario Rossi","subject":"person"}]' \
-          -F maintaining_subjects='[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]' \
-          -F last_survey_date=2026-10-20 -F maintenance_frequency_months=12 \
-          -F geometry=@tracciato-di-prova.gpx
+          -F maintaining_subjects='[{"name":"Forestas","email":"protocollo@forestas.example.it","subject":"organization"}]'
 
-        # 2. Allegati: uno per chiamata, ciascuno risponde 201
+        # Una correzione: si rimanda solo il campo che cambia.
+        # L'ultima riga cancella il valore di overlapping_routes.
+        curl -X POST "$BASE_URL/trail-applications/42" \
+          -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
+          -F _method=PATCH \
+          -F distance=13.2 \
+          -F overlapping_routes=
+
+        # 3. Allegati: uno per chiamata, ciascuno risponde 201
         curl -X POST "$BASE_URL/trail-applications/42/attachments" \
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
           -F collection=report -F file=@relazione.pdf
@@ -483,11 +590,11 @@ return [
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
           -F collection=maintenance_plan -F file=@piano-manutenzione.pdf
 
-        # 3. Trasmissione: 200 se completa, 422 con l'elenco di cio' che manca
+        # 4. Trasmissione: 200 se completa e valida, 422 con missing e invalid
         curl -X POST "$BASE_URL/trail-applications/42/confirm" \
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json'
 
-        # 5. Lettura: si puo' ripetere quante volte serve
+        # 6. Lettura: si puo' ripetere quante volte serve
         curl "$BASE_URL/trail-applications/42" \
           -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json'
         ```
@@ -550,8 +657,9 @@ return [
         `trekking` e `hiking` hanno la stessa scala ma restano due giudizi distinti: lo stesso
         sentiero puo' essere `E` per il trekking e `EEA` per l'escursionismo.
 
-                **La creazione non si corregge, si rifa.** Non esiste un endpoint che modifichi i dati di una
-        domanda gia' creata: e' una scelta, descritta nella pagina della chiamata.
+        **Finche' la domanda e' in compilazione, si corregge.** I campi si cambiano con la
+        chiamata 2, il tracciato compreso; dalla trasmissione in poi la domanda e' chiusa e non
+        accetta piu' modifiche.
 
         ## Il format
 
