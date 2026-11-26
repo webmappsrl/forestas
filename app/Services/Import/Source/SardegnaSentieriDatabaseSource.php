@@ -23,7 +23,10 @@ use Illuminate\Support\Facades\DB;
  * API alla copia e non va più rilanciato (oc:8827).
  *
  * Due regole valgono ovunque:
- * - nessun filtro su `status`: le API esponevano anche le bozze;
+ * - le bozze non si importano (oc:8999): un nodo entra solo se è pubblicato
+ *   nella lingua originale (`status = 1`, changedList()), e del record restano
+ *   solo le traduzioni pubblicate (withoutDraftTranslations()). Le API del
+ *   modulo esponevano anche le bozze: qui la fonte smette di replicarle;
  * - la lingua originale del nodo è la riga con `default_langcode = 1`, non `it`.
  */
 class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
@@ -282,7 +285,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     public function preload(array $ids, int $chunk = 100): void
     {
         foreach (array_chunk(array_values(array_diff($ids, array_keys($this->records))), $chunk) as $block) {
-            $this->records += $this->reader->nodes($block);
+            $this->records += array_map(fn (array $record) => $this->withoutDraftTranslations($record), $this->reader->nodes($block));
         }
     }
 
@@ -295,10 +298,34 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
      */
     public function record(int $id, ?array $types = null): array
     {
-        $record = $this->records[$id] ??= $this->reader->node($id);
+        $record = $this->records[$id] ??= $this->withoutDraftTranslations($this->reader->node($id));
 
         if ($types !== null && ! in_array($record['bundle'], $types, true)) {
             throw new \RuntimeException("Nodo {$id} non trovato nella copia del DB Drupal");
+        }
+
+        return $record;
+    }
+
+    /**
+     * Il record senza le traduzioni in bozza (oc:8999): in Drupal `status` è per traduzione, e una
+     * traduzione non pubblicata non deve dare né testi né media (compreso il ripiego sull'inglese di
+     * mediaReferences()). La lingua originale resta sempre: se è in bozza il nodo non è negli
+     * elenchi di changedList(). Senza `status` la traduzione vale come pubblicata.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function withoutDraftTranslations(array $record): array
+    {
+        foreach ($record['translations'] ?? [] as $langcode => $translation) {
+            if ($langcode === $record['langcode'] || (int) ($translation['status'] ?? 1) !== 0) {
+                continue;
+            }
+            unset($record['translations'][$langcode]);
+            foreach (array_keys($record['fields'] ?? []) as $field) {
+                unset($record['fields'][$field][$langcode]);
+            }
         }
 
         return $record;
@@ -319,6 +346,7 @@ class SardegnaSentieriDatabaseSource implements SardegnaSentieriSource
     {
         return $this->db()->table('node_field_data')
             ->whereIn('type', $types)->where('default_langcode', 1)
+            ->where('status', 1)
             ->orderBy('nid')
             ->pluck('changed', 'nid')
             ->mapWithKeys(fn ($changed, $nid) => [(string) $nid => DrupalValues::dateTime((int) $changed)])

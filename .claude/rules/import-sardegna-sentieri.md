@@ -102,9 +102,14 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
   sulla 3307, mai su un'altra porta — vedi
   [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)
-- **Non filtrare `status = 1` nelle query dell'import**, anche se le query d'esempio della pagina
-  sulla copia lo fanno: le API esponevano le bozze, e filtrarle cambia cosa si importa e marca
-  quei nodi come spariti alla fonte (oc:8900)
+- **Le bozze non si importano: non togliere `status = 1` da `changedList()` né
+  `withoutDraftTranslations()` da `record()`**: le bozze tornerebbero sul sito e nell'app, con gli
+  slug doppi. Una query nuova sui nodi filtra `status = 1` sulla riga `default_langcode = 1`, e un
+  dato preso dal record ha già perso le traduzioni in bozza (oc:8999)
+- **Il reindex di fine import non toglie le voci delle tracce sparite**: lo fa
+  `PruneStaleTrackSearchDocumentsJob`, accodato da `CalculateNearbyTracksJob::regenerateOutputs()`.
+  Un nuovo percorso che rigenera l'indice dopo un reset deve accodarlo anche lui, altrimenti gli id
+  in più restano nella lista come doppioni della notte prima (oc:8999)
 - **Date della copia convertite in PHP, mai con `FROM_UNIXTIME`**: usa il fuso della sessione
   MySQL, e un `changed` spostato di un'ora fa reimportare tutto al primo giro (oc:8900)
 - **URL dei file codificati segmento per segmento con `rawurlencode`**: l'URL è la chiave con cui

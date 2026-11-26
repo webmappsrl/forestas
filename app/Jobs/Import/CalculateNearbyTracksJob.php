@@ -104,11 +104,15 @@ class CalculateNearbyTracksJob implements ShouldQueue
 
     /**
      * File delle tracce, indice e `pois.geojson` dell'app di import, sulla coda dell'import come
-     * nella catena di fine import.
+     * nella catena di fine import. Insieme parte la pulizia delle voci dell'indice che non sono
+     * più tracce: dopo il reset gli id ripartono da 1 e il reindex riscrive solo quelli che
+     * esistono (oc:8999).
      */
     public static function regenerateOutputs(): void
     {
         RegenerateTaxonomyWhereOutputsJob::dispatch(SardegnaSentieriImportService::IMPORT_APP_ID)
+            ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE);
+        PruneStaleTrackSearchDocumentsJob::dispatch()
             ->onQueue(ImportSardegnaSentieriTrackJob::QUEUE);
     }
 }
