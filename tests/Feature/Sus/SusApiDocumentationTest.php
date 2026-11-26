@@ -6,11 +6,27 @@ use Illuminate\Support\Facades\Validator;
 use Wm\WmPackage\TrailRegistry\Schema\ApplicationSchema;
 
 /**
- * Lo schema del corpo della creazione, dal documento OpenAPI generato davvero.
+ * Lo schema del corpo della modifica, dal documento OpenAPI generato davvero.
+ *
+ * I campi del modulo vivono li': l'apertura ne chiede tre e rifiuta il resto,
+ * quindi e' la modifica che deve descriverli uno per uno.
  *
  * @return array<string, mixed>
  */
-function corpoDellaCreazione(): array
+function corpoDellaModifica(): array
+{
+    $generator = app(Generator::class);
+    $documento = $generator->generate(Scramble::getGeneratorConfig('default'))->spec();
+
+    return $documento['paths']['/api/v1/sus/trail-applications/{application}']['patch']['requestBody']['content']['multipart/form-data']['schema'];
+}
+
+/**
+ * Lo schema del corpo dell'apertura.
+ *
+ * @return array<string, mixed>
+ */
+function corpoDellApertura(): array
 {
     $generator = app(Generator::class);
     $documento = $generator->generate(Scramble::getGeneratorConfig('default'))->spec();
@@ -161,7 +177,7 @@ it('elenca i dieci tematismi concordati', function () {
 // come si faceva prima di oc:9039 — pubblicava i soggetti come lista di
 // stringhe, e chi genera un client dal documento otteneva il tipo sbagliato.
 it('pubblica la forma vera degli elementi di una lista di soggetti', function () {
-    $corpo = corpoDellaCreazione();
+    $corpo = corpoDellaModifica();
 
     expect($corpo['properties']['managing_subjects']['items']['type'])->toBe('object')
         ->and($corpo['properties']['managing_subjects']['items']['properties'])
@@ -171,14 +187,14 @@ it('pubblica la forma vera degli elementi di una lista di soggetti', function ()
 });
 
 it('pubblica i valori ammessi dei tematismi come enum', function () {
-    $corpo = corpoDellaCreazione();
+    $corpo = corpoDellaModifica();
 
     expect($corpo['properties']['themes']['items']['enum'])
         ->toContain('history-archaeology', 'spirituality', 'rural-landscape');
 });
 
 it('tiene insieme lo schema delle regole e la descrizione degli attributi', function () {
-    $corpo = corpoDellaCreazione();
+    $corpo = corpoDellaModifica();
     $campo = $corpo['properties']['existing_signage'];
 
     expect($campo['enum'])->toBe(['good_condition', 'dilapidated', 'absent'])
@@ -189,5 +205,24 @@ it('tiene insieme lo schema delle regole e la descrizione degli attributi', func
 // della pagina, non raccoglie i campi di un `multipart/form-data` il cui schema
 // e' un `allOf`, e il bottone di prova partirebbe con un corpo vuoto.
 it('non lascia il corpo della creazione come allOf', function () {
-    expect(corpoDellaCreazione())->not->toHaveKey('allOf');
+    expect(corpoDellaModifica())->not->toHaveKey('allOf');
+});
+
+it('l apertura pubblica i suoi tre campi e nessuno del modulo', function () {
+    // Il contratto che chi integra legge per primo: la pagina non deve
+    // promettere su questa chiamata campi che la chiamata rifiuta.
+    //
+    // Il riferimento e' obbligatorio dove un sistema esterno consegna le
+    // domande, e lo dice la configurazione del dominio: su forestas e' accesa
+    // nel `.env`, qui la si accende come fa l'ambiente vero.
+    config(['wm-package.features.trail_registry.api.require_reference' => true]);
+
+    $corpo = corpoDellApertura();
+
+    expect(array_keys($corpo['properties']))->toEqualCanonicalizing(['reference', 'name', 'geometry'])
+        ->and($corpo['required'])->toEqualCanonicalizing(['reference', 'name', 'geometry']);
+});
+
+it('la modifica non pretende niente: i campi si consegnano quando ci sono', function () {
+    expect(corpoDellaModifica())->not->toHaveKey('required');
 });

@@ -6,14 +6,25 @@ use Spatie\Permission\Models\Role;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Wm\WmPackage\TrailRegistry\Models\TrailApplication;
 
-it('espone le quattro rotte sotto il prefisso del canale', function () {
+it('espone le cinque rotte sotto il prefisso del canale', function () {
     expect(route('sus.applications.store'))->toContain('api/v1/sus/trail-applications');
     expect(route('sus.applications.show', ['application' => 1]))
+        ->toContain('api/v1/sus/trail-applications/1');
+    expect(route('sus.applications.patch', ['application' => 1]))
         ->toContain('api/v1/sus/trail-applications/1');
     expect(route('sus.applications.attachments.store', ['application' => 1]))
         ->toContain('api/v1/sus/trail-applications/1/attachments');
     expect(route('sus.applications.confirm', ['application' => 1]))
         ->toContain('api/v1/sus/trail-applications/1/confirm');
+});
+
+it('la modifica e una rotta PATCH, anche se il client manda un POST', function () {
+    // Il client aggiunge `_method=PATCH` al modulo perche' la chiamata puo'
+    // portare il file del tracciato; il framework legge quel campo prima di
+    // instradare, quindi la rotta si dichiara `patch`. Con una rotta `post` la
+    // stessa chiamata prenderebbe un 405.
+    expect(Route::getRoutes()->getByName('sus.applications.patch')->methods())
+        ->toContain('PATCH');
 });
 
 it('rifiuta le chiamate senza token', function () {
@@ -74,8 +85,8 @@ it('rifiuta con 429 le chiamate oltre il limite configurato', function () {
     $this->postJson(route('sus.applications.store'), [])->assertStatus(429);
 });
 
-it('limita la frequenza delle chiamate su tutte e quattro le rotte', function () {
-    foreach (['sus.applications.store', 'sus.applications.show', 'sus.applications.attachments.store', 'sus.applications.confirm'] as $name) {
+it('limita la frequenza delle chiamate su tutte e cinque le rotte', function () {
+    foreach (['sus.applications.store', 'sus.applications.show', 'sus.applications.patch', 'sus.applications.attachments.store', 'sus.applications.confirm'] as $name) {
         $middleware = collect(Route::getRoutes()->getByName($name)->gatherMiddleware());
 
         expect($middleware->filter(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:')))->not->toBeEmpty();
