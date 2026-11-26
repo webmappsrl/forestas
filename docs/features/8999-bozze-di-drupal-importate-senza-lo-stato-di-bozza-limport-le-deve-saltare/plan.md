@@ -1,5 +1,5 @@
 > Ticket: oc:8999
-> Stato: approvato il 2026-11-26
+> Stato: seguito, con 3 divergenze annotate in notes.md; i Task 6 e 7 si fanno dopo il merge
 
 # Bozze di Drupal fuori dall'import — piano
 

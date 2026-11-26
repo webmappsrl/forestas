@@ -5,7 +5,13 @@
 
 ## Modifiche ai requisiti
 
-Nessuna.
+### 2026-11-26 — Indirizzi di WordPress: si fanno dopo il merge
+- **Requisito:** [R4](overview.md#r4)
+- **Effetto:** non fatto
+- **Decide:** agente
+- **Perché:** i `forget` si lanciano solo dopo il primo import senza bozze di ogni ambiente: sul dev
+  dopo il merge in `develop`, su UAT dopo il merge in `main`. La procedura è nel piano (Task 6 e 7);
+  l'esito va nel ticket, non nel repo, perché oc:8999 entra in `develop` con un merge solo.
 
 ## Divergenze dal piano, task per task
 

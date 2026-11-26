@@ -1,5 +1,5 @@
 > Ticket: oc:8999
-> Stato: approvata il 2026-11-26
+> Stato: chiusa il 2026-11-26 · approvata il 2026-11-26
 
 # Bozze di Drupal importate senza lo stato di bozza: l'import le deve saltare
 
@@ -70,42 +70,53 @@ sarà nessun import, resterà l'ultima copia importata (Rubens, 26/11).
   sono in bozza nella lingua originale. Su dev e UAT, dopo l'import delle 06:00, i nodi in bozza
   (oggi 4 tracce e 23 POI) non sono in Nova, nella lista Elasticsearch né in `pois.geojson`. Un nodo
   che in Drupal passa da bozza a pubblicato entra all'import successivo.
+  - Verifica: [DraftNodesSourceTest.php](../../../tests/Feature/Import/DraftNodesSourceTest.php) › `lascia fuori dagli elenchi i nodi in bozza nella lingua originale`
+  - Verifica: a mano — agente, 2026-11-26: sorgente vera sulla copia Drupal di UAT (tunnel sulla 3307), elenchi dell'import 774 tracce, 955 POI e 93 enti, uguali ai pubblicati della copia, 0 bozze
 - <a id="r2"></a>**R2** — Di un nodo pubblicato l'import porta solo le traduzioni pubblicate: una
   traduzione in bozza non dà né testi né immagini e allegati. Un nodo con la lingua originale in
   bozza resta fuori anche se ha una traduzione pubblicata (Rubens, 26/11).
+  - Verifica: [DraftTranslationsSourceTest.php](../../../tests/Feature/Import/DraftTranslationsSourceTest.php) › `non porta i testi di una traduzione in bozza`
+  - Verifica: [DraftTranslationsSourceTest.php](../../../tests/Feature/Import/DraftTranslationsSourceTest.php) › `non prende immagini`
 - <a id="r3"></a>**R3** — Dopo ogni import con `--reset`, l'indice Elasticsearch delle tracce
   contiene solo le tracce dello shard, con i loro id attuali: le voci che non corrispondono più a
   una traccia si cancellano. L'indice non si svuota né si ricostruisce da zero, quindi la lista del
   sito e delle app non resta mai vuota né a metà.
+  - Verifica: [PruneStaleTrackSearchDocumentsJobTest.php](../../../tests/Feature/Import/PruneStaleTrackSearchDocumentsJobTest.php) › `cancella le voci che non corrispondono a nessuna traccia`
+  - Verifica: a mano — agente, 2026-11-26: Elasticsearch locale, il job ha tolto 67 voci senza traccia lasciando l'indice a 170 voci per 170 tracce
 - <a id="r4"></a>**R4** — Sul sito WordPress di dev e UAT i tre elementi pubblicati che avevano un
   doppione in bozza hanno l'indirizzo senza `-2`, in italiano e in inglese:
   `/sentiero/monte-cresia-t-513a/` (nid 699), `/sentiero/nolau-t-513/` (nid 694),
   `/punti-di-interesse/bivacco-fisso-lungo-il-sentiero-d-105c/` (nid 3111), e i corrispondenti
   `trail/…` in inglese. I vecchi indirizzi con `-2` portano lì con un 301. Su UAT vale dopo il merge
   di `develop` in `main`.
+  - Non fatto: [si fa dopo il merge](notes.md#2026-11-26--indirizzi-di-wordpress-si-fanno-dopo-il-merge)
 - <a id="r5"></a>**R5** — Docblock, regola dell'import e pagina sulla copia Drupal dicono che
   l'import salta le bozze, anche delle traduzioni, e che dopo il reset si cancellano le voci in più
   dell'indice; la regola di oc:8900 che vietava il filtro è sostituita, non lasciata accanto alla
   nuova. Il commento dello schedule in `routes/console.php` e la pagina sulla copia dicono che in
   produzione non è previsto nessun import e che al passaggio lo schedule orario va spento; lo
   schedule non cambia.
+  - Verifica: [import-sardegna-sentieri.md](../../../.claude/rules/import-sardegna-sentieri.md) › `PruneStaleTrackSearchDocumentsJob`
+  - Verifica: [copia-database-drupal.md](../../../docs/knowledge/copia-database-drupal.md) › `Le bozze no`
+  - Verifica: [console.php](../../../routes/console.php) › `in produzione non è previsto nessun import`
 - <a id="r6"></a>**R6** — La procedura di WordPress su dev e i documenti di oc:8947 dicono lo stato
   vero: niente più «170 righe» da togliere, host di dev già aggiornato.
+  - Verifica: [messa-in-opera-wordpress-dev.md](../../../docs/howto/messa-in-opera-wordpress-dev.md) › `ne ha tolte 0`
+  - Verifica: [notes.md di oc:8947](../8947-wordpress-di-sviluppo-sullo-shard-dev-di-forestas/notes.md) › `aggiornato dal 06/11/2026`
 
 ## Rischi
 
+Restano aperti, e stanno dove li ritrova chi fa la messa in opera:
+
 - **Cancellazione delle voci in più fallita.** Per quella notte restano nella lista i documenti
-  vecchi ([R3](#r3) non vale): il fallimento deve finire nel log dell'import.
-- **Ordine e percorso dei passi su WordPress.** `forget` va lanciato sugli indirizzi puliti delle
-  bozze, non sui `-2`: sul `-2` cancellerebbe la riga del pubblicato e il vecchio link darebbe 404.
-  E va lanciato solo dopo che le bozze sono sparite dall'indice dei dettagli del plugin
-  (`wmwp_detail_index`), e per il POI dopo la rigenerazione di `pois.geojson`: prima, alla
-  ricostruzione la bozza riprenderebbe l'indirizzo pulito. Dalla prima notte senza bozze fino a quel
-  passo gli indirizzi puliti danno 404.
-- **Catasto di UAT.** Spariscono le 2 anomalie `codice_gia_assegnato` fra pubblicati e bozze
-  (699↔561, 694↔560). La bozza Sa Crabarissa (545) ha il codice ZNUT511: se il foglio del registro
-  la cita, compare un'anomalia `registro_link_orfano`, che è un dato vero. Il foglio non è stato
-  controllato.
+  vecchi ([R3](#r3) non vale): il fallimento finisce nel log `import` (`failed()` del job), e come
+  si legge la riga del job è in `docs/knowledge/import-asincrono-e-anomalie.md`, «Come si verifica».
+- **Ordine e percorso dei `forget` su WordPress** ([R4](#r4)): sugli indirizzi puliti delle bozze,
+  mai sui `-2`, e solo dopo che le bozze sono sparite dall'indice dei dettagli; fino a quel passo
+  gli indirizzi puliti danno 404. Passi e controlli nel piano, Task 6 e 7.
+- **Catasto di UAT.** Spariscono le 2 anomalie `codice_gia_assegnato` (699↔561, 694↔560); può
+  comparire un `registro_link_orfano` per ZNUT511, la bozza Sa Crabarissa (545). Si guarda nel
+  piano, Task 7.
 
 ## Out of scope
 
@@ -117,16 +128,20 @@ sarà nessun import, resterà l'ultima copia importata (Rubens, 26/11).
 
 ## Moduli toccati
 
-Previsti, tutti in `forestas`:
+Tutti in `forestas`:
 
 - `app/Services/Import/Source/SardegnaSentieriDatabaseSource.php` — filtro dei nodi e delle
   traduzioni, docblock
-- `app/Console/Commands/ImportSardegnaSentieriCommand.php` o un job della catena dell'import —
-  cancellazione delle voci in più dell'indice dopo il reset
-- `tests/Feature/Import/` — test dei filtri (tabella `node_field_data` finta, lettore della copia
-  finto per le traduzioni) e della cancellazione
+- `app/Search/TrackSearchIndex.php` (nuovo), `app/Jobs/Import/PruneStaleTrackSearchDocumentsJob.php`
+  (nuovo), `app/Jobs/Import/CalculateNearbyTracksJob.php` — cancellazione delle voci in più
+  dell'indice, accodata accanto al reindex
+- `tests/Feature/Import/DraftNodesSourceTest.php`, `DraftTranslationsSourceTest.php`,
+  `PruneStaleTrackSearchDocumentsJobTest.php` (nuovi)
 - `routes/console.php` — solo il commento dello schedule
-- `.claude/rules/import-sardegna-sentieri.md`, `docs/knowledge/copia-database-drupal.md`
+- `.claude/rules/import-sardegna-sentieri.md`, `docs/knowledge/copia-database-drupal.md`,
+  `docs/knowledge/import-asincrono-e-anomalie.md`
 - `docs/howto/messa-in-opera-wordpress-dev.md`, `docs/features/8947-…/notes.md` e `plan.md`
+- `docs/features/8999-…/` — overview, piano e note
 
-Sui server, senza file versionati: `wp wmwp detail-paths forget` sul WordPress di dev e di UAT.
+Sui server, senza file versionati: `wp wmwp detail-paths forget` sul WordPress di dev e di UAT
+(piano, Task 6 e 7).
