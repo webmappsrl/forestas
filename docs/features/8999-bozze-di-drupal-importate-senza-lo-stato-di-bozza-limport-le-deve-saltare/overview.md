@@ -140,6 +140,8 @@ Tutti in `forestas`:
 - `routes/console.php` — solo il commento dello schedule
 - `.claude/rules/import-sardegna-sentieri.md`, `docs/knowledge/copia-database-drupal.md`,
   `docs/knowledge/import-asincrono-e-anomalie.md`
+- `CLAUDE.md` (gancio della riga «Copia del DB Drupal»), `.claude/rules/test.md` (trappola della suite
+  sull'indice Elasticsearch locale)
 - `docs/howto/messa-in-opera-wordpress-uat.md` (sezione «Bozze fuori dall'import»),
   `docs/howto/deploy-automatico.md` — procedura di messa in opera su dev e UAT
 - `docs/howto/messa-in-opera-wordpress-dev.md`, `docs/features/8947-…/notes.md` e `plan.md`
