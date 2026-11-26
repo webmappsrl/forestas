@@ -75,6 +75,25 @@ nel package: [wm-package/docs/knowledge/operazioni-del-fascicolo-e-canale-dell-e
 schema, inviarlo fa fallire la creazione: è il prezzo scelto per non perdere più un refuso dentro
 `api_data`. (oc:9039)
 
+### I dati personali dei soggetti privati non arrivano al Catasto
+
+Un soggetto dichiarato persona fisica (`subject: person`) si manda **senza nome e senza e-mail**:
+se arrivano valorizzati la risposta è `422`, e lo stesso vale per un segnaposto convenzionale al
+loro posto. Il vincolo viene dalla CR, che esclude la trasmissione di dati di persone fisiche al
+Catasto, e la riga 24 del documento dei 34 quesiti di Engineering aggiunge che quei dati non vanno
+trasmessi prima di una decisione formale del titolare del trattamento — decisione che, al
+26/11/2026, Forestas non ha ancora preso.
+
+**Chi in Forestas deve sapere chi sia quel privato apre la pratica sul SUS**, con il riferimento
+che la domanda porta nella colonna `reference` e che in Nova si vede come «External reference». Ne
+segue che due privati dello stesso ruolo arrivano indistinguibili fra loro: è voluto, e la pagina
+delle API lo dice perché non sia scambiato per una perdita di dati.
+
+In call era stato proposto da Engineering di mandare un segnaposto testuale nei campi del privato.
+Non si fa: la scelta e il perché sono nel package,
+[wm-package/docs/knowledge/operazioni-del-fascicolo-e-canale-dell-ente.md](../../wm-package/docs/knowledge/operazioni-del-fascicolo-e-canale-dell-ente.md).
+(oc:9061)
+
 ### Condizione di go-live
 
 ```sql
