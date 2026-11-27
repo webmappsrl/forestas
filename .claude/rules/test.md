@@ -27,3 +27,10 @@ suite:
 - **PHPStan vede i test come `PHPUnit\Framework\TestCase`**, non come `Tests\TestCase`: il binding
   di Pest non è interpretato, e gli helper Laravel risultano assenti. `phpstan.neon.dist` ignora
   quei due identifier su `tests/*` — non aggiungere ignore nuovi per lo stesso motivo
+- **Nessun test parla con la rete**: `tests/TestCase.php` chiama `Http::preventStrayRequests()`, e
+  una richiesta HTTP senza `Http::fake()` fa fallire il test. Un test che usa l'HTTP deve fingere
+  le risposte (oc:9001)
+- **Senza `.env.testing` la suite scrive sull'indice Elasticsearch locale**: legge `SCOUT_DRIVER`
+  dal `.env`, mentre il modello `.env.testing-example` ha `collection`. Il 26/11 ha lasciato 67
+  voci di prova in `ec_tracks` e ne ha tolta una vera. Dopo la suite si ripulisce con
+  `PruneStaleTrackSearchDocumentsJob`, e una traccia sparita si rimette con `searchable()` (oc:8999)

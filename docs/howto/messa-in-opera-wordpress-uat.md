@@ -159,6 +159,93 @@ degli enti»):
   indice degli enti sullo shard, `applica --conferma` (mette nel cestino i contenuti di default), rewrite, WP-Cron,
   `EMPTY_TRASH_DAYS`, verifica.
 
+### Filtri e redirect dai dati dello shard (oc:9018)
+
+Al rilascio che porta `wp-package` 0.6.0 (filtri dal `config.json` dell'app, aree degli overlay, indirizzi vecchi di
+Drupal nello storico), dopo `scripts/wordpress-up.sh`:
+
+- il `config.json` e i geojson degli overlay li scarica WP-Cron ogni ora; per averli subito, dal container WordPress:
+  `wp cron event run wmwp_app_config_refresh`. Fino al primo giro la ricerca non ha i filtri che vengono dal
+  `config.json` (tipo, attività, scale di difficoltà, aree) e la mappa usa OpenStreetMap;
+- gli indirizzi vecchi di Drupal entrano nello storico alla ricostruzione dell'indice dei dettagli, solo nel cron o da
+  WP-CLI: i POI tutti al primo giro (stanno in `pois.geojson`), i percorsi al più 100 (e 60 secondi) per giro, perché
+  si legge il dettaglio di ognuno. Fra due ricostruzioni passano almeno 5 minuti: si lancia
+  `wp cron event run wmwp_detail_refresh_index` ogni 5 minuti, o si aspettano i giri orari. Si controlla con
+  `wp eval 'echo count( (array) get_option( "wmwp_detail_legacy_done", [] ) );'`, che deve arrivare al numero dei
+  percorsi con il nid di Drupal; i percorsi che non si sono letti o non hanno un indirizzo Drupal stanno in
+  `wp option get wmwp_detail_legacy_failed --format=json` e si riprovano dopo 6 ore;
+- la pagina di ricerca inglese cambia slug, da `/en/cerca-nel-sito/` a `/en/search-in-our-website/`
+  (`config/pagine.json`): lo applica `bin/wordpress-config.sh pagine --conferma`, o il giro del cron delle pagine. Il
+  vecchio indirizzo porta al nuovo con un 301, che tiene i parametri. Provato solo in locale: dopo il rilascio si
+  controlla anche su UAT che `curl -sI 'https://<sito UAT>/en/cerca-nel-sito/?q=monte'` risponda `301` con
+  `location: …/en/search-in-our-website/?q=monte` (il redirect legge il percorso senza il prefisso della lingua,
+  `$wp->request`; se WPML su UAT lo lasciasse con `en/`, la risposta sarebbe un 404);
+- il pulsante «Stampa» dei dettagli compare solo con «Print PDF» acceso sull'App di Forestas in Nova (tab `frontend`
+  della Resource `App`, `OPTIONS.ec_pdf_enabled` del `config.json`; knowledge 8982), e dopo il giro del cron del
+  `config.json` (`wp cron event run wmwp_app_config_refresh`). Su UAT il 24/11 l'opzione non c'è;
+- **produzione, prima del passaggio di dominio:** il `.env` dello shard non deve avere `EC_TRACK_MODEL` (senza il
+  modello di forestas la chiave degli elementi è l'id dello shard, che cambia, e lo storico si sporca: oc:8959), e gli
+  indirizzi vecchi devono essere già tutti nello storico (punto sopra).
+
+### Pagine d'elenco (oc:9003)
+
+Al rilascio che porta `wp-package` 0.7.0 (griglie di `/sentieri/`, `/itinerari/`, `/cammini/` e
+`/punti-di-interesse/`, slider di distanza e tempo anche nella ricerca unica), dopo `scripts/wordpress-up.sh` e i passi
+di oc:9018 qui sopra se arrivano insieme: copia delle tracce, `applica --conferma` (template della griglia),
+`pagine --conferma` (template, titoli di Punti di interesse e Itinerari, sottotitolo di Cammini) e verifica, in
+[`wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md`](../../wp-forestas/docs/howto/messa-in-opera-delle-pagine-d-elenco.md).
+
+### Bozze fuori dall'import (oc:8999)
+
+Dal rilascio di oc:8999 l'import da Sardegna Sentieri salta i nodi e le traduzioni in bozza di
+Drupal, e a fine import toglie dall'indice delle tracce le voci il cui id non è più una traccia. Lo
+shard si allinea da solo al primo import. Il sito no: tre elementi pubblicati che avevano un
+doppione in bozza restano su `-2` finché non si liberano a mano gli indirizzi puliti delle bozze.
+Si fa una volta sola, dopo il deploy, che riavvia già Horizon (`scripts/deploy.sh`). Dall'host:
+
+1. **Import.** Si aspetta quello delle 06:00, o lo si lancia subito:
+   `docker exec php-forestasuat php artisan sardegnasentieri:import --reset`. Fa il backup del DB,
+   svuota e reimporta; il comando accoda e ritorna. L'import è finito quando
+   `storage/logs/import-AAAA-MM-GG.log` ha la riga
+   `[sardegnasentieri] Indice delle tracce: tolte N voci senza traccia.`, con N uguale al calo delle
+   tracce (4 il 26/11).
+2. **Shard senza bozze.**
+
+   ```bash
+   docker exec php-forestasuat php artisan tinker --execute='$nids = DB::connection("sardegnasentieri")->table("node_field_data")->where("default_langcode", 1)->where("status", 0)->whereIn("type", ["sentiero", "itinerario", "poi", "ente_istituzione_societa"])->pluck("nid")->map(fn ($n) => (string) $n)->all(); echo "tracce in bozza: ".App\Models\EcTrack::whereIn("properties->sardegnasentieri_id", $nids)->count()." · POI in bozza: ".Wm\WmPackage\Models\EcPoi::where(fn ($q) => $q->whereIn("properties->sardegnasentieri_id", $nids)->orWhereIn("properties->out_source_feature_id", $nids))->count()." · tracce: ".App\Models\EcTrack::count()." · voci nell indice: ".count(app(App\Search\TrackSearchIndex::class)->documentIds()).PHP_EOL;'
+   ```
+
+   Deve dare 0 tracce e 0 POI in bozza, e tante voci nell'indice quante tracce (774 il 26/11; prima
+   del rilascio dava 4 tracce, 23 POI e 778 tracce).
+3. **Indirizzi del sito**, dal container WordPress
+   (`docker exec -u www-data wordpress-forestasuat wp …`):
+   - si ricostruisce l'indice dei dettagli: `wp eval 'wmwp_detail_index( true );'`;
+   - gli indirizzi puliti delle bozze devono rispondere 404:
+     `curl -s -o /dev/null -w '%{http_code}\n' https://wp.forestas.uat.maphub.it/sentiero/nolau-t-513/`
+     e `…/punti-di-interesse/bivacco-fisso-lungo-il-sentiero-d-105c/`. Se rispondono ancora 200 il sito
+     vede ancora la bozza: per il POI succede finché `pois.geojson` non è rigenerato, sulla coda
+     `default` dietro le conversioni delle immagini. Si aspetta e si ricostruisce di nuovo;
+   - solo allora, e solo sugli indirizzi puliti delle bozze:
+     `wp wmwp detail-paths forget sentiero/nolau-t-513`,
+     `wp wmwp detail-paths forget trail/nolau-t-513`,
+     `wp wmwp detail-paths forget punti-di-interesse/bivacco-fisso-lungo-il-sentiero-d-105c`;
+     poi di nuovo `wp eval 'wmwp_detail_index( true );'`. **Mai `forget` sui `-2`:** cancellerebbe
+     la riga del pubblicato, e il suo vecchio link darebbe 404. Con l'ordine giusto il pubblicato prende
+     l'indirizzo pulito e il `-2` resta come 301. Prima che la bozza sparisca dall'indice, invece, la
+     bozza riprenderebbe l'indirizzo pulito (`wmwp_detail_history_forget()` del plugin).
+   - Monte Cresia su UAT ha già l'indirizzo pulito sul pubblicato (nid 699): niente da fare.
+4. **Verifica.** `wp wmwp detail-paths list sentiero/nolau-t-513` dà la chiave `s:694` come
+   attuale; `/sentiero/nolau-t-513/`, `/en/trail/nolau-t-513/` e l'indirizzo pulito del Bivacco
+   rispondono 200 con il pubblicato (nid 694 e 3111); `/sentiero/nolau-t-513-2/` e
+   `…/bivacco-fisso-lungo-il-sentiero-d-105c-2/` rispondono 301 verso l'indirizzo pulito.
+5. **Catasto.** Spariscono le 2 anomalie `codice_gia_assegnato` (ZORT513, ZORT513A, fra i
+   pubblicati e le bozze). Può comparire un `registro_link_orfano` per ZNUT511, il codice della bozza
+   Sa Crabarissa (nid 545), se il foglio del registro la cita: è un dato vero, non un errore.
+
+L'esito va nel ticket oc:8999. Su dev gli stessi passi, con `php-forestasdev` e
+`wordpress-forestasdev`, e con due `forget` in più per Monte Cresia, che lì ha il pubblicato su `-2`:
+`sentiero/monte-cresia-t-513a` e `trail/monte-cresia-t-513a`.
+
 ## Azzerare WordPress
 
 ```bash

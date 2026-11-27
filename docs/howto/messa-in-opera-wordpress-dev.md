@@ -124,6 +124,15 @@ dello shard, `scripts/wordpress-up.sh`, come su UAT. Il rilascio della ricerca u
 compreso togliere a mano `wm-package` e il ritorno indietro.
 Anche il rilascio degli enti (oc:8990) ha i passi di UAT
 ([«Enti sul sito»](messa-in-opera-wordpress-uat.md#enti-sul-sito-oc8990)).
+Anche il rilascio dei filtri e dei redirect dai dati dello shard (oc:9018) ha i passi di UAT
+([«Filtri e redirect dai dati dello shard»](messa-in-opera-wordpress-uat.md#filtri-e-redirect-dai-dati-dello-shard-oc9018)),
+senza passi in più: le righe dello storico con chiave per id che su UAT si sono tolte il 23/11 sul dev
+non c'erano più (il 25/11 `wmwp_detail_history_forget_ids( "track" )` ne ha tolte 0).
+Anche il rilascio delle pagine d'elenco (oc:9003) ha i passi di UAT
+([«Pagine d'elenco»](messa-in-opera-wordpress-uat.md#pagine-delenco-oc9003)).
+Anche il rilascio che esclude le bozze di Drupal (oc:8999) ha i passi di UAT
+([«Bozze fuori dall'import»](messa-in-opera-wordpress-uat.md#bozze-fuori-dallimport-oc8999)), con
+`php-forestasdev` e `wordpress-forestasdev` e due `forget` in più per Monte Cresia.
 
 Per azzerare: `scripts/wordpress-reset.sh --conferma`, poi il passo 5 (o si aspetta il giro del
 cron) e la verifica. Su dev si può fare quando serve.

@@ -8,7 +8,9 @@
 **Obiettivo:** `https://wp.forestas.dev.maphub.it` in opera sull'host di dev, popolato dall'import e
 tenuto allineato da un cron notturno.
 
-**Architettura:** lo stack WordPress è già incluso in `develop.compose.yml` e i container
+**Architettura:** lo stack WordPress è già incluso in `develop.compose.yml` e in `compose.yml` (su
+dev i container nascono da `compose.yml`, label `com.docker.compose.project.config_files`; annotato
+in oc:8999), e i container
 `wordpress-forestasdev` / `mariadb-forestasdev` esistono, fermi. Si aggiungono il `.env` di
 `wp-forestas`, gli zip commerciali, i virtual host Apache, il certificato e il cron sull'host; nel
 repo cambiano solo i virtual host di riferimento e la documentazione.
@@ -179,7 +181,7 @@ Sequenza di `wp-forestas/docs/howto/ricreare-wordpress-da-zero.md`, passi 2-5.
   `b84a917`), in `forestas`
   aggiorna il puntatore con l'hash letto da `git -C wp-forestas rev-parse HEAD` e committalo da
   solo: `chore(oc:8947): puntatore di wp-forestas con i virtual host di dev`.
-- [ ] **Passo 2:** dopo il merge su `develop` di `forestas`, aggiorna lo shard di dev con la
+- [x] **Passo 2:** dopo il merge su `develop` di `forestas`, aggiorna lo shard di dev con la
   procedura abituale e `scripts/wordpress-up.sh`.
-- [ ] **Passo 3: verifica** sull'host `ls wp-forestas/docker/dev/` mostra i due file, e
+- [x] **Passo 3: verifica** sull'host `ls wp-forestas/docker/dev/` mostra i due file, e
   `diff` con quelli in `/etc/apache2/sites-available/` non dà differenze.

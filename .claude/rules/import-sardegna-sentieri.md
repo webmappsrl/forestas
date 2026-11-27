@@ -102,9 +102,14 @@ da GeoHub. Comando `sardegnasentieri:import`, service
   UAT: per lavorare dal locale sulla copia di UAT si spegne il container locale e si apre il tunnel
   sulla 3307, mai su un'altra porta — vedi
   [docs/howto/copia-database-drupal.md](../../docs/howto/copia-database-drupal.md) (oc:8706)
-- **Non filtrare `status = 1` nelle query dell'import**, anche se le query d'esempio della pagina
-  sulla copia lo fanno: le API esponevano le bozze, e filtrarle cambia cosa si importa e marca
-  quei nodi come spariti alla fonte (oc:8900)
+- **Le bozze non si importano: non togliere `status = 1` da `changedList()` né
+  `withoutDraftTranslations()` da `record()`**: le bozze tornerebbero sul sito e nell'app, con gli
+  slug doppi. Una query nuova sui nodi filtra `status = 1` sulla riga `default_langcode = 1`, e un
+  dato preso dal record ha già perso le traduzioni in bozza (oc:8999)
+- **Il reindex di fine import non toglie le voci delle tracce sparite**: lo fa
+  `PruneStaleTrackSearchDocumentsJob`, accodato da `CalculateNearbyTracksJob::regenerateOutputs()`.
+  Un nuovo percorso che rigenera l'indice dopo un reset deve accodarlo anche lui, altrimenti gli id
+  in più restano nella lista come doppioni della notte prima (oc:8999)
 - **Date della copia convertite in PHP, mai con `FROM_UNIXTIME`**: usa il fuso della sessione
   MySQL, e un `changed` spostato di un'ora fa reimportare tutto al primo giro (oc:8900)
 - **URL dei file codificati segmento per segmento con `rawurlencode`**: l'URL è la chiave con cui
@@ -123,3 +128,9 @@ da GeoHub. Comando `sardegnasentieri:import`, service
 - **L'import salva gli enti con `saveQuietly()`, che salta Scout**: chi cambia un ente fuori da
   `importOrUpdateEnte` e da `markRemovedEnti` deve chiamare `searchable()` / `unsearchable()` da sé,
   altrimenti la ricerca degli enti resta vecchia (oc:8965)
+- **Il passo delle aree geografiche gira a ogni esecuzione, con e senza `--reset`, e i layer che
+  crea nascono vuoti.** `--only=aree` gira senza la copia Drupal e non si combina con `--reset`.
+  Un nuovo percorso che crea quei layer fuori dalla catena di fine batch deve accodare
+  `SyncTaxonomyWhereJob` → `RecalculateSardegnaSentieriLayersJob` → `RegenerateTaxonomyWhereOutputsJob`,
+  come fa il comando: altrimenti restano vuoti e la ricerca non trova i loro percorsi — vedi
+  [docs/knowledge/9001-aree-geografiche-nell-import.md](../../docs/knowledge/9001-aree-geografiche-nell-import.md) (oc:9001)

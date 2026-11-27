@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Controllers\Api\EcPoiDetailController;
 use App\Http\Controllers\Api\Sus\SusTestDecisionController;
+use App\Models\EcPoi;
 use App\Models\EcTrack;
 use App\Models\RegistroCatastaleRow;
 use App\Observers\RelatedTrackCardObserver;
@@ -42,6 +43,8 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Wm\WmPackage\Models\TaxonomyTermable;
 use Wm\WmPackage\Models\Tile;
+use Wm\WmPackage\Policies\EcPoiPolicy;
+use Wm\WmPackage\Policies\EcTrackPolicy;
 use Wm\WmPackage\Policies\PermissionPolicy;
 use Wm\WmPackage\Policies\RolePolicy;
 use Wm\WmPackage\Policies\TilePolicy;
@@ -69,6 +72,23 @@ class AppServiceProvider extends ServiceProvider
             ui: 'docs/api/sus',
             document: 'docs/api/sus.json',
         );
+
+        // Stampa PDF delle schede (oc:8982, R17 e R20): la mappa sta da sola in una pagina A4 al vivo,
+        // senza margini, testata né piè di pagina (la pagina 2 della traccia, l'ultima del POI). Il
+        // servizio mappe la disegna già a questa misura e la view la stende sulla pagina intera
+        // (\ForestasMappaPagina nel preambolo). Colori, font e stili di testo stanno nel preambolo
+        // delle view (resources/views/vendor/wm-package/print/).
+        config([
+            'wm-package.print.map.width_mm' => 210,
+            'wm-package.print.map.height_mm' => 297,
+            // Su un A4 intero lo zoom di serie del servizio (16) lascia un sentiero breve piccolo in mezzo
+            // al territorio: la traccia 119 (circa 1 km) esce a 1:21.500 con 16 e a 1:5.400 con 18. I
+            // sentieri lunghi non cambiano, perché l'inquadratura li ferma prima (oc:9011, prova del 24/11).
+            'wm-package.print.map_service.max_zoom' => 18,
+            // Il margine di 42 mm del package serve alla copertina del template di default (riquadro
+            // del titolo sopra la mappa): la pagina della mappa di Forestas non ha il riquadro.
+            'wm-package.print.map.padding_mm' => null,
+        ]);
 
         // Tipi di anomalia del registro catastale (oc:8539): il package li
         // unisce ai suoi nella Resource Anomalie. Il nome porta il prefisso
@@ -115,6 +135,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Tile::class, TilePolicy::class);
         Gate::policy(RegistroCatastaleRow::class, RegistroCatastaleRowPolicy::class);
+
+        // Senza una policy registrata Nova autorizza chiunque non sia Guest: un Validator poteva
+        // modificare in Nova POI e tracce di altri utenti. Si registrano i modelli di forestas,
+        // che sono quelli montati dalle Resource (oc:8181 nel package).
+        Gate::policy(EcPoi::class, EcPoiPolicy::class);
+        Gate::policy(EcTrack::class, EcTrackPolicy::class);
 
         // Card dei sentieri correlati nei file delle tracce (oc:8959): quando cambia una traccia,
         // la sua prima foto o il suo tipo di percorso, si riscrivono i file di chi la mostra.

@@ -33,6 +33,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Indirizzo del sito WordPress (oc:8982)
+    |--------------------------------------------------------------------------
+    |
+    | Base del rimando stampato nel QR code delle schede PDF:
+    | `<base>/?wmwp_detail=track|poi&wmwp_id=<id>`, che il plugin del sito
+    | risolve nella pagina di dettaglio. Senza schema né slash finale, es.
+    | `https://www.sardegnasentieri.it`. Vuoto: schede senza QR code.
+    |
+    */
+
+    'website_url' => env('FORESTAS_WEBSITE_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Dizionario delle traduzioni per i TaxonomyPoiType
     |--------------------------------------------------------------------------
     |

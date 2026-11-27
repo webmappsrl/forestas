@@ -37,8 +37,13 @@ escono di sbagliate. In entrambi i casi il canale di log `import` registra quant
 **Le aree catastali invece si ricalcolano a ogni batch, senza soglia.** La callback `finally`
 accoda per prima la catena sync delle aree → layer → sentieri correlati, sulla coda
 `sardegnasentieri-import`; il reindex Elasticsearch e i file delle tracce li accoda il calcolo dei
-correlati nel `finally` del proprio batch (oc:8959); il dettaglio è nel docblock di `dispatchImportBatch()`. Non parte solo
-quando non c'è un batch, cioè quando non c'è nessun job da importare.
+correlati nel `finally` del proprio batch (oc:8959); il dettaglio è nel docblock di
+`dispatchImportBatch()`. Non parte solo quando non c'è un batch, cioè quando non c'è nessun job da
+importare.
+
+**Con il reindex parte la pulizia dell'indice** (`PruneStaleTrackSearchDocumentsJob`), che toglie le
+voci il cui id non è più una traccia: dopo il reset gli id ripartono da 1, e il reindex riscrive solo
+quelli che esistono (oc:8999).
 
 **I job di import hanno una coda tutta loro, `sardegnasentieri-import`.** Ogni job che completa ne
 accoda altri — conversione delle immagini, aggiornamento delle relazioni — e su una coda condivisa
@@ -105,7 +110,8 @@ Il riscontro giusto è la riga nel canale `import`:
 
 Per le aree il riscontro è `[sardegnasentieri:<runId>] Sync aree catastali e reindex accodati.`
 nel canale `import`, poi i due job in Horizon nell'ordine sync → reindex (in locale 32 s e 4 s su
-780 tracce, 28/10/2026).
+780 tracce, 28/10/2026). La pulizia dell'indice scrive `[sardegnasentieri] Indice delle tracce: tolte
+N voci senza traccia.`; la prima notte dopo il rilascio di oc:8999 N è il calo delle tracce (oc:8999).
 
 ## Come ci siamo arrivati
 
