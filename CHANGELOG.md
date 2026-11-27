@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.5.0](https://github.com/webmappsrl/forestas/compare/v1.4.0...v1.5.0) (2026-11-27)
+
+
+### Features
+
+* **ci:** deploy automatico su dev e sul collaudo con GitHub Actions ([#57](https://github.com/webmappsrl/forestas/issues/57)) ([6177f0d](https://github.com/webmappsrl/forestas/commit/6177f0d30a9e843603f999b1da7e2fa36fb156d7))
+* **oc:8959:** dati di Forestas nel dettaglio della traccia ([#51](https://github.com/webmappsrl/forestas/issues/51)) ([0598c96](https://github.com/webmappsrl/forestas/commit/0598c9641b70d74867650a4b9f6664cc4eba7b3a))
+* **oc:8959:** dettaglio del POI, roadbook nei Blocchi Dettaglio, layer_name e nid di Drupal ([#61](https://github.com/webmappsrl/forestas/issues/61)) ([f26f88a](https://github.com/webmappsrl/forestas/commit/f26f88a21cf6a24c0cbb55d743e50ae6ffdd2ec5))
+* **oc:8960:** colonna api_data e stato in compilazione sulle istanze ([#46](https://github.com/webmappsrl/forestas/issues/46)) ([9719589](https://github.com/webmappsrl/forestas/commit/971958968456e55d42e350a9db9aa59d3de176d8))
+* **oc:8965:** API degli enti per il nuovo sito WordPress ([#63](https://github.com/webmappsrl/forestas/issues/63)) ([6d8321a](https://github.com/webmappsrl/forestas/commit/6d8321a9fd147ac0e2b75a3deca3143f0ef245f5))
+* **oc:8965:** card dei sentieri gestiti nel JSON degli enti ([#64](https://github.com/webmappsrl/forestas/issues/64)) ([2fb929f](https://github.com/webmappsrl/forestas/commit/2fb929fdaba7c4da571a8afe666bdce3cc2532c5))
+* **oc:8968:** il canale SUS monta le operazioni del fascicolo ([#52](https://github.com/webmappsrl/forestas/issues/52)) ([150b6cf](https://github.com/webmappsrl/forestas/commit/150b6cf1861a47047ab5180dd9cba99a19f00aeb))
+* **oc:8981:** avvisi dei sentieri nel tab Status e API pubblica /api/v1/avvisi ([#68](https://github.com/webmappsrl/forestas/issues/68)) ([a60e5b4](https://github.com/webmappsrl/forestas/commit/a60e5b4f296625f947d4970261b03ac8925cef57))
+* **oc:8982:** scheda con Via, QR code verso il sito WordPress, data e mappa di wm-tiles ([#80](https://github.com/webmappsrl/forestas/issues/80)) ([1123b46](https://github.com/webmappsrl/forestas/commit/1123b4659cc026133b980525e3b6b30b009b80e1))
+* **oc:8982:** schede PDF di Forestas con la grafica di SARDEGNA Sentieri ([#70](https://github.com/webmappsrl/forestas/issues/70)) ([9bd0286](https://github.com/webmappsrl/forestas/commit/9bd0286190910f5ed67709582351e087d0f0a639))
+* **oc:8988:** filtri Attività e Avvertenze nella lista EC Tracce, via la Difficoltà di accessibilità ([#69](https://github.com/webmappsrl/forestas/issues/69)) ([33120f3](https://github.com/webmappsrl/forestas/commit/33120f34c052d15a55de9c44a4d75fd5c0f72c5f))
+* **oc:8988:** filtri di EcTrack sui termini delle tassonomie ([#65](https://github.com/webmappsrl/forestas/issues/65)) ([4344a25](https://github.com/webmappsrl/forestas/commit/4344a2555b974ae63fede465291096d67a975be1))
+* **oc:8989:** percorribilità dei sentieri, separata dallo stato della pratica ([#66](https://github.com/webmappsrl/forestas/issues/66)) ([710ddc2](https://github.com/webmappsrl/forestas/commit/710ddc21536803962c929349025513074fa40680))
+* **oc:8997:** forestas scrive entrambe le versioni del JSON della traccia ([#71](https://github.com/webmappsrl/forestas/issues/71)) ([564213f](https://github.com/webmappsrl/forestas/commit/564213f2ad916a2e5d0705495a529b1275006404))
+* **oc:8999:** l'import salta le bozze di Drupal e pulisce l'indice delle tracce ([#86](https://github.com/webmappsrl/forestas/issues/86)) ([fd38aff](https://github.com/webmappsrl/forestas/commit/fd38aff37116449cf12d7316ea9955559d39880d))
+* **oc:9001:** l'import porta le aree geografiche di Geohub (Taxonomy Where, layer e overlay), come le aree catastali ([#79](https://github.com/webmappsrl/forestas/issues/79)) ([2b50f01](https://github.com/webmappsrl/forestas/commit/2b50f0183e2a5c9c14e7749e45d57e9b38dbcec7))
+* **sus:** documentazione per chi integra e pulsanti di prova per approvare o respingere ([#53](https://github.com/webmappsrl/forestas/issues/53)) ([4440a32](https://github.com/webmappsrl/forestas/commit/4440a32d27ed3cf50d789022f68d364cb2e544c5))
+* **sus:** strumenti di prova completi e tracciato scaricabile nella pagina delle API ([#54](https://github.com/webmappsrl/forestas/issues/54)) ([4041098](https://github.com/webmappsrl/forestas/commit/4041098aacea7fea44609b0ef4b2dcadead5cde9))
+
+
+### Bug Fixes
+
+* **ci:** database dei test e permessi del controllo dello stile ([#56](https://github.com/webmappsrl/forestas/issues/56)) ([c07c54a](https://github.com/webmappsrl/forestas/commit/c07c54a96d790a208d3fa6e2e908b26039305393))
+* **ci:** il controllo dello stile rilancia i test dopo il suo commit ([#60](https://github.com/webmappsrl/forestas/issues/60)) ([3ef15a9](https://github.com/webmappsrl/forestas/commit/3ef15a9768a5c6a02034b3676f616f94cfaa6fe9))
+* **deploy:** deploy_dev.sh aggiorna solo wm-package, prima della manutenzione ([0c63c5d](https://github.com/webmappsrl/forestas/commit/0c63c5de56020a57f0e1baa3e28a148bc565c553))
+* il file della traccia si riscrive dopo allegati e video ([#74](https://github.com/webmappsrl/forestas/issues/74)) ([01b640b](https://github.com/webmappsrl/forestas/commit/01b640bd99a66f04bef5d64385a89cd054517d7d))
+* **test:** i test del package girano anche da qui, e due difetti di forestas vengono a galla ([#78](https://github.com/webmappsrl/forestas/issues/78)) ([c6f9a02](https://github.com/webmappsrl/forestas/commit/c6f9a02d7d2f7a8ad3a47ee56a076c04318139ba))
+
+
+### Miscellaneous Chores
+
+* **oc:8952:** filtro «Percorribilità» della ricerca, puntatore e documentazione ([#50](https://github.com/webmappsrl/forestas/issues/50)) ([d0aaf73](https://github.com/webmappsrl/forestas/commit/d0aaf73d69dd586376029785b919ed567f6a89ab))
+* **oc:8952:** puntatore di wp-forestas con i documenti della messa in opera su dev ([#49](https://github.com/webmappsrl/forestas/issues/49)) ([f12c8d3](https://github.com/webmappsrl/forestas/commit/f12c8d3a9617923e03d0845308849c282632c3ff))
+* **oc:8952:** puntatore di wp-forestas con la pagina di ricerca unica ([#48](https://github.com/webmappsrl/forestas/issues/48)) ([121d167](https://github.com/webmappsrl/forestas/commit/121d1673b4d922ba681342eb6b68538ab8c79f03))
+* **oc:8969:** puntatore di wp-forestas con le pagine di dettaglio ([#62](https://github.com/webmappsrl/forestas/issues/62)) ([1e113c0](https://github.com/webmappsrl/forestas/commit/1e113c0c6c6311d9319f6c6562b7ae0485b74833))
+* **oc:8990:** puntatore di wp-forestas con gli enti sul sito ([#67](https://github.com/webmappsrl/forestas/issues/67)) ([1c7937d](https://github.com/webmappsrl/forestas/commit/1c7937d44b17c9637895889f58db19d3ad7f718a))
+* **oc:9000:** puntatore di wp-forestas con percorribilità e avvisi sul sito ([#72](https://github.com/webmappsrl/forestas/issues/72)) ([69c5b7b](https://github.com/webmappsrl/forestas/commit/69c5b7b211d4c266da9f3f098cc4381d04387e68))
+* **oc:9018:** messa in opera dei filtri, /print/ fuori dai crawler e puntatore di wp-forestas con 9018 e 9003 ([#84](https://github.com/webmappsrl/forestas/issues/84)) ([5c805db](https://github.com/webmappsrl/forestas/commit/5c805db1c00f954e17a5b011079b9c82e56f0d7d))
+
 ## [1.4.0](https://github.com/webmappsrl/forestas/compare/v1.3.0...v1.4.0) (2026-11-05)
 
 
